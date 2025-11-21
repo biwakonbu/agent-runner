@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
+	"net"
 	"net/http"
 	"regexp"
 	"strings"
@@ -55,7 +57,49 @@ type chatResponse struct {
 	} `json:"choices"`
 }
 
+// isRetryableError determines if an error or status code should trigger a retry
+func isRetryableError(err error, resp *http.Response) bool {
+	// Check network/timeout errors
+	if err != nil {
+		// Timeout errors
+		if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
+			return true
+		}
+		// Temporary/transient errors
+		if netErr, ok := err.(net.Error); ok && netErr.Temporary() {
+			return true
+		}
+		// context cancellation is not retryable
+		if err == context.Canceled {
+			return false
+		}
+		// context deadline exceeded is retryable
+		if err == context.DeadlineExceeded {
+			return true
+		}
+		// Other errors (like connection refused) may be transient
+		return true
+	}
+
+	// Check HTTP status codes
+	if resp != nil {
+		// 5xx errors are retryable
+		if resp.StatusCode >= 500 && resp.StatusCode < 600 {
+			return true
+		}
+		// 429 Too Many Requests (Rate Limit) is retryable
+		if resp.StatusCode == 429 {
+			return true
+		}
+	}
+
+	return false
+}
+
 func (c *Client) callLLM(ctx context.Context, systemPrompt, userPrompt string) (string, error) {
+	const maxRetries = 3
+	const baseDelay = 1 * time.Second
+
 	reqBody := chatRequest{
 		Model: c.model,
 		Messages: []message{
@@ -68,39 +112,95 @@ func (c *Client) callLLM(ctx context.Context, systemPrompt, userPrompt string) (
 		return "", err
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "POST", "https://api.openai.com/v1/chat/completions", bytes.NewBuffer(jsonBody))
-	if err != nil {
-		return "", err
-	}
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+c.apiKey)
-
-	resp, err := c.client.Do(req)
-	if err != nil {
-		return "", err
-	}
-	defer func() {
-		_ = resp.Body.Close()
-	}()
-
-	if resp.StatusCode != 200 {
-		body, err := io.ReadAll(resp.Body)
+	var lastErr error
+	for attempt := 0; attempt <= maxRetries; attempt++ {
+		// Create request fresh for each attempt
+		req, err := http.NewRequestWithContext(ctx, "POST", "https://api.openai.com/v1/chat/completions", bytes.NewBuffer(jsonBody))
 		if err != nil {
-			return "", fmt.Errorf("OpenAI API error: %s (and failed to read error body: %w)", resp.Status, err)
+			return "", err
 		}
-		return "", fmt.Errorf("OpenAI API error: %s %s", resp.Status, string(body))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", "Bearer "+c.apiKey)
+
+		resp, err := c.client.Do(req)
+		if err != nil {
+			lastErr = err
+			if !isRetryableError(err, nil) {
+				return "", err
+			}
+
+			// Retryable error, continue to next attempt
+			if attempt < maxRetries {
+				delay := baseDelay * time.Duration(1<<uint(attempt))
+				slog.Warn("LLM request failed, retrying",
+					"attempt", attempt+1,
+					"max_retries", maxRetries,
+					"delay_seconds", delay.Seconds(),
+					"error", err.Error())
+				select {
+				case <-time.After(delay):
+					// Continue to next attempt
+				case <-ctx.Done():
+					return "", ctx.Err()
+				}
+			}
+			continue
+		}
+
+		// Close response body on defer, but only if we have a response
+		defer func() {
+			_ = resp.Body.Close()
+		}()
+
+		if resp.StatusCode != 200 {
+			body, err := io.ReadAll(resp.Body)
+			if err != nil {
+				lastErr = fmt.Errorf("OpenAI API error: %s (and failed to read error body: %w)", resp.Status, err)
+			} else {
+				lastErr = fmt.Errorf("OpenAI API error: %s %s", resp.Status, string(body))
+			}
+
+			if !isRetryableError(nil, resp) {
+				// Non-retryable error (4xx, 3xx, etc.), return immediately
+				return "", lastErr
+			}
+
+			// Retryable error (5xx, 429), continue to next attempt
+			if attempt < maxRetries {
+				delay := baseDelay * time.Duration(1<<uint(attempt))
+				slog.Warn("LLM request failed with retryable status, retrying",
+					"attempt", attempt+1,
+					"max_retries", maxRetries,
+					"status_code", resp.StatusCode,
+					"delay_seconds", delay.Seconds())
+				select {
+				case <-time.After(delay):
+					// Continue to next attempt
+				case <-ctx.Done():
+					return "", ctx.Err()
+				}
+			}
+			continue
+		}
+
+		// Success
+		var result chatResponse
+		if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+			return "", err
+		}
+
+		if len(result.Choices) == 0 {
+			return "", fmt.Errorf("no choices returned from LLM")
+		}
+
+		return result.Choices[0].Message.Content, nil
 	}
 
-	var result chatResponse
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return "", err
+	// Max retries exceeded
+	if lastErr != nil {
+		return "", fmt.Errorf("LLM request failed after %d retries: %w", maxRetries, lastErr)
 	}
-
-	if len(result.Choices) == 0 {
-		return "", fmt.Errorf("no choices returned from LLM")
-	}
-
-	return result.Choices[0].Message.Content, nil
+	return "", fmt.Errorf("LLM request failed after %d retries", maxRetries)
 }
 
 // extractYAML extracts YAML content from LLM response, handling markdown code blocks
