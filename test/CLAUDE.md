@@ -16,19 +16,20 @@
 ### テストファイル構成と統計
 
 ```
-ユニットテスト（5ファイル、~52テスト）:
-  - internal/core/runner_test.go          (1 PBT)
+ユニットテスト（6ファイル、~88テスト）:
+  - internal/core/runner_test.go          (1 PBT + 4テスト)
+  - internal/meta/client_test.go          (36テスト、Phase C追加)
   - internal/meta/protocol_test.go        (9テスト)
   - internal/note/writer_test.go          (12テスト)
-  - internal/worker/executor_test.go      (15テスト)
+  - internal/worker/executor_test.go      (18テスト)
   - pkg/config/config_test.go             (16テスト)
 
-統合テスト（2ファイル、~10テスト）:
+統合テスト（3ファイル、~17テスト）:
   - test/integration/run_flow_test.go     (2テスト)
   - test/sandbox/sandbox_test.go          (7テスト、-tags=docker)
   - test/codex/codex_integration_test.go  (8テスト、-tags=codex)
 
-合計: 70+ テスト、複数レイヤー、完全隔離
+合計: 100+ テスト、複数レイヤー、完全隔離、カバレッジ60.4%達成 ✅
 ```
 
 ---

@@ -6,6 +6,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -318,4 +319,84 @@ func TestSandboxManager_Cleanup(t *testing.T) {
 	// Note: This may or may not fail depending on Docker implementation
 	// Just verify that the function completes without panic
 	_, _, _ = sm.Exec(ctx, containerID, []string{"echo", "test"})
+}
+
+// TestSandboxManager_ImagePull_AutoPull verifies automatic image pull when image doesn't exist locally
+func TestSandboxManager_ImagePull_AutoPull(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping Docker tests in short mode")
+	}
+
+	sm, err := worker.NewSandboxManager()
+	if err != nil {
+		t.Skipf("Docker not available: %v", err)
+	}
+
+	// 長めのタイムアウト設定（イメージ取得を含む）
+	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
+	defer cancel()
+
+	// 小さいイメージを指定（alpine:3.19.1）
+	// Note: 既にローカルに存在する場合はImagePullはスキップされるが、
+	// そのケースでもStartContainerは成功するため、機能は正常に動作する
+	image := "alpine:3.19.1"
+	tmpDir := t.TempDir()
+
+	// Act: StartContainer() を呼び出し（イメージがローカルになければ ImagePull が自動実行される）
+	containerID, err := sm.StartContainer(ctx, image, tmpDir, map[string]string{})
+	if err != nil {
+		t.Fatalf("StartContainer() with ImagePull failed: %v", err)
+	}
+	defer sm.StopContainer(ctx, containerID)
+
+	// Assert: コンテナが起動していることを確認
+	if containerID == "" {
+		t.Error("Container ID should not be empty")
+	}
+
+	// コンテナが実行可能であることを検証
+	exitCode, output, err := sm.Exec(ctx, containerID, []string{"echo", "test"})
+	if err != nil {
+		t.Fatalf("Exec() error = %v", err)
+	}
+
+	if exitCode != 0 {
+		t.Errorf("Exec() exit code = %d, want 0", exitCode)
+	}
+
+	if output == "" {
+		t.Errorf("Exec() output should not be empty")
+	}
+}
+
+// TestSandboxManager_ImagePull_NonExistentImage verifies error handling for non-existent image
+func TestSandboxManager_ImagePull_NonExistentImage(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping Docker tests in short mode")
+	}
+
+	sm, err := worker.NewSandboxManager()
+	if err != nil {
+		t.Skipf("Docker not available: %v", err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+
+	// 存在しないイメージを指定
+	image := "nonexistent-registry.invalid/test:99.99"
+	tmpDir := t.TempDir()
+
+	// Act: StartContainer() を呼び出し（ImagePull が失敗するはず）
+	_, err = sm.StartContainer(ctx, image, tmpDir, map[string]string{})
+
+	// Assert: エラーが返されることを検証
+	if err == nil {
+		t.Fatal("Expected ImagePull to fail for nonexistent image, but got nil error")
+	}
+
+	// エラーメッセージに "failed to pull image" が含まれることを確認
+	if !strings.Contains(err.Error(), "failed to pull image") {
+		t.Errorf("Error message should mention image pull failure: %v", err)
+	}
 }

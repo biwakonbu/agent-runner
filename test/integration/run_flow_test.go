@@ -67,6 +67,12 @@ func TestRunFlow_Success(t *testing.T) {
 
 	// Worker: Success
 	mockWorker := &mock.WorkerExecutor{
+		StartFunc: func(ctx context.Context) error {
+			return nil
+		},
+		StopFunc: func(ctx context.Context) error {
+			return nil
+		},
 		RunWorkerFunc: func(ctx context.Context, prompt string, env map[string]string) (*core.WorkerRunResult, error) {
 			if env["TEST_ENV"] != "1" {
 				t.Error("Env var not passed to worker")
@@ -139,7 +145,14 @@ func TestRunFlow_Failure(t *testing.T) {
 		},
 	}
 
-	mockWorker := &mock.WorkerExecutor{} // Should not be called
+	mockWorker := &mock.WorkerExecutor{
+		StartFunc: func(ctx context.Context) error {
+			return nil
+		},
+		StopFunc: func(ctx context.Context) error {
+			return nil
+		},
+	} // Should not be called
 	mockNote := &mock.NoteWriter{
 		WriteFunc: func(taskCtx *core.TaskContext) error { return nil },
 	}
@@ -154,5 +167,193 @@ func TestRunFlow_Failure(t *testing.T) {
 	}
 	if result.State != core.StateFailed {
 		t.Errorf("Expected state FAILED, got %s", result.State)
+	}
+}
+
+func TestRunFlow_WorkerStartFailure(t *testing.T) {
+	// 1. Setup Config
+	cfg := &config.TaskConfig{
+		Task: config.TaskDetails{
+			ID:    "integration-task-worker-start-fail",
+			Title: "Worker Start Failure Task",
+			Repo:  "/tmp/worker-start-fail",
+			PRD: config.PRDDetails{
+				Text: "This task should fail at worker startup",
+			},
+		},
+		Runner: config.RunnerConfig{
+			Worker: config.WorkerConfig{
+				Env: map[string]string{"TEST_ENV": "1"},
+			},
+		},
+	}
+
+	// 2. Setup Mocks
+	// Meta: Plan -> NextAction (run_worker要求)
+	mockMeta := &mock.MetaClient{
+		PlanTaskFunc: func(ctx context.Context, prdText string) (*meta.PlanTaskResponse, error) {
+			return &meta.PlanTaskResponse{
+				TaskID: "integration-task-worker-start-fail",
+				AcceptanceCriteria: []meta.AcceptanceCriterion{
+					{ID: "AC-1", Description: "Should not reach here"},
+				},
+			}, nil
+		},
+		NextActionFunc: func(ctx context.Context, summary *meta.TaskSummary) (*meta.NextActionResponse, error) {
+			// Worker起動を要求
+			return &meta.NextActionResponse{
+				Decision: meta.Decision{Action: "run_worker"},
+				WorkerCall: meta.WorkerCall{
+					WorkerType: "codex-cli",
+					Prompt:     "Attempt to run worker",
+				},
+			}, nil
+		},
+	}
+
+	// Worker: Start がエラーを返す
+	mockWorker := &mock.WorkerExecutor{
+		StartFunc: func(ctx context.Context) error {
+			return context.DeadlineExceeded // Worker起動失敗をシミュレート
+		},
+		StopFunc: func(ctx context.Context) error {
+			return nil
+		},
+		RunWorkerFunc: func(ctx context.Context, prompt string, env map[string]string) (*core.WorkerRunResult, error) {
+			t.Error("RunWorker should not be called when Start fails")
+			return nil, nil
+		},
+	}
+
+	mockNote := &mock.NoteWriter{
+		WriteFunc: func(taskCtx *core.TaskContext) error { return nil },
+	}
+
+	// 3. Run
+	runner := core.NewRunner(cfg, mockMeta, mockWorker, mockNote)
+	result, err := runner.Run(context.Background())
+
+	// 4. Verify
+	if err == nil {
+		t.Error("Expected error from Worker.Start(), got nil")
+	}
+	if result.State != core.StateFailed {
+		t.Errorf("Expected state FAILED, got %s", result.State)
+	}
+}
+
+func TestRunFlow_CompletionAssessmentFailed(t *testing.T) {
+	// 1. Setup Config
+	cfg := &config.TaskConfig{
+		Task: config.TaskDetails{
+			ID:    "integration-task-validation-fail",
+			Title: "Completion Assessment Failed Task",
+			Repo:  "/tmp/validation-fail",
+			PRD: config.PRDDetails{
+				Text: "Task with failing completion assessment",
+			},
+		},
+		Runner: config.RunnerConfig{
+			Worker: config.WorkerConfig{
+				Env: map[string]string{"TEST_ENV": "1"},
+			},
+		},
+	}
+
+	// 2. Setup Mocks
+	// Meta: Plan -> Run -> Validation (Failed)
+	mockMeta := &mock.MetaClient{
+		PlanTaskFunc: func(ctx context.Context, prdText string) (*meta.PlanTaskResponse, error) {
+			return &meta.PlanTaskResponse{
+				TaskID: "integration-task-validation-fail",
+				AcceptanceCriteria: []meta.AcceptanceCriterion{
+					{ID: "AC-1", Description: "Feature implemented"},
+					{ID: "AC-2", Description: "Tests passing"},
+				},
+			}, nil
+		},
+		NextActionFunc: func(ctx context.Context, summary *meta.TaskSummary) (*meta.NextActionResponse, error) {
+			if summary.WorkerRunsCount == 0 {
+				// 初回: Worker実行を要求
+				return &meta.NextActionResponse{
+					Decision: meta.Decision{Action: "run_worker"},
+					WorkerCall: meta.WorkerCall{
+						WorkerType: "codex-cli",
+						Prompt:     "Implement feature",
+					},
+				}, nil
+			}
+			// Worker実行後: 完了マーク（VALIDATING状態へ遷移）
+			return &meta.NextActionResponse{
+				Decision: meta.Decision{Action: "mark_complete"},
+			}, nil
+		},
+		CompletionAssessmentFunc: func(ctx context.Context, summary *meta.TaskSummary) (*meta.CompletionAssessmentResponse, error) {
+			// CompletionAssessment で失敗を返す
+			return &meta.CompletionAssessmentResponse{
+				AllCriteriaSatisfied: false, // タスク失敗
+				Summary:              "AC-2 not satisfied: Tests are still failing",
+				ByCriterion: []meta.CriterionResult{
+					{ID: "AC-1", Status: "passed", Comment: "Feature implemented"},
+					{ID: "AC-2", Status: "failed", Comment: "Tests failing"},
+				},
+			}, nil
+		},
+	}
+
+	// Worker: Success（実行自体は成功）
+	mockWorker := &mock.WorkerExecutor{
+		StartFunc: func(ctx context.Context) error {
+			return nil
+		},
+		StopFunc: func(ctx context.Context) error {
+			return nil
+		},
+		RunWorkerFunc: func(ctx context.Context, prompt string, env map[string]string) (*core.WorkerRunResult, error) {
+			return &core.WorkerRunResult{
+				ID:         "run-1",
+				StartedAt:  time.Now(),
+				FinishedAt: time.Now(),
+				ExitCode:   0,
+				Summary:    "Worker executed successfully, but tests failed",
+			}, nil
+		},
+	}
+
+	mockNote := &mock.NoteWriter{
+		WriteFunc: func(taskCtx *core.TaskContext) error { return nil },
+	}
+
+	// 3. Run
+	runner := core.NewRunner(cfg, mockMeta, mockWorker, mockNote)
+	result, err := runner.Run(context.Background())
+
+	// 4. Verify
+	// CompletionAssessment でタスク失敗と判定されるべき
+	// 注: runner.Run() は AllCriteriaSatisfied=false の場合も err=nil を返す
+	if err != nil {
+		t.Logf("runner.Run() returned error: %v (state: %s)", err, result.State)
+	}
+	if result.State != core.StateFailed {
+		t.Errorf("Expected state FAILED, got %s", result.State)
+	}
+
+	// ACの評価結果が記録されているか確認
+	if len(result.AcceptanceCriteria) != 2 {
+		t.Errorf("Expected 2 ACs, got %d", len(result.AcceptanceCriteria))
+	}
+
+	// AC-2 が失敗（Passed=false）と記録されているか
+	var ac2Found bool
+	for _, ac := range result.AcceptanceCriteria {
+		if ac.ID == "AC-2" {
+			ac2Found = true
+			if ac.Passed {
+				t.Error("AC-2 should be marked as not Passed (Passed=false)")
+			}
+		}
+	}
+	if !ac2Found {
+		t.Error("AC-2 not found in result")
 	}
 }

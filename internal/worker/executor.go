@@ -99,11 +99,17 @@ func (e *Executor) Stop(ctx context.Context) error {
 		return fmt.Errorf("no container to stop")
 	}
 
-	err := e.Sandbox.StopContainer(ctx, e.containerID)
+	// Store containerID before clearing (for error message)
+	containerID := e.containerID
+
+	// Clear containerID first to prevent resource leak
+	// even if StopContainer fails
+	e.containerID = ""
+
+	err := e.Sandbox.StopContainer(ctx, containerID)
 	if err != nil {
 		return fmt.Errorf("failed to stop container: %w", err)
 	}
 
-	e.containerID = ""
 	return nil
 }

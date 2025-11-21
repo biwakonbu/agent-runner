@@ -3,6 +3,7 @@ package meta
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -739,5 +740,327 @@ func TestCallLLM_ExponentialBackoff(t *testing.T) {
 	expectedMaximum := 9 * time.Second
 	if elapsed > expectedMaximum {
 		t.Errorf("Elapsed time %v exceeds expected maximum of %v", elapsed, expectedMaximum)
+	}
+}
+
+// TestClient_CompletionAssessment_MockSuccess tests CompletionAssessment with mock mode (all AC passed)
+func TestClient_CompletionAssessment_MockSuccess(t *testing.T) {
+	client := NewMockClient()
+
+	summary := &TaskSummary{
+		Title: "Test Task",
+		State: "RUNNING",
+		AcceptanceCriteria: []AcceptanceCriterion{
+			{ID: "AC-1", Description: "Feature A implemented", Type: "e2e", Critical: true},
+			{ID: "AC-2", Description: "Feature B tested", Type: "unit", Critical: false},
+		},
+		WorkerRunsCount: 1,
+		WorkerRuns: []WorkerRunSummary{
+			{ID: "run-1", ExitCode: 0, Summary: "Success"},
+		},
+	}
+
+	result, err := client.CompletionAssessment(context.Background(), summary)
+
+	if err != nil {
+		t.Fatalf("CompletionAssessment failed: %v", err)
+	}
+
+	if !result.AllCriteriaSatisfied {
+		t.Errorf("Expected AllCriteriaSatisfied=true, got false")
+	}
+
+	if len(result.ByCriterion) != 2 {
+		t.Errorf("Expected 2 CriterionResults, got %d", len(result.ByCriterion))
+	}
+
+	for _, cr := range result.ByCriterion {
+		if cr.Status != "passed" {
+			t.Errorf("Expected status=passed for %s, got %s", cr.ID, cr.Status)
+		}
+	}
+
+	if result.Summary != "Mock: All criteria satisfied" {
+		t.Errorf("Expected mock summary, got %q", result.Summary)
+	}
+}
+
+// TestClient_CompletionAssessment_SomeFailed tests CompletionAssessment with partial failure
+func TestClient_CompletionAssessment_SomeFailed(t *testing.T) {
+	responseYAML := `type: completion_assessment
+version: 1
+payload:
+  all_criteria_satisfied: false
+  summary: "AC-2 not satisfied"
+  by_criterion:
+    - id: "AC-1"
+      status: "passed"
+      comment: "Feature A implemented correctly"
+    - id: "AC-2"
+      status: "failed"
+      comment: "Test coverage insufficient"`
+
+	// Create JSON-safe response
+	jsonResponse := fmt.Sprintf(`{"choices":[{"message":{"role":"assistant","content":%q}}]}`, responseYAML)
+
+	client := &Client{
+		kind:  "openai-chat",
+		model: "gpt-4-turbo",
+		client: &http.Client{
+			Transport: mockRoundTripperFunc(func(req *http.Request) (*http.Response, error) {
+				return &http.Response{
+					StatusCode: 200,
+					Body:       io.NopCloser(bytes.NewBufferString(jsonResponse)),
+					Header:     make(http.Header),
+				}, nil
+			}),
+		},
+	}
+
+	summary := &TaskSummary{
+		Title: "Test Task",
+		State: "RUNNING",
+		AcceptanceCriteria: []AcceptanceCriterion{
+			{ID: "AC-1", Description: "Feature A", Type: "e2e", Critical: true},
+			{ID: "AC-2", Description: "Feature B", Type: "unit", Critical: true},
+		},
+		WorkerRunsCount: 1,
+		WorkerRuns: []WorkerRunSummary{
+			{ID: "run-1", ExitCode: 0, Summary: "Partial success"},
+		},
+	}
+
+	result, err := client.CompletionAssessment(context.Background(), summary)
+
+	if err != nil {
+		t.Fatalf("CompletionAssessment failed: %v", err)
+	}
+
+	if result.AllCriteriaSatisfied {
+		t.Errorf("Expected AllCriteriaSatisfied=false, got true")
+	}
+
+	if len(result.ByCriterion) != 2 {
+		t.Errorf("Expected 2 CriterionResults, got %d", len(result.ByCriterion))
+	}
+
+	// Verify AC-1 passed
+	if result.ByCriterion[0].ID != "AC-1" || result.ByCriterion[0].Status != "passed" {
+		t.Errorf("Expected AC-1 passed, got %s with status %s", result.ByCriterion[0].ID, result.ByCriterion[0].Status)
+	}
+
+	// Verify AC-2 failed
+	if result.ByCriterion[1].ID != "AC-2" || result.ByCriterion[1].Status != "failed" {
+		t.Errorf("Expected AC-2 failed, got %s with status %s", result.ByCriterion[1].ID, result.ByCriterion[1].Status)
+	}
+
+	if result.Summary != "AC-2 not satisfied" {
+		t.Errorf("Expected summary 'AC-2 not satisfied', got %q", result.Summary)
+	}
+}
+
+// TestClient_CompletionAssessment_MarkdownCodeBlock tests YAML extraction from markdown code blocks
+func TestClient_CompletionAssessment_MarkdownCodeBlock(t *testing.T) {
+	responseMarkdown := "```yaml\ntype: completion_assessment\nversion: 1\npayload:\n  all_criteria_satisfied: true\n  summary: \"All criteria met\"\n  by_criterion:\n    - id: \"AC-1\"\n      status: \"passed\"\n      comment: \"Success\"\n```"
+
+	// Create JSON-safe response
+	jsonResponse := fmt.Sprintf(`{"choices":[{"message":{"role":"assistant","content":%q}}]}`, responseMarkdown)
+
+	client := &Client{
+		kind:  "openai-chat",
+		model: "gpt-4-turbo",
+		client: &http.Client{
+			Transport: mockRoundTripperFunc(func(req *http.Request) (*http.Response, error) {
+				return &http.Response{
+					StatusCode: 200,
+					Body:       io.NopCloser(bytes.NewBufferString(jsonResponse)),
+					Header:     make(http.Header),
+				}, nil
+			}),
+		},
+	}
+
+	summary := &TaskSummary{
+		Title: "Test Task",
+		State: "RUNNING",
+		AcceptanceCriteria: []AcceptanceCriterion{
+			{ID: "AC-1", Description: "Feature A", Type: "e2e", Critical: true},
+		},
+		WorkerRunsCount: 1,
+		WorkerRuns: []WorkerRunSummary{
+			{ID: "run-1", ExitCode: 0, Summary: "Success"},
+		},
+	}
+
+	result, err := client.CompletionAssessment(context.Background(), summary)
+
+	if err != nil {
+		t.Fatalf("CompletionAssessment failed with markdown code block: %v", err)
+	}
+
+	if !result.AllCriteriaSatisfied {
+		t.Errorf("Expected AllCriteriaSatisfied=true, got false")
+	}
+
+	if len(result.ByCriterion) != 1 {
+		t.Errorf("Expected 1 CriterionResult, got %d", len(result.ByCriterion))
+	}
+
+	if result.ByCriterion[0].Status != "passed" {
+		t.Errorf("Expected status=passed, got %s", result.ByCriterion[0].Status)
+	}
+}
+
+// TestClient_CompletionAssessment_RetryOn5xx tests retry behavior on 5xx errors
+func TestClient_CompletionAssessment_RetryOn5xx(t *testing.T) {
+	responseYAML := `type: completion_assessment
+version: 1
+payload:
+  all_criteria_satisfied: true
+  summary: "Recovered after retry"
+  by_criterion:
+    - id: "AC-1"
+      status: "passed"
+      comment: "Success after retry"`
+
+	// Create JSON-safe response
+	jsonResponse := fmt.Sprintf(`{"choices":[{"message":{"role":"assistant","content":%q}}]}`, responseYAML)
+
+	client := &Client{
+		kind:  "openai-chat",
+		model: "gpt-4-turbo",
+		client: &http.Client{
+			Transport: &mockRoundTripper{
+				responses: []http.Response{
+					{
+						StatusCode: 503,
+						Body:       io.NopCloser(bytes.NewBufferString("Service Unavailable")),
+						Header:     make(http.Header),
+					},
+					{
+						StatusCode: 200,
+						Body:       io.NopCloser(bytes.NewBufferString(jsonResponse)),
+						Header:     make(http.Header),
+					},
+				},
+			},
+		},
+	}
+
+	summary := &TaskSummary{
+		Title: "Test Task",
+		State: "RUNNING",
+		AcceptanceCriteria: []AcceptanceCriterion{
+			{ID: "AC-1", Description: "Feature A", Type: "e2e", Critical: true},
+		},
+		WorkerRunsCount: 1,
+		WorkerRuns: []WorkerRunSummary{
+			{ID: "run-1", ExitCode: 0, Summary: "Success"},
+		},
+	}
+
+	result, err := client.CompletionAssessment(context.Background(), summary)
+
+	if err != nil {
+		t.Fatalf("CompletionAssessment failed after retry: %v", err)
+	}
+
+	if !result.AllCriteriaSatisfied {
+		t.Errorf("Expected AllCriteriaSatisfied=true after retry, got false")
+	}
+
+	if result.Summary != "Recovered after retry" {
+		t.Errorf("Expected summary 'Recovered after retry', got %q", result.Summary)
+	}
+}
+
+// TestClient_CompletionAssessment_MultipleACs tests assessment with multiple acceptance criteria
+func TestClient_CompletionAssessment_MultipleACs(t *testing.T) {
+	responseYAML := `type: completion_assessment
+version: 1
+payload:
+  all_criteria_satisfied: true
+  summary: "All 5 acceptance criteria met"
+  by_criterion:
+    - id: "AC-1"
+      status: "passed"
+      comment: "Authentication implemented"
+    - id: "AC-2"
+      status: "passed"
+      comment: "Authorization working"
+    - id: "AC-3"
+      status: "passed"
+      comment: "Data validation complete"
+    - id: "AC-4"
+      status: "passed"
+      comment: "Error handling verified"
+    - id: "AC-5"
+      status: "passed"
+      comment: "Tests passing"`
+
+	// Create JSON-safe response
+	jsonResponse := fmt.Sprintf(`{"choices":[{"message":{"role":"assistant","content":%q}}]}`, responseYAML)
+
+	client := &Client{
+		kind:  "openai-chat",
+		model: "gpt-4-turbo",
+		client: &http.Client{
+			Transport: mockRoundTripperFunc(func(req *http.Request) (*http.Response, error) {
+				return &http.Response{
+					StatusCode: 200,
+					Body:       io.NopCloser(bytes.NewBufferString(jsonResponse)),
+					Header:     make(http.Header),
+				}, nil
+			}),
+		},
+	}
+
+	summary := &TaskSummary{
+		Title: "Complex Task",
+		State: "RUNNING",
+		AcceptanceCriteria: []AcceptanceCriterion{
+			{ID: "AC-1", Description: "Authentication", Type: "e2e", Critical: true},
+			{ID: "AC-2", Description: "Authorization", Type: "e2e", Critical: true},
+			{ID: "AC-3", Description: "Data validation", Type: "unit", Critical: true},
+			{ID: "AC-4", Description: "Error handling", Type: "unit", Critical: false},
+			{ID: "AC-5", Description: "Tests", Type: "integration", Critical: true},
+		},
+		WorkerRunsCount: 2,
+		WorkerRuns: []WorkerRunSummary{
+			{ID: "run-1", ExitCode: 0, Summary: "Implementation complete"},
+			{ID: "run-2", ExitCode: 0, Summary: "Tests added"},
+		},
+	}
+
+	result, err := client.CompletionAssessment(context.Background(), summary)
+
+	if err != nil {
+		t.Fatalf("CompletionAssessment failed: %v", err)
+	}
+
+	if !result.AllCriteriaSatisfied {
+		t.Errorf("Expected AllCriteriaSatisfied=true, got false")
+	}
+
+	if len(result.ByCriterion) != 5 {
+		t.Errorf("Expected 5 CriterionResults, got %d", len(result.ByCriterion))
+	}
+
+	// Verify all criteria passed
+	for i, cr := range result.ByCriterion {
+		expectedID := fmt.Sprintf("AC-%d", i+1)
+		if cr.ID != expectedID {
+			t.Errorf("Expected ID=%s at index %d, got %s", expectedID, i, cr.ID)
+		}
+		if cr.Status != "passed" {
+			t.Errorf("Expected status=passed for %s, got %s", cr.ID, cr.Status)
+		}
+		if cr.Comment == "" {
+			t.Errorf("Expected non-empty comment for %s", cr.ID)
+		}
+	}
+
+	if !strings.Contains(result.Summary, "All 5 acceptance criteria") {
+		t.Errorf("Expected summary mentioning 5 criteria, got %q", result.Summary)
 	}
 }

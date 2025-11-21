@@ -328,133 +328,21 @@ export CODEX_API_KEY="..."
 - **ロギング**: 構造化ログ（log/slog）導入済み
 - **依存関係**: Go 1.23以上、Docker、OpenAI API
 
----
+## プロジェクトメモリ管理ルール
 
-## 改善履歴（Phase 1-3）2025年11月
+**CLAUDE.mdには静的な構造・設計情報のみを記載します。**
 
-### Phase 1-3 完了時の成果
+### 記載すべき内容
+- プロジェクト構造とアーキテクチャ
+- 設計パターンと実装ガイドライン
+- よく使うコマンドと操作方法
+- 既知の課題と対応方法
+- サブディレクトリメモリ体系
 
-| 項目 | 改善前 | 改善後 | 向上度 |
-|------|-------|-------|--------|
-| **全体カバレッジ** | 26.8% | 33.9% | **+7.1pp** ⬆️ |
-| **Meta層カバレッジ** | 0% | 28.0% | **+28.0pp** ✨ |
-| **テスト数** | 63個 | 79個 | **+16個** 🎯 |
-| **extractYAML** | 0% | 100% | **新規実装** 🏆 |
+### 記載しない内容
+- Phase履歴や開発進捗
+- カバレッジ推移や改善履歴
+- 完了時の成果テーブル
+- 「✅完了」「次フェーズの予定」等の進捗状況
 
-### Phase 1: 本番安定性向上 ✅
-
-1. **YAML抽出ロジック実装**
-   - LLMがMarkdown code blockで応答した場合のパース対応
-   - 複数の抽出パターン実装（正規表現、prefix/suffix削除）
-   - 5つのエッジケーステスト追加
-
-2. **エラーハンドリング強化**
-   - `filepath.Abs()` / `io.ReadAll()` のエラー処理
-   - 非推奨API（`ioutil`）を`os`/`io`に置き換え
-
-3. **Meta-agent通信層テスト追加**
-   - `internal/meta/client_test.go` 新規作成
-   - 11個のテストケース追加
-   - カバレッジ: 0% → 28.0%
-
-### Phase 2: 開発体験向上 ✅
-
-4. **Makefile追加**
-   - `make build`, `make test-unit`, `make coverage` 等
-   - ワンコマンド開発タスク実行
-
-5. **ドキュメント更新**
-   - CLAUDE.md に改善履歴セクション追加
-
-### Phase 3: Docker Sandbox 構造化 ✅
-
-6. **Sandbox API インターフェース化検討**
-   - DockerClient インターフェース設計
-   - テスト用ファクトリーメソッド検討
-   - 既存 test/sandbox テスト（7テスト）で実運用カバー
-
-### 次フェーズの予定（将来改善）
-
-- [ ] main関数テスト
-- [ ] Docker Sandbox モック化テスト（+8-12%期待）
-- [ ] completion_assessment実装（VALIDATING状態）
-- [ ] 構造化ログ（log/slog）導入
-- [ ] タイムアウト・リトライ戦略
-
-**カバレッジロードマップ**:
-- 現状: 33.9% ✅
-- 短期: 45% （main + Sandbox テスト）
-- 中期: 55% （競争優位性確保）
-- 長期: 60%+ （本番対応準備完了）
-
-## 開発改善ロードマップ（Phase 1-5 完了）
-
-### Phase 1: 構造化ロギング実装 ✅
-- **log/slog 導入**: cmd/agent-runner/main.go, internal/core/runner.go で slog を使用
-- **ロギングレベル**: INFO/WARN/ERROR に統一
-- **改善効果**: エラーハンドリング可視化、本番デバッグ性向上
-
-### Phase 2: main関数テスト追加 ✅
-- **cmd/agent-runner/main_test.go 新規作成**: 10個のテストケース追加
-- **テスト項目**: YAML解析、エラーハンドリング、環境変数、I/O操作
-- **関連改善**: mock パッケージにファクトリー関数追加（NewMockMetaClient等）
-
-### Phase 3: Meta層カバレッジ拡大 ✅
-- **internal/meta/client_test.go 拡張**: 新規テストケース追加
-- **カバレッジ**: 28% → 30.7%（段階的改善）
-- **テスト項目**: YAML抽出、エラーハンドリング、複数パターン検証
-
-### Phase 4: test.command実装 ✅
-- **internal/core/runner.go**: runTestCommand() メソッド追加
-- **機能**: タスク完了後の自動テスト実行
-- **設定**: Task.Test.Command, Task.Test.Cwd で制御
-- **結果**: TaskContext.TestResult に記録、Task Note に出力
-
-### Phase 5: golangci-lint設定 ✅
-- **.golangci.yml 作成**: 実用的なlinter設定（9個有効化）
-- **エラー修正**: json.Marshal, yaml.Marshal, Close() のエラーチェック改善
-- **設定**: check-blank: false で開発効率とのバランスを確保
-- **実行**: Makefile の make lint ターゲット対応
-
-### Phase A: Core層テスト追加（最小工数最大効果実装）✅
-- **internal/core/runner_test.go 拡張**: 4個の新テストケース追加
-  - TestRunner_TestCommand_Success（成功ケース）
-  - TestRunner_TestCommand_Failure（失敗ケース）
-  - TestRunner_TestCommand_NotConfigured（未設定時の挙動）
-  - TestRunner_TestCommand_RelativeCwd（相対パスCwd処理）
-- **カバレッジ**: 44.2% → 77.9% (Core層) | **全体**: 34.2% → 38.5%
-
-### Phase B: Worker/Executorエラーハンドリングテスト追加 ✅
-- **internal/worker/executor_test.go 拡張**: 3個の新テストケース追加
-  - TestExecutor_RunWorker_SandboxStartError（起動失敗）
-  - TestExecutor_RunWorker_SandboxExecError（実行エラー記録）
-  - TestExecutor_RunWorker_EnvironmentVariables（環境変数伝播）
-- **効果**: エラーハンドリングの自動検証、本番安定性向上
-- **カバレッジ**: **全体**: 38.5% → 43.4% ✅
-
-### 整体カバレッジ推移
-
-| Phase | コンポーネント | 改善内容 | カバレッジ |
-|-------|--------------|--------|-----------|
-| 1-5 | 全層統合 | ロギング・テスト・linter | 26.8% → 34.2% |
-| A | core | test.command テスト | 44.2% → 77.9% |
-| B | worker | エラーハンドリングテスト | - → 23.4%+ |
-| **最終** | **全体** | MVP準備完了 | **34.2% → 43.4%** ✅ |
-
-**現状**: 43.4% | **達成**: 目標42-45%範囲内 ✅ | **次段階**: Priority Medium項目（45-55%）
-
-## テスト実装状況と改善履歴
-
-**詳細は [test/CLAUDE.md](test/CLAUDE.md) を参照してください。**
-
-テスト関連の詳細な実装状況、テスト戦略、精度管理手法は、test/ディレクトリの CLAUDE.md に一元管理されています：
-
-- **テスト実装フェーズ**: Phase 1-5 + Phase A-B 完了（全層統合テスト完成）
-- **テスト統計**: 83+ テスト（ユニット・Mock・Docker・Codex・統合）
-- **カバレッジ**: 26.8% → 43.4% ✅ （最小工数で目標達成）
-- **段階的テスト実行**: ビルドタグによる段階的実行戦略
-- **精度管理**: カバレッジ目標、不変条件、テストデータ生成戦略
-- **トラブルシューティング**: Docker、認証、タイムアウト等の既知問題と対応
-- **品質指標**: Core層 77.9% | Note層 81.2% | Worker層 23.4%+ | Meta層 28.0%
-
-test/CLAUDE.md で包括的に管理・更新されています。
+**理由**: 進捗情報は時間とともに陳腐化し、メモリの可読性を低下させます。履歴情報はGitコミットログで管理してください。
