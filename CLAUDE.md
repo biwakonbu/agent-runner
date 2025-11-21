@@ -47,20 +47,29 @@ agent-runner/
 │   │   └── sandbox_test.go      # Docker API・コンテナ管理テスト（-tags=docker）
 │   └── codex/
 │       └── codex_integration_test.go  # Codex統合テスト（-tags=codex）
-├── docs/                        # 設計ドキュメント
+├── docs/                        # 設計・仕様・開発ガイド
+│   ├── CLAUDE.md                # ドキュメント整理ルール
 │   ├── AgentRunner-architecture.md
 │   ├── agentrunner-spec-v1.md
-│   └── AgentRunner-impl-design-v1.md
+│   ├── AgentRunner-impl-design-v1.md
+│   ├── TESTING.md               # テストベストプラクティス
+│   └── CODEX_TEST_README.md     # Codex統合ガイド
+├── examples/                    # ★詳細は examples/CLAUDE.md を参照
+│   ├── CLAUDE.md                # サンプル・スクリプト管理ガイド
+│   ├── tasks/
+│   │   ├── sample_task_go.yaml  # Goプロジェクト用サンプル
+│   │   └── test_codex_task.yaml # Codex統合テスト定義
+│   └── scripts/
+│       └── run_codex_test.sh    # Codex統合テスト実行スクリプト
 ├── sandbox/
 │   └── Dockerfile               # Worker実行環境（Codex CLI）
 ├── CLAUDE.md                    # このファイル（プロジェクトメモリ）
-├── GEMINI.md                    # プロジェクト概要と背景
-├── TESTING.md                   # テストベストプラクティス
-├── CODEX_TEST_README.md         # Codex統合ガイド
+├── GEMINI.md                    # プロジェクト概要と背景（変更禁止）
+├── README.md                    # ユーザー向け紹介（変更禁止）
 ├── go.mod                       # Goモジュール管理
 ├── go.sum
-├── sample_task_go.yaml          # Goプロジェクト用サンプルタスク定義
-└── test_codex_task.yaml         # Codex統合テスト用タスク定義
+├── Makefile                     # ビルド・テストターゲット
+└── .golangci.yml                # Code quality linter設定
 ```
 
 ### ディレクトリの役割
@@ -75,7 +84,8 @@ agent-runner/
 | `internal/mock/` | テスト用モック実装 | [internal/mock/CLAUDE.md](internal/mock/CLAUDE.md) |
 | `pkg/config/` | YAML設定パース（再利用可能） | [pkg/config/CLAUDE.md](pkg/config/CLAUDE.md) |
 | `test/` | **4段階テスト戦略**（ユニット→Mock→Docker→Codex） | **[test/CLAUDE.md](test/CLAUDE.md)** |
-| `docs/` | アーキテクチャ・仕様書 | 詳細な設計ドキュメント |
+| `docs/` | 設計・仕様・開発ガイド統合 | [docs/CLAUDE.md](docs/CLAUDE.md) |
+| `examples/` | サンプルタスク・実行スクリプト | [examples/CLAUDE.md](examples/CLAUDE.md) |
 | `sandbox/` | Docker イメージ定義 | Codex CLI ランタイム |
 
 ## よく使うコマンド

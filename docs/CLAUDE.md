@@ -259,3 +259,68 @@ internal/CLAUDE.md：
 - 仕様書（spec）：新版作成、旧版は参考資料化
 - 実装ドキュメント（impl-design）：マージ・統合
 - 内部メモリ（CLAUDE.md）：継続更新（バージョン分岐不可）
+
+## 非コードファイル配置ルール
+
+### examples/ - サンプル・実行スクリプト
+
+**目的**：YAML タスク定義、参考スクリプト、実行例の一元管理
+
+```
+examples/
+├── CLAUDE.md                    # サンプル管理ガイド ★詳細は examples/CLAUDE.md を参照
+├── tasks/                       # YAML タスク定義サンプル
+│   ├── sample_task_go.yaml      # Go開発用汎用サンプル
+│   ├── test_codex_task.yaml     # Codex統合テスト定義
+│   └── (将来) sample_python.yaml, sample_node.yaml
+└── scripts/                     # テスト・デバッグスクリプト
+    ├── run_codex_test.sh        # Codex統合テスト実行スクリプト
+    └── (将来) debug_sandbox.sh, generate_report.sh
+```
+
+**配置判断フローチャート**：
+
+```
+ファイルの用途？
+
+┌─ YAML タスク定義？
+│  ├─ 汎用サンプル → examples/tasks/sample_*.yaml
+│  └─ テスト用固定定義 → examples/tasks/test_*.yaml
+│
+├─ シェルスクリプト？
+│  ├─ テスト/デバッグ用 → examples/scripts/{purpose}_*.sh
+│  └─ 本番実行用 → cmd/ + ドキュメント
+│
+└─ その他（バイナリ、画像等）？
+   └─ .gitignore で除外、または docs/assets/
+```
+
+### 具体例
+
+| ファイル | 配置先 | 理由 |
+|---------|-------|------|
+| Go プロジェクト実行例 | `examples/tasks/sample_task_go.yaml` | 複数言語対応・再利用可能 |
+| Codex 統合テスト定義 | `examples/tasks/test_codex_task.yaml` | テスト用・固定仕様 |
+| テスト実行スクリプト | `examples/scripts/run_codex_test.sh` | テスト関連・非本番 |
+| デバッグスクリプト | `examples/scripts/debug_*.sh` | 開発者用・非本番 |
+| docs 画像・図表 | `docs/assets/` | ドキュメント資産 |
+
+### 更新ルール
+
+**トリガー**：
+1. **YAML スキーマ変更** → サンプル (examples/tasks/*.yaml) 同期更新
+2. **テスト手法改善** → テスト定義 (examples/tasks/test_*.yaml) 更新
+3. **新機能追加** → サンプル拡張、ガイド更新
+
+**手順**：
+```bash
+# 1. サンプル更新
+vi examples/tasks/sample_task_go.yaml
+
+# 2. 実行確認
+./agent-runner < examples/tasks/sample_task_go.yaml
+
+# 3. examples/CLAUDE.md 更新（変更内容を記録）
+
+# 4. 必要に応じて README.md や docs/ にリンク追加
+```
