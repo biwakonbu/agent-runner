@@ -213,3 +213,4 @@ MIT License - [LICENSE](LICENSE) を参照してください。
 - [OpenAI API ドキュメント](https://platform.openai.com/docs)
 - [Docker ドキュメント](https://docs.docker.com/)
 - [Codex CLI](https://github.com/openai/codex)
+# Test comment for pre-commit hook
