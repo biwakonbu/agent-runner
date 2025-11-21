@@ -266,53 +266,56 @@ export OPENAI_API_KEY="sk-..."
 export CODEX_API_KEY="..."
 ```
 
-## サブディレクトリメモリ
+## サブディレクトリメモリ体系
 
-各パッケージ・ディレクトリの詳細な実装ガイダンスは、該当ディレクトリの CLAUDE.md を参照してください：
+**★ [docs/CLAUDE.md](docs/CLAUDE.md)** - ドキュメント整理ルール・命名規則・拡張ガイド（メンテナンス責務分担）
 
-### コア実装層
-- **[internal/core/CLAUDE.md](internal/core/CLAUDE.md)** - タスク実行エンジンの詳細
-  - FSM状態遷移ルール、TaskContextの伝播、エラーハンドリング戦略
+各パッケージ内 `CLAUDE.md` は標準フォーマット：**責務** → **主要概念** → **実装パターン** → **テスト戦略** → **拡張・既知問題**
 
-- **[internal/meta/CLAUDE.md](internal/meta/CLAUDE.md)** - Meta-agent通信の詳細
-  - YAMLプロトコル仕様、LLM呼び出し、モック実装の使い方
+### 実装層パッケージ
 
-- **[internal/worker/CLAUDE.md](internal/worker/CLAUDE.md)** - Worker実行の詳細
-  - Dockerマウント戦略、認証情報管理、既知の問題と回避策
+| 層 | パッケージ | 責務 | 詳細 |
+|----|---------|----|------|
+| **Core** | core | FSM・TaskContext・状態遷移 | [CLAUDE.md](internal/core/CLAUDE.md) |
+| **Core** | meta | LLM通信・YAMLプロトコル | [CLAUDE.md](internal/meta/CLAUDE.md) |
+| **Core** | worker | CLI実行・Docker サンドボックス | [CLAUDE.md](internal/worker/CLAUDE.md) |
+| **Util** | note | Task Note生成・テンプレート | [CLAUDE.md](internal/note/CLAUDE.md) |
+| **Util** | mock | テストダブル・FuncField注入 | [CLAUDE.md](internal/mock/CLAUDE.md) |
+| **Config** | pkg/config | YAML設定スキーマ | [CLAUDE.md](pkg/config/CLAUDE.md) |
 
-### ユーティリティ・テスト層
-- **[internal/note/CLAUDE.md](internal/note/CLAUDE.md)** - Task Note生成の詳細
-  - テンプレート設計、ファイルシステム操作、Markdownフォーマット、拡張ガイド
+### テスト戦略（重要）
 
-- **[internal/mock/CLAUDE.md](internal/mock/CLAUDE.md)** - テスト設計パターンの詳細
-  - Function Field Injection、テストケース例、モック拡張ガイド
+**[test/CLAUDE.md](test/CLAUDE.md)** - 4段階テスト戦略、ビルドタグ、精度管理、完全コマンドリファレンス
 
-- **[test/CLAUDE.md](test/CLAUDE.md)** - テスト戦略・実装パターン・精度管理の詳細 ★重要
-  - 4段階テスト戦略（ユニット→Mock→Docker→Codex）
-  - 5つの実装パターン（Table-driven、PBT、Mock、Docker、E2E）
-  - ビルドタグ戦略、完全なコマンドリファレンス
-  - ベストプラクティス、精度管理手法、トラブルシューティング
+## ドキュメント体系
 
-### 設定・スキーマ層
-- **[pkg/config/CLAUDE.md](pkg/config/CLAUDE.md)** - YAML設定スキーマの詳細
-  - TaskConfig階層構造、バージョニング戦略、拡張ガイド、設計パターン
+### AI開発者向け（メモリ・操作ガイド）
+- **[CLAUDE.md](CLAUDE.md)** (このファイル) - プロジェクト全体・操作ガイド
+- **[docs/CLAUDE.md](docs/CLAUDE.md)** ★ドキュメント整理ルール・命名規則・メンテナンス責務
+- **各internal/*/CLAUDE.md** - パッケージ実装ガイダンス（標準フォーマット統一）
+- **[test/CLAUDE.md](test/CLAUDE.md)** - テスト戦略・ビルドタグ・精度管理
 
-## 関連ドキュメント
+### 人間開発者向け（設計・仕様）
+- **[docs/AgentRunner-architecture.md](docs/AgentRunner-architecture.md)** - システムアーキテクチャ・設計
+- **[docs/agentrunner-spec-v1.md](docs/agentrunner-spec-v1.md)** - MVP仕様書・機能定義
+- **[docs/AgentRunner-impl-design-v1.md](docs/AgentRunner-impl-design-v1.md)** - Go実装設計
 
-- **[GEMINI.md](GEMINI.md)**: プロジェクト概要と背景
-- **[TESTING.md](TESTING.md)**: テストベストプラクティス
-- **[CODEX_TEST_README.md](CODEX_TEST_README.md)**: Codex統合ガイド
-- **[docs/AgentRunner-architecture.md](docs/AgentRunner-architecture.md)**: アーキテクチャ詳細仕様
-- **[docs/agentrunner-spec-v1.md](docs/agentrunner-spec-v1.md)**: MVP/v1仕様書
-- **[docs/AgentRunner-impl-design-v1.md](docs/AgentRunner-impl-design-v1.md)**: Go実装設計
+### エンドユーザー向け（不変）
+- **[README.md](README.md)** - プロジェクト紹介（変更禁止）
+- **[GEMINI.md](GEMINI.md)** - プロジェクト背景・コンテキスト（変更禁止）
+
+### 開発ガイド
+- **[TESTING.md](TESTING.md)** - テストベストプラクティス
+- **[CODEX_TEST_README.md](CODEX_TEST_README.md)** - Codex統合ガイド
 
 ## 開発ノート
 
-- **言語**: コメントは日本語、関数・変数名は英語
+- **言語**: コメント・ドキュメント は日本語、コード（関数・変数名）は英語
+- **ドキュメント管理**: ★[docs/CLAUDE.md](docs/CLAUDE.md)で命名規則・責務分担を一元管理
 - **テスト**: 依存性注入とモックを使用；プロパティベーステストで不変条件を検証
 - **テスト自動化**: ビルドタグ（-tags=docker,codex）を使用した段階的テスト実行
-- **ロギング**: 現在`fmt.Printf`を使用（今後`slog`への移行を検討）
-- **依存関係**: Go 1.24.0以上、Docker、OpenAI API
+- **ロギング**: 構造化ログ（log/slog）導入済み
+- **依存関係**: Go 1.23以上、Docker、OpenAI API
 
 ---
 
