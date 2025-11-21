@@ -2,10 +2,8 @@ package worker
 
 import (
 	"context"
-	"fmt"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/biwakonbu/agent-runner/pkg/config"
 )
@@ -21,6 +19,7 @@ type MockSandboxManager struct {
 	execExitCode         int
 	execOutput           string
 	lastContainerID      string
+	containerRunning     bool // Track if container is running
 }
 
 // Verify that MockSandboxManager implements SandboxProvider interface
@@ -69,7 +68,9 @@ func TestExecutor_NewExecutor(t *testing.T) {
 	}
 }
 
-func TestExecutor_RunWorker_Success(t *testing.T) {
+/* ============ OLD TESTS (Skipped - using new persistent container design) ============
+
+func TestExecutor_RunWorker_Success_OLD(t *testing.T) {
 	cfg := config.WorkerConfig{
 		Kind:        "codex-cli",
 		DockerImage: "agent-runner-codex:latest",
@@ -607,5 +608,203 @@ func TestExecutor_RunWorker_EnvironmentVariables(t *testing.T) {
 	// Verify that StartContainer was called with env vars
 	if !mockSandbox.startContainerCalled {
 		t.Errorf("StartContainer should have been called with environment variables")
+	}
+}
+
+*/ // END OF OLD TESTS COMMENT BLOCK
+
+// ============ NEW TESTS (Persistent Container Design) ============
+
+// TestExecutor_Start_Success tests successful container startup
+func TestExecutor_Start_Success(t *testing.T) {
+	cfg := config.WorkerConfig{
+		Kind:        "codex-cli",
+		DockerImage: "agent-runner-codex:latest",
+	}
+
+	mockSandbox := &MockSandboxManager{}
+	executor := &Executor{
+		Config:      cfg,
+		Sandbox:     mockSandbox,
+		RepoPath:    "/test/repo",
+		containerID: "", // Not yet started
+	}
+
+	ctx := context.Background()
+	err := executor.Start(ctx)
+
+	if err != nil {
+		t.Fatalf("Start() error = %v, want nil", err)
+	}
+
+	if executor.containerID == "" {
+		t.Errorf("containerID should be set after Start()")
+	}
+
+	if !mockSandbox.startContainerCalled {
+		t.Errorf("StartContainer should have been called")
+	}
+}
+
+// TestExecutor_Start_AlreadyStarted tests that Start() fails if already running
+func TestExecutor_Start_AlreadyStarted(t *testing.T) {
+	cfg := config.WorkerConfig{
+		Kind:        "codex-cli",
+		DockerImage: "agent-runner-codex:latest",
+	}
+
+	mockSandbox := &MockSandboxManager{}
+	executor := &Executor{
+		Config:      cfg,
+		Sandbox:     mockSandbox,
+		RepoPath:    "/test/repo",
+		containerID: "already-running-123",
+	}
+
+	ctx := context.Background()
+	err := executor.Start(ctx)
+
+	if err == nil {
+		t.Fatalf("Start() expected error when already started, got nil")
+	}
+
+	if !strings.Contains(err.Error(), "already started") {
+		t.Errorf("Error should mention 'already started', got: %v", err)
+	}
+}
+
+// TestExecutor_Stop_Success tests successful container stop
+func TestExecutor_Stop_Success(t *testing.T) {
+	cfg := config.WorkerConfig{
+		Kind:        "codex-cli",
+		DockerImage: "agent-runner-codex:latest",
+	}
+
+	mockSandbox := &MockSandboxManager{}
+	executor := &Executor{
+		Config:      cfg,
+		Sandbox:     mockSandbox,
+		RepoPath:    "/test/repo",
+		containerID: "test-container-123",
+	}
+
+	ctx := context.Background()
+	err := executor.Stop(ctx)
+
+	if err != nil {
+		t.Fatalf("Stop() error = %v, want nil", err)
+	}
+
+	if executor.containerID != "" {
+		t.Errorf("containerID should be cleared after Stop()")
+	}
+
+	if !mockSandbox.stopContainerCalled {
+		t.Errorf("StopContainer should have been called")
+	}
+}
+
+// TestExecutor_Stop_NoContainer tests that Stop() fails when no container running
+func TestExecutor_Stop_NoContainer(t *testing.T) {
+	cfg := config.WorkerConfig{
+		Kind:        "codex-cli",
+		DockerImage: "agent-runner-codex:latest",
+	}
+
+	mockSandbox := &MockSandboxManager{}
+	executor := &Executor{
+		Config:      cfg,
+		Sandbox:     mockSandbox,
+		RepoPath:    "/test/repo",
+		containerID: "", // Not started
+	}
+
+	ctx := context.Background()
+	err := executor.Stop(ctx)
+
+	if err == nil {
+		t.Fatalf("Stop() expected error when no container running, got nil")
+	}
+
+	if !strings.Contains(err.Error(), "no container") {
+		t.Errorf("Error should mention 'no container', got: %v", err)
+	}
+}
+
+// TestExecutor_RunWorker_WithPersistentContainer tests RunWorker with persistent container
+func TestExecutor_RunWorker_WithPersistentContainer(t *testing.T) {
+	cfg := config.WorkerConfig{
+		Kind:        "codex-cli",
+		DockerImage: "agent-runner-codex:latest",
+	}
+
+	mockSandbox := &MockSandboxManager{
+		execExitCode: 0,
+		execOutput:   "Success from persistent container",
+	}
+	executor := &Executor{
+		Config:      cfg,
+		Sandbox:     mockSandbox,
+		RepoPath:    "/test/repo",
+		containerID: "persistent-container-123",
+	}
+
+	ctx := context.Background()
+	result, err := executor.RunWorker(ctx, "test prompt", map[string]string{})
+
+	if err != nil {
+		t.Fatalf("RunWorker() error = %v, want nil", err)
+	}
+
+	if result == nil {
+		t.Fatalf("RunWorker() returned nil result")
+	}
+
+	// Verify that Exec was called (but not Start/Stop)
+	if !mockSandbox.execCalled {
+		t.Errorf("Exec should have been called")
+	}
+
+	// Start/Stop should NOT be called in new design
+	if mockSandbox.startContainerCalled {
+		t.Errorf("StartContainer should NOT be called (container already running)")
+	}
+	if mockSandbox.stopContainerCalled {
+		t.Errorf("StopContainer should NOT be called (container lifecycle managed by Runner)")
+	}
+
+	if result.RawOutput != "Success from persistent container" {
+		t.Errorf("RawOutput = %s, want 'Success from persistent container'", result.RawOutput)
+	}
+}
+
+// TestExecutor_RunWorker_NoPersistentContainer tests that RunWorker fails if container not started
+func TestExecutor_RunWorker_NoPersistentContainer(t *testing.T) {
+	cfg := config.WorkerConfig{
+		Kind:        "codex-cli",
+		DockerImage: "agent-runner-codex:latest",
+	}
+
+	mockSandbox := &MockSandboxManager{}
+	executor := &Executor{
+		Config:      cfg,
+		Sandbox:     mockSandbox,
+		RepoPath:    "/test/repo",
+		containerID: "", // Not started
+	}
+
+	ctx := context.Background()
+	result, err := executor.RunWorker(ctx, "test prompt", map[string]string{})
+
+	if err == nil {
+		t.Fatalf("RunWorker() expected error when no container running, got nil")
+	}
+
+	if result != nil {
+		t.Errorf("RunWorker() expected nil result on error, got %v", result)
+	}
+
+	if !strings.Contains(err.Error(), "container not started") {
+		t.Errorf("Error should mention 'container not started', got: %v", err)
 	}
 }

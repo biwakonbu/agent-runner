@@ -24,6 +24,8 @@ type MetaClient interface {
 // WorkerExecutor interface for executing worker tasks
 type WorkerExecutor interface {
 	RunWorker(ctx context.Context, prompt string, env map[string]string) (*WorkerRunResult, error)
+	Start(ctx context.Context) error     // Start persistent container
+	Stop(ctx context.Context) error      // Stop persistent container
 }
 
 // NoteWriter interface for writing task notes
@@ -121,8 +123,22 @@ func (r *Runner) Run(ctx context.Context) (*TaskContext, error) {
 		})
 	}
 
-	// 3. Execution Loop
+	// 3. Start Container for the task
 	taskCtx.State = StateRunning
+
+	// Start persistent container
+	if err := r.Worker.Start(ctx); err != nil {
+		taskCtx.State = StateFailed
+		return taskCtx, fmt.Errorf("failed to start container: %w", err)
+	}
+	// Ensure container is stopped at the end
+	defer func() {
+		if err := r.Worker.Stop(ctx); err != nil {
+			r.Logger.Warn("Failed to stop container", "error", err)
+		}
+	}()
+
+	// 4. Execution Loop
 	maxLoops := r.Config.Runner.MaxLoops
 	if maxLoops <= 0 {
 		maxLoops = 10 // Default value
