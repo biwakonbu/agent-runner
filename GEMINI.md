@@ -1,51 +1,59 @@
 # GEMINI.md
 
-## Project Overview
+## プロジェクト概要
 
-`agent-runner` is a meta-agent and orchestration layer designed to autonomously execute tasks by managing AI-based worker agents (e.g., coding assistants). It aims to minimize human intervention by orchestrating worker agents in a safe and reproducible manner within Docker sandboxes. After a task is completed, it generates a "memory" of the task as a Markdown file, which can be used by other agents or humans for context.
+`agent-runner` は、AI ベースのワーカーエージェント（例：コーディングアシスタント）を管理し、タスクを自律的に実行するために設計されたメタエージェントおよびオーケストレーションレイヤーです。Docker サンドボックス内で安全かつ再現可能な方法でワーカーエージェントをオーケストレーションすることにより、人間の介入を最小限に抑えることを目的としています。タスク完了後、タスクの「メモリ」を Markdown ファイルとして生成し、他のエージェントや人間がコンテキストとして利用できるようにします。
 
-The architecture consists of three main components:
--   **Meta-agent (LLM):** The "brain" that plans tasks, decides on the next actions, and evaluates the results.
--   **AgentRunner Core:** The "hands" that execute the Meta-agent's decisions. It manages Docker sandboxes, executes worker CLIs, manages the task state, and generates Markdown notes.
--   **Worker Agents (CLI):** The "doers" that perform the actual work (e.g., coding, running tests, using git) inside a sandbox.
+アーキテクチャは 3 つの主要コンポーネントで構成されています：
 
-The system uses YAML for structured protocols and instructions between components and generates Markdown files as a persistent record of a task's lifecycle and outcomes.
+- **Meta-agent (LLM):** タスクを計画し、次のアクションを決定し、結果を評価する「頭脳」です。
+- **AgentRunner Core:** Meta-agent の決定を実行する「手」です。Docker サンドボックスの管理、Worker CLI の実行、タスク状態の管理、Markdown ノートの生成を行います。
+- **Worker Agents (CLI):** サンドボックス内で実際の作業（コーディング、テスト実行、git 操作など）を行う「実行者」です。
 
-## Building and Running
+システムは、コンポーネント間の構造化されたプロトコルと指示に YAML を使用し、タスクのライフサイクルと結果の永続的な記録として Markdown ファイルを生成します。
 
-The project is a standard Go application.
+## ビルドと実行
 
-### Building the application
+このプロジェクトは標準的な Go アプリケーションです。
 
-To build the `agent-runner` binary, run:
+### アプリケーションのビルド
+
+`agent-runner` バイナリをビルドするには、以下を実行します：
+
 ```bash
 go build ./cmd/agent-runner
 ```
 
-### Running the application
+### アプリケーションの実行
 
-The `agent-runner` reads a task configuration from a YAML file provided via standard input.
+`agent-runner` は標準入力から提供される YAML ファイルからタスク設定を読み込みます。
 
 ```bash
 ./agent-runner < task.yaml
 ```
-A sample task configuration can be found in `sample_task_go.yaml`.
 
-### Running tests
+サンプルタスク設定は `sample_task_go.yaml` にあります。
 
-To run the project's tests, use the standard Go test command:
+### テストの実行
+
+プロジェクトのテストを実行するには、標準的な Go テストコマンドを使用します：
+
 ```bash
 go test ./...
 ```
 
-## Development Conventions
+## 開発の規約
 
--   **Configuration:** Task configurations are defined in YAML files.
--   **Communication Protocol:** Communication between the Core and the Meta-agent is handled via YAML-based protocols.
--   **Task Output:** The results and "memory" of each task are stored in Markdown files, typically in the `.agent-runner/` directory.
--   **Sandboxing:** All worker actions are executed within a Docker container for isolation and reproducibility. The `sandbox/Dockerfile` defines the base environment for these workers.
--   **Modularity:** The project is organized into several internal packages (`core`, `meta`, `worker`, `note`) and a `pkg` directory for shared configuration, following common Go practices.
+- **設定:** タスク設定は YAML ファイルで定義されます。
+- **通信プロトコル:** Core と Meta-agent 間の通信は YAML ベースのプロトコルで処理されます。
+- **タスク出力:** 各タスクの結果と「メモリ」は Markdown ファイルとして保存され、通常は `.agent-runner/` ディレクトリに格納されます。
+- **サンドボックス化:** すべてのワーカーアクションは、隔離と再現性のために Docker コンテナ内で実行されます。`sandbox/Dockerfile` はこれらのワーカーのベース環境を定義します。
+- **モジュール性:** プロジェクトはいくつかの内部パッケージ（`core`, `meta`, `worker`, `note`）と、共有設定用の `pkg` ディレクトリに整理されており、一般的な Go の慣習に従っています。
 
-## Interaction Policy
+## インタラクションポリシー
 
--   **Language:** Please always communicate in Japanese.
+- **言語:** 常に日本語でコミュニケーションを行ってください。
+
+## 重要：作業前の確認事項
+
+それぞれのディレクトリに配置されている CLAUDE.md は必ず作業前に調査、確認、理解して作業に進んでください。また、必ず作業対象のディレクトリより上位のディレクトリは全て遡ってこのルールの対象とします。
