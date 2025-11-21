@@ -1,0 +1,16 @@
+id: "BENCH-002"
+title: "Simple Calculator"
+prd: |
+  Create a Python script `calculator.py` that takes three arguments: num1, operator, num2.
+  Supported operators: +, -, *, /.
+  Print the result to stdout.
+acceptance_criteria:
+  - id: "AC-1"
+    description: "Script exists"
+    condition: "file_exists('calculator.py')"
+  - id: "AC-2"
+    description: "Addition works"
+    condition: "run('python3 calculator.py 5 + 3').stdout.strip() == '8'"
+  - id: "AC-3"
+    description: "Multiplication works"
+    condition: 'run(''python3 calculator.py 4 "*" 2'').stdout.strip() == ''8'''

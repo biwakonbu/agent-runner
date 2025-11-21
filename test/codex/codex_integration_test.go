@@ -1,3 +1,4 @@
+//go:build codex
 // +build codex
 
 package codex

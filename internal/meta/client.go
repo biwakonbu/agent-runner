@@ -65,10 +65,7 @@ func isRetryableError(err error, resp *http.Response) bool {
 		if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
 			return true
 		}
-		// Temporary/transient errors
-		if netErr, ok := err.(net.Error); ok && netErr.Temporary() {
-			return true
-		}
+
 		// context cancellation is not retryable
 		if err == context.Canceled {
 			return false

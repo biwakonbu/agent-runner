@@ -1,0 +1,11 @@
+id: "BENCH-005"
+title: "JSON Parsing"
+prd: |
+  Create a script `parse_json.py` that reads a JSON string from stdin and prints the value of the 'key' field.
+acceptance_criteria:
+  - id: "AC-1"
+    description: "Script exists"
+    condition: "file_exists('parse_json.py')"
+  - id: "AC-2"
+    description: "Extracts key correctly"
+    condition: "run('echo \"{\\\"key\\\": \\\"value\\\"}\" | python3 parse_json.py').stdout.strip() == 'value'"

@@ -1,0 +1,11 @@
+id: "BENCH-001"
+title: "Hello World File Creation"
+prd: |
+  Create a file named `hello.txt` with the content "Hello, World!".
+acceptance_criteria:
+  - id: "AC-1"
+    description: "File hello.txt exists"
+    condition: "file_exists('hello.txt')"
+  - id: "AC-2"
+    description: "Content is correct"
+    condition: "file_content('hello.txt') == 'Hello, World!'"

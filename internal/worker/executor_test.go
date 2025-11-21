@@ -20,7 +20,6 @@ type MockSandboxManager struct {
 	execExitCode         int
 	execOutput           string
 	lastContainerID      string
-	containerRunning     bool // Track if container is running
 }
 
 // Verify that MockSandboxManager implements SandboxProvider interface

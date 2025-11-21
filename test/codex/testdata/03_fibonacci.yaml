@@ -1,0 +1,13 @@
+id: "BENCH-003"
+title: "Fibonacci Generator"
+prd: |
+  Create a Python script `fib.py` that prints the first N Fibonacci numbers.
+  N is provided as a command line argument.
+  Output should be space-separated.
+acceptance_criteria:
+  - id: "AC-1"
+    description: "Script exists"
+    condition: "file_exists('fib.py')"
+  - id: "AC-2"
+    description: "First 5 numbers"
+    condition: "run('python3 fib.py 5').stdout.strip() == '0 1 1 2 3'"

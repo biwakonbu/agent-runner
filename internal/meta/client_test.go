@@ -399,9 +399,9 @@ func (f mockRoundTripperFunc) RoundTrip(req *http.Request) (*http.Response, erro
 // TestIsRetryableError tests the isRetryableError helper function
 func TestIsRetryableError(t *testing.T) {
 	tests := []struct {
-		name       string
-		err        error
-		resp       *http.Response
+		name        string
+		err         error
+		resp        *http.Response
 		shouldRetry bool
 	}{
 		{

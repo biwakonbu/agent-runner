@@ -1,0 +1,11 @@
+id: "BENCH-004"
+title: "File I/O"
+prd: |
+  Create a Python script `process.py` that reads `input.txt`, converts all text to uppercase, and writes to `output.txt`.
+acceptance_criteria:
+  - id: "AC-1"
+    description: "Script exists"
+    condition: "file_exists('process.py')"
+  - id: "AC-2"
+    description: "Processing works"
+    condition: "run('echo hello > input.txt && python3 process.py && cat output.txt').stdout.strip() == 'HELLO'"

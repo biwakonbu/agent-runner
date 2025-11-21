@@ -24,8 +24,8 @@ type MetaClient interface {
 // WorkerExecutor interface for executing worker tasks
 type WorkerExecutor interface {
 	RunWorker(ctx context.Context, prompt string, env map[string]string) (*WorkerRunResult, error)
-	Start(ctx context.Context) error     // Start persistent container
-	Stop(ctx context.Context) error      // Stop persistent container
+	Start(ctx context.Context) error // Start persistent container
+	Stop(ctx context.Context) error  // Stop persistent container
 }
 
 // NoteWriter interface for writing task notes

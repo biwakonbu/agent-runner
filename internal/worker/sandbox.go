@@ -43,7 +43,7 @@ func (s *SandboxManager) StartContainer(ctx context.Context, image string, repoP
 		if pullErr != nil {
 			return "", fmt.Errorf("failed to pull image %s: %w", image, pullErr)
 		}
-		defer pullReader.Close()
+		defer func() { _ = pullReader.Close() }()
 
 		// Wait for pull to complete by reading all output
 		_, copyErr := io.Copy(io.Discard, pullReader)
