@@ -41,3 +41,13 @@ jobs:
 
       - name: Test Docker Sandbox
         run: make test-docker
+
+      - name: Test Worker with Docker (Coverage)
+        run: make test-worker-coverage
+
+      - name: Upload Worker Coverage Report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: worker-coverage-report
+          path: coverage-worker.html

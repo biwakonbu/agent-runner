@@ -138,6 +138,11 @@ func TestStart_RelativePathHandling(t *testing.T) {
 	if !mockSandbox.startContainerCalled {
 		t.Errorf("StartContainer should have been called")
 	}
+
+	// Verify that the path passed to StartContainer is absolute
+	if !filepath.IsAbs(mockSandbox.lastRepoPath) {
+		t.Errorf("StartContainer should receive absolute path, got: %s", mockSandbox.lastRepoPath)
+	}
 }
 
 // TestStart_ErrorPropagation tests that StartContainer errors are propagated

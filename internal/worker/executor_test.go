@@ -20,6 +20,7 @@ type MockSandboxManager struct {
 	execExitCode         int
 	execOutput           string
 	lastContainerID      string
+	lastRepoPath         string // Added to verify repo path resolution
 }
 
 // Verify that MockSandboxManager implements SandboxProvider interface
@@ -27,6 +28,7 @@ var _ SandboxProvider = (*MockSandboxManager)(nil)
 
 func (m *MockSandboxManager) StartContainer(ctx context.Context, image string, repoPath string, env map[string]string) (string, error) {
 	m.startContainerCalled = true
+	m.lastRepoPath = repoPath // Capture the repo path
 	if m.startContainerErr != nil {
 		return "", m.startContainerErr
 	}

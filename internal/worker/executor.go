@@ -36,6 +36,15 @@ func (e *Executor) RunWorker(ctx context.Context, prompt string, env map[string]
 		return nil, fmt.Errorf("container not started: call Start() first")
 	}
 
+	// Determine timeout
+	timeoutSec := e.Config.MaxRunTimeSec
+	if timeoutSec <= 0 {
+		timeoutSec = 1800 // Default 30 minutes
+	}
+
+	ctx, cancel := context.WithTimeout(ctx, time.Duration(timeoutSec)*time.Second)
+	defer cancel()
+
 	// Construct Command
 	// "codex exec --sandbox workspace-write --json --cwd /workspace/project '<prompt>'"
 	cmd := []string{
@@ -75,14 +84,16 @@ func (e *Executor) Start(ctx context.Context) error {
 		image = "ghcr.io/biwakonbu/agent-runner-codex:latest" // Default
 	}
 
+	// Resolve RepoPath to absolute path
 	repoPath := e.RepoPath
 	if repoPath == "" {
-		absRepo, err := filepath.Abs(".")
-		if err != nil {
-			return fmt.Errorf("failed to get absolute path: %w", err)
-		}
-		repoPath = absRepo
+		repoPath = "."
 	}
+	absRepo, err := filepath.Abs(repoPath)
+	if err != nil {
+		return fmt.Errorf("failed to get absolute path for %s: %w", repoPath, err)
+	}
+	repoPath = absRepo
 
 	containerID, err := e.Sandbox.StartContainer(ctx, image, repoPath, nil)
 	if err != nil {
