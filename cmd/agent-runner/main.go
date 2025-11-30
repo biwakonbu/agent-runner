@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"os"
 
+	"github.com/biwakonbu/agent-runner/internal/cli"
 	"github.com/biwakonbu/agent-runner/internal/core"
 	"github.com/biwakonbu/agent-runner/internal/meta"
 	"github.com/biwakonbu/agent-runner/internal/note"
@@ -29,7 +30,13 @@ func main() {
 
 // Run is the main entry point for the application, extracted for testing.
 func Run(ctx context.Context, stdin io.Reader, _, _ io.Writer, logger *slog.Logger) error {
-	// 1. Read YAML from stdin
+	// 1. Parse CLI flags
+	flags, err := cli.ParseFlags(os.Args[1:], os.Stderr)
+	if err != nil {
+		return err
+	}
+
+	// 2. Read YAML from stdin
 	bytes, err := io.ReadAll(stdin)
 	if err != nil {
 		return err
@@ -40,13 +47,17 @@ func Run(ctx context.Context, stdin io.Reader, _, _ io.Writer, logger *slog.Logg
 		return err
 	}
 
-	// 2. Initialize Components
+	// 3. Initialize Components
 	apiKey := os.Getenv("OPENAI_API_KEY")
 	if apiKey == "" {
 		logger.Warn("OPENAI_API_KEY not set, using mock mode")
 	}
 
-	metaClient := meta.NewClient(cfg.Runner.Meta.Kind, apiKey, cfg.Runner.Meta.Model, cfg.Runner.Meta.SystemPrompt)
+	// Resolve Meta Model ID
+	metaModel := cli.ResolveMetaModel(flags.MetaModel, cfg.Runner.Meta.Model)
+	logger.Info("resolved meta model", "model", metaModel)
+
+	metaClient := meta.NewClient(cfg.Runner.Meta.Kind, apiKey, metaModel, cfg.Runner.Meta.SystemPrompt)
 
 	workerExecutor, err := worker.NewExecutor(cfg.Runner.Worker, cfg.Task.Repo)
 	if err != nil {
@@ -57,7 +68,7 @@ func Run(ctx context.Context, stdin io.Reader, _, _ io.Writer, logger *slog.Logg
 
 	runner := core.NewRunner(&cfg, metaClient, workerExecutor, noteWriter)
 
-	// 3. Run
+	// 4. Run
 	logger.Info("starting task", "title", cfg.Task.Title, "id", cfg.Task.ID)
 
 	result, err := runner.Run(ctx)

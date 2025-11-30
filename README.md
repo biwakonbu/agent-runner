@@ -1,10 +1,10 @@
 # agent-runner
 
-AIエージェント（Meta-agent と Worker agent）を組み合わせて、開発タスクを自動化するメタエージェント・オーケストレーションツール。
+AI エージェント（Meta-agent と Worker agent）を組み合わせて、開発タスクを自動化するメタエージェント・オーケストレーションツール。
 
 ## 概要
 
-**agent-runner** は、PRD（要件定義）を入力として、Meta-agent（LLM）による計画・評価と、Worker agent（Codex CLI等）によるコード編集・テスト実行を組み合わせることで、開発タスクを自律的に完遂します。
+**agent-runner** は、PRD（要件定義）を入力として、Meta-agent（LLM）による計画・評価と、Worker agent（Codex CLI 等）によるコード編集・テスト実行を組み合わせることで、開発タスクを自律的に完遂します。
 
 ```
 Meta-agent (LLM)
@@ -99,7 +99,7 @@ version: 1
 task:
   id: "TASK-001"
   title: "新機能を実装"
-  repo: "/path/to/repo"  # 絶対パスを推奨
+  repo: "/path/to/repo" # 絶対パスを推奨
 
   prd:
     text: |
@@ -115,7 +115,7 @@ task:
 runner:
   meta:
     kind: "openai-chat"
-    model: "gpt-4-turbo"
+    model: "gpt-5.1-codex-max-high" # または --meta-model フラグで指定
 
   worker:
     kind: "codex-cli"
@@ -135,11 +135,11 @@ runner:
 
 ### 三層構造
 
-| レイヤー | 役割 | 主要コンポーネント |
-|---------|------|------------------|
-| **Meta-agent** | タスク計画・評価 | OpenAI API クライアント |
-| **AgentRunner Core** | 状態管理・オーケストレーション | Runner、TaskContext、FSM |
-| **Worker Agents** | 実装・テスト実行 | Codex CLI、Docker Sandbox |
+| レイヤー             | 役割                           | 主要コンポーネント        |
+| -------------------- | ------------------------------ | ------------------------- |
+| **Meta-agent**       | タスク計画・評価               | OpenAI API クライアント   |
+| **AgentRunner Core** | 状態管理・オーケストレーション | Runner、TaskContext、FSM  |
+| **Worker Agents**    | 実装・テスト実行               | Codex CLI、Docker Sandbox |
 
 ### パッケージ構成
 
@@ -181,6 +181,7 @@ cmd/
 ### 既知の課題
 
 **相対パスの解決**
+
 - タスク設定で相対パス `"."` を使用すると Docker マウントエラーが発生します
 - 対応：絶対パスを使用するか、`worker/executor.go` で `filepath.Abs` を使用してください
 
@@ -213,4 +214,5 @@ MIT License - [LICENSE](LICENSE) を参照してください。
 - [OpenAI API ドキュメント](https://platform.openai.com/docs)
 - [Docker ドキュメント](https://docs.docker.com/)
 - [Codex CLI](https://github.com/openai/codex)
+
 # Test comment for pre-commit hook

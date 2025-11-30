@@ -387,7 +387,7 @@ func (c *Client) Chat(ctx context.Context, req ChatRequest) (ChatResponse, error
 
 - ✅ CLI エントリポイント
 - ✅ FSM オーケストレーション
-- ✅ Meta-agent 通信（OpenAI API）
+- ✅ Meta-agent 通信（OpenAI API, `modelID` string 直接指定）
 - ✅ Worker 実行（Codex CLI）
 - ✅ Docker サンドボックス管理
 - ✅ Task Note 生成

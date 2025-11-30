@@ -17,9 +17,21 @@ agent-runner < task.yaml
 ### 1.2 入力
 
 - **stdin**: Task YAML ファイル（1 枚）
-- **コマンドラインオプション**: v1 では未サポート
+- **stdin**: Task YAML ファイル（1 枚）
+- **コマンドラインオプション**:
+  - `--meta-model=<model_id>`: Meta 用 LLM モデル ID を指定 (v1)
 
-### 1.3 出力
+### 1.3 モデル決定の優先順位
+
+Meta 用 LLM モデル ID は以下の優先順位で決定されます：
+
+1. **CLI オプション**: `--meta-model` で指定された値
+2. **Task YAML**: `runner.meta.model` で指定された値
+3. **ビルトインデフォルト**: `gpt-5.1-codex-max-high`
+
+※ 設定ファイルによるデフォルト指定は将来拡張です。
+
+### 1.4 出力
 
 - **stdout**: 実行ログ（人間が読む用の簡易ログ）
 - **ファイル**: Task Note (`<repo>/.agent-runner/task-<task_id>.md`)
@@ -51,7 +63,7 @@ task:
 runner:
   meta:
     kind: "openai-chat" # v1 は固定想定
-    model: "gpt-4o" # 任意。未指定ならデフォルトモデル
+    model: "gpt-5.1-codex-max-high" # 任意。プロバイダのモデルIDを直接指定
     # system_prompt: |              # 任意。Meta 用 system prompt を上書き
     max_loops: 5 # 任意。最大ループ回数（デフォルト: 5）
 
@@ -70,18 +82,18 @@ runner:
 
 ### 2.3 デフォルト補完ルール
 
-| フィールド                       | デフォルト値                 |
-| -------------------------------- | ---------------------------- |
-| `task.id`                        | UUID 自動生成                |
-| `task.title`                     | `task.id` と同じ             |
-| `task.repo`                      | `"."` (カレントディレクトリ) |
-| `task.test`                      | 未設定（テスト自動実行なし） |
-| `runner.meta.kind`               | `"openai-chat"`              |
-| `runner.meta.model`              | 環境変数またはデフォルト     |
-| `runner.meta.max_loops`          | `5`                          |
-| `runner.worker.kind`             | `"codex-cli"`                |
-| `runner.worker.docker_image`     | デフォルトイメージ           |
-| `runner.worker.max_run_time_sec` | `1800` (30 分)               |
+| フィールド                       | デフォルト値                                     |
+| -------------------------------- | ------------------------------------------------ |
+| `task.id`                        | UUID 自動生成                                    |
+| `task.title`                     | `task.id` と同じ                                 |
+| `task.repo`                      | `"."` (カレントディレクトリ)                     |
+| `task.test`                      | 未設定（テスト自動実行なし）                     |
+| `runner.meta.kind`               | `"openai-chat"`                                  |
+| `runner.meta.model`              | `gpt-5.1-codex-max-high` (プロバイダのモデル ID) |
+| `runner.meta.max_loops`          | `5`                                              |
+| `runner.worker.kind`             | `"codex-cli"`                                    |
+| `runner.worker.docker_image`     | デフォルトイメージ                               |
+| `runner.worker.max_run_time_sec` | `1800` (30 分)                                   |
 
 ### 2.4 環境変数参照
 

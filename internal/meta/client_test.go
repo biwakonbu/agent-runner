@@ -338,7 +338,7 @@ func TestExtractYAML_MultipleCodeBlocks(t *testing.T) {
 // TestClient_APIKeyHandling tests that API key is stored correctly
 func TestClient_APIKeyHandling(t *testing.T) {
 	apiKey := "test-api-key-12345"
-	client := NewClient("openai-chat", apiKey, "gpt-4-turbo", "")
+	client := NewClient("openai-chat", apiKey, "", "")
 
 	// We can't access private field, but we can verify the client was created
 	if client == nil {
@@ -346,8 +346,8 @@ func TestClient_APIKeyHandling(t *testing.T) {
 	}
 
 	// Verify other public fields
-	if client.model != "gpt-4-turbo" {
-		t.Errorf("Model should be gpt-4-turbo, got %q", client.model)
+	if client.model != "gpt-5.1-codex-max-high" {
+		t.Errorf("expected default model gpt-5.1-codex-max-high, got %s", client.model)
 	}
 }
 

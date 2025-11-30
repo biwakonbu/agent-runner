@@ -94,14 +94,14 @@ flowchart TB
 
 #### 2. AgentRunner Core
 
-| コンポーネント       | 責務                                    |
-| -------------------- | --------------------------------------- |
-| **CLI Layer**        | stdin から YAML を読み込み、Core を起動 |
-| **Task FSM**         | タスク状態を管理する状態機械            |
-| **Meta Client**      | Meta-agent（LLM）との YAML 通信         |
-| **Worker Executor**  | Worker CLI の実行管理                   |
-| **Sandbox Manager**  | Docker サンドボックスの管理             |
-| **Task Note Writer** | Markdown ノートの生成                   |
+| コンポーネント       | 責務                                                                      |
+| -------------------- | ------------------------------------------------------------------------- |
+| **CLI Layer**        | stdin から YAML を読み込み、Core を起動                                   |
+| **Task FSM**         | タスク状態を管理する状態機械                                              |
+| **Meta Client**      | Meta-agent（LLM）との YAML 通信。モデル ID はプロバイダのものを直接使用。 |
+| **Worker Executor**  | Worker CLI の実行管理                                                     |
+| **Sandbox Manager**  | Docker サンドボックスの管理                                               |
+| **Task Note Writer** | Markdown ノートの生成                                                     |
 
 #### 3. Meta-agent (LLM)
 

@@ -236,7 +236,7 @@ task:
 runner:
   meta:
     kind: "openai-chat" # または "mock"
-    model: "gpt-4-turbo" # LLMモデル名
+    model: "gpt-5.1-codex-max-high" # LLMモデル名（または --meta-model フラグで指定）
 
   worker:
     kind: "codex-cli"
