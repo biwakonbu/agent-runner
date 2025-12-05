@@ -1,0 +1,16 @@
+{
+  "name": "multiverse-ide",
+  "outputfilename": "multiverse-ide",
+  "frontend:install": "npm install",
+  "frontend:build": "npm run build",
+  "frontend:dev:watcher": "npm run dev",
+  "frontend:dev:serverUrl": "auto",
+  "frontend:dir": "frontend/ide",
+  "assetdir": "frontend/ide/dist",
+  "author": {
+    "name": "AgentRunner",
+    "email": "agent@example.com"
+  },
+  "wailsjsdir": "./frontend/ide/wailsjs",
+  "version": "2"
+}

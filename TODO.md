@@ -1,47 +1,68 @@
-# TODO: AgentRunner v1 実装タスク
+# TODO: multiverse IDE v0.1 Implementation
 
-`docs/` ディレクトリの仕様書に基づき、現状の実装で不足している機能や改善が必要な項目をまとめる。
+Based on `PRD.md`.
 
-## 1. 実装すべき機能（不足機能）
+---
 
-### Worker パッケージ
+## 進捗サマリ
 
-- [x] **相対パスの完全な解決**
+| Phase                  | Status  | 備考                                                      |
+| ---------------------- | ------- | --------------------------------------------------------- |
+| M0: 基盤整備           | ✅ 完了 | Backend ロジック実装済み、テスト済み                      |
+| M1: IDE v0.1           | ✅ 完了 | Wails ビルド成功、`build/bin/multiverse-ide.app` 生成済み |
+| M1.1: Core Integration | ✅ 完了 | Executor 実装、AgentRunner Core 連携完了                  |
 
-  - 現状: `repo` が空の場合のみ絶対パス化している。
-  - 仕様: `.` や `../foo` などの相対パスが指定された場合も、Docker マウント用に絶対パスに変換する必要がある。
-  - 対象: `internal/worker/executor.go`
+---
 
-- [x] **実行タイムアウト制御の確認と実装**
-  - 仕様: `runner.worker.max_run_time_sec` (デフォルト 1800s) に基づき、Worker の実行を打ち切る必要がある。
-  - 現状: `context.WithTimeout` などで制御されているか確認し、未実装なら実装する。
-  - 対象: `internal/worker/executor.go`
+## M0: 基盤整備（バックエンドのみ） ✅ 完了
 
-### Core パッケージ
+- [x] **ディレクトリ構成の作成**
+- [x] **Workspace 管理 (Backend)**
+- [x] **Task / Attempt 永続化 (Backend)**
+- [x] **Orchestrator (Dummy Implementation)**
 
-- [ ] **テストコマンドの実行（将来的な拡張）**
-  - 仕様: `task.test.command` が指定されている場合、v1 では Worker に任せる方針だが、Core 側で実行する基盤も検討が必要（現状はスキップで OK）。
+---
 
-## 2. 改善・リファクタリング
+## M1: IDE v0.1 (UI Implementation) ✅ 完了
 
-### テスト
+- [x] **Wails プロジェクト立ち上げ**
+- [x] **UI コンポーネント実装**
+- [x] **Backend API 実装 (Go)**
 
-- [x] **Docker 統合テストの CI 組み込み**
-  - 現状: `make test-worker-coverage` で手動実行。
-  - 目標: CI で自動実行できるようにする（GitHub Actions の Service Container 利用など）。
-  - 完了: `.github/workflows/ci.yaml` に `test-worker-coverage` ステップを追加し、カバレッジレポートをアーティファクトとして保存するように設定。
+---
 
-### ドキュメント
+## M1.1: Core Integration ✅ 完了
 
-- [x] **CLAUDE.md の更新**
-  - 「既知の課題」として記載されている相対パス問題が解決したら削除する。
+- [x] **Executor 実装**
 
-## 3. 完了済み（確認用）
+  - [x] `internal/orchestrator/executor.go`: AgentRunner Core 連携
+  - [x] `ExecuteTask()`: Task YAML 生成 → agent-runner 実行 → 結果更新
 
-- [x] Meta プロトコル (`plan_task`, `next_action`, `completion_assessment`)
-- [x] LLM リトライロジック (Exponential Backoff)
-- [x] Sandbox 基本機能 (Start/Exec/Stop)
-- [x] ImagePull 自動実行
-- [x] Codex 認証自動マウント
-- [x] `env:` プレフィックス対応
-- [x] Task Note 生成
+- [x] **IDE 統合**
+  - [x] `app.go`: Executor を使用した RunTask 実装
+  - [x] バックグラウンド実行対応
+
+---
+
+## 実装済みファイル一覧
+
+### Core Integration (新規)
+
+| ファイル                            | 説明                          |
+| ----------------------------------- | ----------------------------- |
+| `internal/orchestrator/executor.go` | AgentRunner Core 実行ラッパー |
+
+### Backend (既存)
+
+| ファイル  | 説明                                     |
+| --------- | ---------------------------------------- |
+| `main.go` | Wails エントリポイント                   |
+| `app.go`  | Wails バインディング (Executor 統合済み) |
+
+---
+
+## 次のステップ
+
+1. アプリの起動テスト: `open build/bin/multiverse-ide.app`
+2. Task 作成 → Run → ステータス確認の E2E テスト
+3. エラーハンドリングの改善

@@ -1,0 +1,31 @@
+# 依存パッケージ
+node_modules/
+
+# ビルド出力
+dist/
+
+# Vite キャッシュ
+.vite/
+
+# TypeScript ビルド情報
+*.tsbuildinfo
+
+# ローカル環境変数
+.env.local
+.env.*.local
+
+# エディタ
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# ビルドエラーログ
+build_error.log
+
+# Wails 自動生成ファイル（wailsjs/ はコミット対象）
+# wailsjs/ は Go バインディングの TypeScript 型定義を含むためコミットする

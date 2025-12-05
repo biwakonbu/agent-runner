@@ -10,6 +10,11 @@
 
 # プロジェクト固有のバイナリ
 /agent-runner
+/multiverse-ide
+/multiverse-orchestrator
+
+# Wails ビルド成果物
+/build/bin/
 
 # Go モジュール
 vendor/
@@ -43,3 +48,11 @@ test_output.log
 # プロジェクト生成物（Task Note 除外は不要。.agent-runner/ は保持）
 /output/
 /results/
+
+# フロントエンド（Node.js）
+node_modules/
+frontend/ide/dist/
+frontend/ide/node_modules/
+
+# multiverse データディレクトリ（ローカル開発用）
+# 本番データは ~/.multiverse/ に保存される

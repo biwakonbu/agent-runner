@@ -160,6 +160,114 @@ cmd/
 
 詳細は [docs/AgentRunner-architecture.md](docs/AgentRunner-architecture.md) を参照してください。
 
+---
+
+## multiverse IDE (Desktop Application)
+
+**multiverse IDE** は、agent-runner Core をデスクトップアプリケーションから操作するための GUI ツールです。Wails + Svelte + TypeScript で構築されています。
+
+### ビルド方法
+
+```bash
+# 前提条件: Wails CLI のインストール
+go install github.com/wailsapp/wails/v2/cmd/wails@latest
+
+# フロントエンドの依存関係をインストール
+cd frontend/ide && npm install && cd ../..
+
+# デスクトップアプリをビルド
+wails build
+
+# 生成されたアプリ
+# macOS: build/bin/multiverse-ide.app
+```
+
+### 起動方法
+
+```bash
+# macOS
+open build/bin/multiverse-ide.app
+
+# または直接実行
+./build/bin/multiverse-ide.app/Contents/MacOS/multiverse-ide
+```
+
+### 使い方
+
+1. **Workspace 選択**: アプリ起動時にプロジェクトルートを選択
+2. **Task 作成**: 「New Task」ボタンでタスクを作成（Title と Pool ID を入力）
+3. **Task 実行**: Task 詳細画面で「Run」ボタンをクリック
+4. **ステータス確認**: ポーリングで自動更新（2 秒間隔）
+
+### 運用上の注意点
+
+| 項目                  | 説明                                       |
+| --------------------- | ------------------------------------------ |
+| **データ保存先**      | `~/.multiverse/workspaces/<workspace-id>/` |
+| **Task ファイル**     | `tasks/<task-id>.jsonl` (JSONL 形式)       |
+| **Attempt ファイル**  | `attempts/<attempt-id>.json` (JSON 形式)   |
+| **agent-runner パス** | 現在は `./agent-runner` を前提（改善予定） |
+
+### 既知の制限事項
+
+1. **agent-runner バイナリの配置**: IDE は `./agent-runner` バイナリが同じディレクトリにあることを前提としています
+
+   ```bash
+   # 対策: agent-runner を先にビルドしてコピー
+   go build -o build/bin/multiverse-ide.app/Contents/MacOS/agent-runner ./cmd/agent-runner
+   ```
+
+2. **Worker CLI の設定**: 現在は `codex` CLI をハードコードしています（将来的に設定可能にする予定）
+
+3. **TypeScript 設定の警告**: `tsconfig.json` に警告が出ますが、ビルドには影響しません
+
+### テストコマンド
+
+```bash
+# Backend テスト
+go test -v ./internal/ide/...
+go test -v ./internal/orchestrator/...
+
+# フロントエンドビルド確認
+cd frontend/ide && npm run build && cd ../..
+
+# 全体ビルド確認
+wails build
+```
+
+### トラブルシューティング
+
+| 問題                       | 原因                   | 対策                                            |
+| -------------------------- | ---------------------- | ----------------------------------------------- |
+| Wails build が失敗         | Node.js 未インストール | `brew install node`                             |
+| フロントエンドビルドエラー | 依存関係不足           | `cd frontend/ide && npm install`                |
+| Task 実行が失敗            | agent-runner がない    | `go build -o ./agent-runner ./cmd/agent-runner` |
+| Workspace が見つからない   | パーミッション         | `~/.multiverse/` の権限を確認                   |
+
+### ディレクトリ構成
+
+```
+cmd/
+├── multiverse-ide/        # IDE バックエンド（Wails バインディング）
+└── multiverse-orchestrator/  # Orchestrator CLI（将来用）
+
+internal/
+├── ide/                   # Workspace 管理
+└── orchestrator/          # Task/Attempt 永続化、スケジューラ、Executor
+
+frontend/
+└── ide/                   # Svelte + TypeScript フロントエンド
+    └── src/
+        ├── App.svelte
+        └── lib/
+            ├── WorkspaceSelector.svelte
+            ├── TaskList.svelte
+            ├── TaskDetail.svelte
+            └── TaskCreate.svelte
+```
+
+---
+
 ## 開発ガイド
 
 ### コード規約
