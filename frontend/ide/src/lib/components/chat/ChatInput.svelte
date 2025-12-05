@@ -39,17 +39,17 @@
   .chat-input-container {
     display: flex;
     align-items: flex-start; /* Align to top for multi-line */
-    gap: 8px;
-    padding: 8px; /* Slightly more padding */
-    background: rgba(0, 0, 0, 0.4);
-    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    gap: var(--mv-spacing-xs);
+    padding: var(--mv-spacing-xs);
+    background: var(--mv-color-surface-overlay);
+    border-top: var(--mv-border-width-thin) solid var(--mv-color-border-subtle);
   }
 
   .prompt-icon {
     color: var(--mv-primitive-frost-1); /* User color */
     font-weight: bold;
     font-family: var(--mv-font-mono);
-    margin-top: 4px; /* Align with first line of text */
+    margin-top: var(--mv-spacing-xxs); /* Align with first line of text */
   }
 
   .input-wrapper {
@@ -64,13 +64,14 @@
     font-family: var(--mv-font-sans);
     font-size: var(--mv-font-size-md);
     outline: none;
-    text-shadow: 1px 1px 1px black;
+    text-shadow: var(--mv-border-width-thin) var(--mv-border-width-thin) var(--mv-border-width-thin) var(--mv-primitive-deep-0);
     resize: none; /* User can't resize manually, fixed to rows */
     display: block;
-    line-height: 1.4;
+    line-height: var(--mv-line-height-normal);
   }
 
   .transparent-input::placeholder {
-    color: rgba(255, 255, 255, 0.3);
+    color: var(--mv-color-text-disabled);
+    opacity: 0.6;
   }
 </style>

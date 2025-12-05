@@ -229,6 +229,25 @@
   --mv-container-max-width-sm: 480px;
   --mv-container-max-height-modal: 80vh;
   --mv-container-max-height-error: 100px;
+  --mv-container-max-height-list: 320px;
+
+  /* フローティングウィンドウ */
+  --mv-floating-window-width: 600px;
+  --mv-floating-window-height: 350px;
+
+  /* ========================================
+     ロゴサイズ
+     ======================================== */
+  --mv-logo-width: 340px;
+  --mv-logo-height: 72px;
+  --mv-logo-font-size: 32px;
+  --mv-logo-letter-spacing: 0.15em;
+
+  /* ========================================
+     スクロールバー
+     ======================================== */
+  --mv-scrollbar-width: 6px;
+  --mv-scrollbar-radius: 3px;
 
   /* ========================================
      アイコンサイズ
@@ -236,8 +255,16 @@
   --mv-icon-size-xs: 14px;
   --mv-icon-size-sm: 16px;
   --mv-icon-size-md: 20px;
-  --mv-icon-size-lg: 28px;
+  --mv-icon-size-lg: 24px;
   --mv-icon-size-xl: 32px;
+  --mv-icon-size-xxl: 40px;
+  --mv-icon-size-xxxl: 48px;
+
+  /* ========================================
+     スピナーサイズ
+     ======================================== */
+  --mv-spinner-size-md: 24px;
+  --mv-spinner-border-width: 2px;
 
   /* ========================================
      Letter-spacing
@@ -260,6 +287,7 @@
   --mv-shadow-focus: 0 0 0 var(--mv-focus-ring-width) var(--mv-color-glow-focus);
   --mv-shadow-selected: 0 0 0 var(--mv-border-width-thick) var(--mv-color-glow-selected);
   --mv-shadow-card: 0 4px 12px var(--mv-color-shadow-elevated);
+  --mv-shadow-tab-active-inset: 0 calc(-1 * var(--mv-border-width-default)) 0 0 var(--mv-primitive-aurora-yellow) inset;
 
   /* ========================================
      トランスフォーム

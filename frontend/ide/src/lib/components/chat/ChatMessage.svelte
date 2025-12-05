@@ -1,14 +1,18 @@
 <script lang="ts">
+  import { formatLocalTime } from "../../utils/time";
+
   export let role: "user" | "assistant" | "system" = "user";
   export let content: string;
   export let timestamp: string;
 
   const isUser = role === "user";
   const isSystem = role === "system";
+
+  $: displayTime = formatLocalTime(timestamp);
 </script>
 
 <div class="log-line {role}">
-  <span class="timestamp">[{timestamp}]</span>
+  <span class="timestamp">[{displayTime}]</span>
   <span class="sender">{isUser ? "You" : "Antigravity"}</span>
   <span class="separator">{@html isSystem ? "" : "&gt;"}</span>
   <span class="content">{content}</span>
@@ -20,16 +24,17 @@
       --mv-font-mono
     ); /* Monospace font looks more like a system log */
     font-size: var(--mv-font-size-md);
-    line-height: 1.4;
-    padding: 2px 0;
-    text-shadow: 1px 1px 1px rgba(0, 0, 0, 0.8); /* Text shadow for legibility on transparent bg */
+    line-height: var(--mv-line-height-normal);
+    padding: calc(var(--mv-spacing-xxs) / 2) 0;
+    text-shadow: var(--mv-border-width-thin) var(--mv-border-width-thin)
+      var(--mv-border-width-thin) var(--mv-color-shadow-deep);
     word-break: break-word;
   }
 
   .timestamp {
     color: var(--mv-color-text-muted);
     font-size: var(--mv-font-size-sm);
-    margin-right: 4px;
+    margin-right: var(--mv-spacing-xxs);
     opacity: 0.7;
   }
 
@@ -38,7 +43,7 @@
   }
 
   .separator {
-    margin: 0 4px;
+    margin: 0 var(--mv-spacing-xxs);
     color: var(--mv-color-text-muted);
   }
 

@@ -67,14 +67,14 @@
     display: flex;
     flex-direction: column;
     gap: var(--mv-spacing-sm);
-    max-height: 320px;
+    max-height: var(--mv-container-max-height-list);
     overflow-y: auto;
     padding-right: var(--mv-spacing-xs);
   }
 
   /* スクロールバーのスタイル */
   .workspace-list::-webkit-scrollbar {
-    width: 6px;
+    width: var(--mv-scrollbar-width);
   }
 
   .workspace-list::-webkit-scrollbar-track {
@@ -83,7 +83,7 @@
 
   .workspace-list::-webkit-scrollbar-thumb {
     background: var(--mv-color-border-default);
-    border-radius: 3px;
+    border-radius: var(--mv-scrollbar-radius);
   }
 
   .workspace-list::-webkit-scrollbar-thumb:hover {
@@ -101,8 +101,8 @@
   }
 
   .empty-icon {
-    width: 48px;
-    height: 48px;
+    width: var(--mv-icon-size-xxxl);
+    height: var(--mv-icon-size-xxxl);
     color: var(--mv-color-text-disabled);
     margin-bottom: var(--mv-spacing-md);
   }
@@ -136,11 +136,11 @@
   }
 
   .spinner {
-    width: 24px;
-    height: 24px;
-    border: 2px solid var(--mv-color-border-subtle);
+    width: var(--mv-spinner-size-md);
+    height: var(--mv-spinner-size-md);
+    border: var(--mv-spinner-border-width) solid var(--mv-color-border-subtle);
     border-top-color: var(--mv-color-interactive-primary);
-    border-radius: 50%;
+    border-radius: var(--mv-radius-full);
     animation: spin 1s linear infinite;
   }
 

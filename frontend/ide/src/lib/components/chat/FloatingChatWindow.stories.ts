@@ -15,16 +15,21 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
+const now = new Date();
+const timeMinus2 = new Date(now.getTime() - 2 * 60000).toISOString();
+const timeMinus1 = new Date(now.getTime() - 1 * 60000).toISOString();
+const timeNow = now.toISOString();
+
 const defaultMessages: Array<{
   id: string;
   role: 'user' | 'assistant' | 'system';
   content: string;
   timestamp: string;
 }> = [
-  { id: '1', role: 'system', content: 'Agent connected to Multiverse.', timestamp: '10:00' },
-  { id: '2', role: 'assistant', content: 'こんにちは！タスクを開始します。どのようなサポートが必要ですか？', timestamp: '10:01' },
-  { id: '3', role: 'user', content: 'フロントエンドのチャットUIを作成してほしい。', timestamp: '10:02' },
-  { id: '4', role: 'assistant', content: '承知しました。MMO風のフローティングウィンドウを作成しましょう。', timestamp: '10:02' },
+  { id: '1', role: 'system', content: 'Agent connected to Multiverse.', timestamp: timeMinus2 },
+  { id: '2', role: 'assistant', content: 'こんにちは！タスクを開始します。どのようなサポートが必要ですか？', timestamp: timeMinus1 },
+  { id: '3', role: 'user', content: 'フロントエンドのチャットUIを作成してほしい。', timestamp: timeNow },
+  { id: '4', role: 'assistant', content: '承知しました。MMO風のフローティングウィンドウを作成しましょう。', timestamp: timeNow },
 ];
 
 export const Standalone: Story = {

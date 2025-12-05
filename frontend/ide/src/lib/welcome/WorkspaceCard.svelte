@@ -112,8 +112,8 @@
 
   .card-icon {
     flex-shrink: 0;
-    width: 40px;
-    height: 40px;
+    width: var(--mv-icon-size-xxl);
+    height: var(--mv-icon-size-xxl);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -121,8 +121,8 @@
   }
 
   .card-icon svg {
-    width: 24px;
-    height: 24px;
+    width: var(--mv-icon-size-lg);
+    height: var(--mv-icon-size-lg);
   }
 
   .card-content {
@@ -158,8 +158,8 @@
 
   .remove-btn {
     flex-shrink: 0;
-    width: 32px;
-    height: 32px;
+    width: var(--mv-icon-size-xl);
+    height: var(--mv-icon-size-xl);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -188,7 +188,7 @@
   }
 
   .remove-btn svg {
-    width: 16px;
-    height: 16px;
+    width: var(--mv-icon-size-sm);
+    height: var(--mv-icon-size-sm);
   }
 </style>

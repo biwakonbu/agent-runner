@@ -29,8 +29,8 @@
   }
 
   .logo {
-    width: 340px;
-    height: 72px;
+    width: var(--mv-logo-width);
+    height: var(--mv-logo-height);
   }
 
   .logo-icon {
@@ -40,20 +40,20 @@
   .grid-cell-primary {
     fill: currentColor;
     opacity: 1;
-    transition: opacity 0.3s ease;
+    transition: opacity var(--mv-transition-state);
   }
 
   .grid-cell-secondary {
     fill: currentColor;
     opacity: 0.5;
-    transition: opacity 0.3s ease;
+    transition: opacity var(--mv-transition-state);
   }
 
   .title-text {
-    font-family: var(--mv-font-family-primary);
-    font-size: 32px;
-    font-weight: 700;
-    letter-spacing: 0.15em;
+    font-family: var(--mv-font-sans);
+    font-size: var(--mv-logo-font-size);
+    font-weight: var(--mv-font-weight-bold);
+    letter-spacing: var(--mv-logo-letter-spacing);
   }
 
   .title-main {

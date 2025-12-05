@@ -134,7 +134,7 @@
     align-items: center;
     gap: var(--mv-spacing-xl);
     width: 100%;
-    max-width: 480px;
+    max-width: var(--mv-container-max-width-sm);
   }
 
   /* アクションセクション */

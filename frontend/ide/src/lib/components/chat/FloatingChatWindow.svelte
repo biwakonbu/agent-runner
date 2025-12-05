@@ -9,6 +9,10 @@
   let dragOffset = { x: 0, y: 0 };
   let windowEl: HTMLElement;
 
+  // Tabs
+  let tabs = ["General", "Log"];
+  let activeTab = "General";
+
   // Mock messages for display if empty
   export let messages: Array<{
     id: string;
@@ -18,37 +22,41 @@
   }> = [];
 
   function startDrag(e: MouseEvent) {
+    if (e.button !== 0) return; // Only left click
     isDragging = true;
     const rect = windowEl.getBoundingClientRect();
+    // Calculate offset from the top-left corner of the element
     dragOffset = {
       x: e.clientX - rect.left,
       y: e.clientY - rect.top,
     };
 
     // Bring to front logic could go here
+    window.addEventListener("mouseup", stopDrag);
   }
 
   function onMouseMove(e: MouseEvent) {
     if (!isDragging) return;
 
+    // Calculate new position relative to viewport (since fixed/absolute)
+    // If strict absolute within a container is needed, we need container offset,
+    // but clientX/Y are viewport coordinates.
+    // For absolute positioning inside a relative container, we need to account for container position,
+    // BUT MockMainView sets context.
+    // Let's stick to standard drag logic for fixed/absolute elements.
+
     let newX = e.clientX - dragOffset.x;
     let newY = e.clientY - dragOffset.y;
 
-    // Constraint to viewport
-    newX = Math.max(
-      0,
-      Math.min(window.innerWidth - windowEl.offsetWidth, newX)
-    );
-    newY = Math.max(
-      0,
-      Math.min(window.innerHeight - windowEl.offsetHeight, newY)
-    );
+    // Constraint is handled by CSS/bounds mostly, but we can clamp here if needed
+    // For now, let it be free
 
     position = { x: newX, y: newY };
   }
 
   function stopDrag() {
     isDragging = false;
+    window.removeEventListener("mouseup", stopDrag);
   }
 
   function handleSend(e: CustomEvent<string>) {
@@ -60,7 +68,7 @@
         id: crypto.randomUUID(),
         role: "user",
         content: text,
-        timestamp: new Date().toLocaleTimeString(),
+        timestamp: new Date().toISOString(),
       },
     ];
 
@@ -72,25 +80,33 @@
           id: crypto.randomUUID(),
           role: "assistant",
           content: `受信しました: "${text}"`,
-          timestamp: new Date().toLocaleTimeString(),
+          timestamp: new Date().toISOString(),
         },
       ];
     }, 1000);
   }
 </script>
 
-<svelte:window on:mousemove={onMouseMove} on:mouseup={stopDrag} />
+<svelte:window on:mousemove={onMouseMove} />
 
 <!-- svelte-ignore a11y-no-static-element-interactions -->
 <div
   class="floating-window"
-  style="transform: translate({position.x}px, {position.y}px);"
+  style="top: {position.y}px; left: {position.x}px;"
   bind:this={windowEl}
 >
   <div class="header" on:mousedown={startDrag}>
     <div class="tabs">
-      <div class="tab active">General</div>
-      <div class="tab">Log</div>
+      {#each tabs as tab}
+        <!-- svelte-ignore a11y-click-events-have-key-events -->
+        <div
+          class="tab"
+          class:active={activeTab === tab}
+          on:click|stopPropagation={() => (activeTab = tab)}
+        >
+          {tab}
+        </div>
+      {/each}
     </div>
     <!-- <div class="controls"> -->
     <!-- Plus button or settings cog could go here -->
@@ -98,13 +114,31 @@
   </div>
 
   <div class="content">
-    {#each messages as msg (msg.id)}
-      <ChatMessage
-        role={msg.role}
-        content={msg.content}
-        timestamp={msg.timestamp}
-      />
-    {/each}
+    {#if activeTab === "General"}
+      {#each messages as msg (msg.id)}
+        <ChatMessage
+          role={msg.role}
+          content={msg.content}
+          timestamp={msg.timestamp}
+        />
+      {/each}
+    {:else if activeTab === "Log"}
+      <!-- Filter showing only system/log messages could go here -->
+      <div class="log-placeholder">
+        <ChatMessage
+          role="system"
+          content="[System] Log tab selected."
+          timestamp={new Date().toISOString()}
+        />
+        {#each messages.filter((m) => m.role === "system") as msg (msg.id)}
+          <ChatMessage
+            role={msg.role}
+            content={msg.content}
+            timestamp={msg.timestamp}
+          />
+        {/each}
+      </div>
+    {/if}
   </div>
 
   <div class="footer">
@@ -115,45 +149,42 @@
 <style>
   .floating-window {
     position: fixed;
-    top: 0;
-    left: 0;
-    width: 600px; /* Wider based on feedback */
-    height: 350px; /* Slightly taller to match width */
+    width: var(--mv-floating-window-width);
+    height: var(--mv-floating-window-height);
     background: linear-gradient(
       180deg,
-      rgba(0, 0, 0, 0.4) 0%,
-      rgba(20, 20, 30, 0.5) 100%
-    ); /* More transparent */
-    backdrop-filter: blur(
-      3px
-    ); /* Slightly less blur to emphasize transparency */
-    border-radius: 4px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+      var(--mv-color-surface-overlay) 0%,
+      var(--mv-color-surface-primary) 100%
+    );
+    backdrop-filter: blur(var(--mv-scrollbar-radius));
+    border-radius: var(--mv-radius-sm);
+    box-shadow: 0 var(--mv-spacing-xxs) var(--mv-spacing-sm)
+      var(--mv-color-shadow-deep);
     display: flex;
     flex-direction: column;
     z-index: 1000;
     overflow: hidden;
-    /* No border property to feel more integrated/semi-transparent */
   }
 
   .floating-window:focus-within {
     background: linear-gradient(
       180deg,
-      rgba(0, 0, 0, 0.7) 0%,
-      rgba(30, 30, 45, 0.8) 100%
+      var(--mv-color-surface-secondary) 0%,
+      var(--mv-color-surface-hover) 100%
     );
   }
 
   .header {
-    height: 32px;
+    height: var(--mv-icon-size-xl);
     display: flex;
     align-items: flex-end; /* Tabs sit at the bottom of header */
     padding: 0 var(--mv-spacing-xs);
     cursor: grab;
     user-select: none;
     flex-shrink: 0;
+
     /* Subtle separation */
-    background: rgba(0, 0, 0, 0.3);
+    background: var(--mv-color-surface-overlay);
   }
 
   .header:active {
@@ -162,31 +193,32 @@
 
   .tabs {
     display: flex;
-    gap: 2px;
+    gap: calc(var(--mv-spacing-xxs) / 2);
   }
 
   .tab {
-    padding: 4px 12px;
+    padding: var(--mv-spacing-xxs) var(--mv-spacing-sm);
     font-size: var(--mv-font-size-sm);
     color: var(--mv-color-text-muted);
-    background: rgba(255, 255, 255, 0.05);
-    border-top-left-radius: 4px;
-    border-top-right-radius: 4px;
+    background: var(--mv-color-surface-primary);
+    border-top-left-radius: var(--mv-radius-sm);
+    border-top-right-radius: var(--mv-radius-sm);
     cursor: pointer;
-    text-shadow: 1px 1px 2px black;
-    transition: all 0.2s;
+    text-shadow: var(--mv-border-width-thin) var(--mv-border-width-thin)
+      var(--mv-border-width-default) var(--mv-primitive-deep-0);
+    transition: all var(--mv-duration-fast);
   }
 
   .tab:hover {
-    background: rgba(255, 255, 255, 0.1);
+    background: var(--mv-color-surface-hover);
     color: var(--mv-color-text-secondary);
   }
 
   .tab.active {
-    background: rgba(255, 255, 255, 0.15);
-    color: var(--mv-primitive-aurora-yellow); /* Active tab highlight */
+    background: var(--mv-color-surface-selected);
+    color: var(--mv-primitive-aurora-yellow);
     font-weight: bold;
-    box-shadow: 0 -2px 0 0 var(--mv-primitive-aurora-yellow) inset; /* Top highlight line */
+    box-shadow: var(--mv-shadow-tab-active-inset);
   }
 
   .content {
@@ -195,25 +227,26 @@
     padding: var(--mv-spacing-xs) var(--mv-spacing-sm);
     display: flex;
     flex-direction: column;
-    /* Log messages flow from bottom usually, but standard scroll for now is fine. 
+
+    /* Log messages flow from bottom usually, but standard scroll for now is fine.
        Maybe add logic to keep scroll at bottom. */
     mask-image: linear-gradient(
       to bottom,
       transparent,
-      black 10px
+      var(--mv-primitive-deep-0) 10px
     ); /* Fade out top slightly */
   }
 
   /* Custom scrollbar for MMO feel (thin, unobtrusive) */
   .content::-webkit-scrollbar {
-    width: 6px;
+    width: var(--mv-scrollbar-width);
   }
   .content::-webkit-scrollbar-track {
-    background: rgba(0, 0, 0, 0.2);
+    background: var(--mv-color-surface-overlay);
   }
   .content::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.2);
-    border-radius: 3px;
+    background: var(--mv-color-surface-hover);
+    border-radius: var(--mv-scrollbar-radius);
   }
 
   .footer {
