@@ -4,6 +4,7 @@
  * 使用方法:
  * ```ts
  * import { colors, spacing, animation } from './design-system';
+ * import { Button, Badge, Card, Input } from './design-system';
  * ```
  *
  * CSS変数を使う場合は variables.css をインポート:
@@ -13,3 +14,4 @@
  */
 
 export * from './tokens';
+export * from './components';

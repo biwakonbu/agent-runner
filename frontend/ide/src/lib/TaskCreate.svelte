@@ -1,5 +1,6 @@
 <script lang="ts">
   import { createEventDispatcher } from 'svelte';
+  import { Button, Input } from '../design-system';
   // @ts-ignore - Wails自動生成ファイル
   import { CreateTask } from '../../wailsjs/go/main/App';
 
@@ -49,22 +50,15 @@
 
 <form class="task-create-form" on:submit|preventDefault={handleSubmit}>
   <!-- タイトル入力 -->
-  <div class="form-group">
-    <label for="task-title" class="form-label">タイトル</label>
-    <input
-      id="task-title"
-      type="text"
-      class="form-input"
-      class:error={!!error}
-      bind:value={title}
-      on:keydown={handleKeydown}
-      placeholder="タスクのタイトルを入力"
-      disabled={isSubmitting}
-    />
-    {#if error}
-      <span class="form-error">{error}</span>
-    {/if}
-  </div>
+  <Input
+    label="タイトル"
+    placeholder="タスクのタイトルを入力"
+    bind:value={title}
+    disabled={isSubmitting}
+    error={!!error}
+    errorMessage={error}
+    on:keydown={handleKeydown}
+  />
 
   <!-- Pool選択 -->
   <div class="form-group">
@@ -83,18 +77,15 @@
 
   <!-- 送信ボタン -->
   <div class="form-actions">
-    <button
+    <Button
       type="submit"
-      class="btn btn-primary"
-      disabled={isSubmitting || !title.trim()}
+      variant="primary"
+      disabled={!title.trim()}
+      loading={isSubmitting}
+      loadingLabel="作成中..."
     >
-      {#if isSubmitting}
-        <span class="spinner"></span>
-        作成中...
-      {:else}
-        タスクを作成
-      {/if}
-    </button>
+      タスクを作成
+    </Button>
   </div>
 </form>
 
@@ -106,7 +97,7 @@
     padding: var(--mv-spacing-md);
   }
 
-  /* フォームグループ */
+  /* フォームグループ（セレクト用） */
   .form-group {
     display: flex;
     flex-direction: column;
@@ -119,8 +110,7 @@
     color: var(--mv-color-text-secondary);
   }
 
-  /* 入力フィールド */
-  .form-input,
+  /* セレクト */
   .form-select {
     padding: var(--mv-spacing-sm);
     font-size: var(--mv-font-size-md);
@@ -131,31 +121,6 @@
     border-radius: var(--mv-radius-sm);
     transition: border-color var(--mv-transition-hover),
                 box-shadow var(--mv-transition-hover);
-  }
-
-  .form-input:focus,
-  .form-select:focus {
-    outline: none;
-    border-color: var(--mv-color-border-focus);
-    box-shadow: var(--mv-shadow-focus);
-  }
-
-  .form-input::placeholder {
-    color: var(--mv-color-text-muted);
-  }
-
-  .form-input.error {
-    border-color: var(--mv-color-status-failed-border);
-  }
-
-  .form-input:disabled,
-  .form-select:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-  }
-
-  /* セレクト */
-  .form-select {
     cursor: pointer;
     appearance: none;
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23888888' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
@@ -164,15 +129,20 @@
     padding-right: var(--mv-spacing-xl);
   }
 
+  .form-select:focus {
+    outline: none;
+    border-color: var(--mv-color-border-focus);
+    box-shadow: var(--mv-shadow-focus);
+  }
+
+  .form-select:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
   .form-select option {
     background: var(--mv-color-surface-primary);
     color: var(--mv-color-text-primary);
-  }
-
-  /* エラーメッセージ */
-  .form-error {
-    font-size: var(--mv-font-size-xs);
-    color: var(--mv-color-status-failed-text);
   }
 
   /* アクション */
@@ -180,57 +150,5 @@
     display: flex;
     justify-content: flex-end;
     padding-top: var(--mv-spacing-xs);
-  }
-
-  /* ボタン */
-  .btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: var(--mv-spacing-xs);
-    padding: var(--mv-spacing-sm) var(--mv-spacing-md);
-    font-size: var(--mv-font-size-sm);
-    font-weight: var(--mv-font-weight-medium);
-    border-radius: var(--mv-radius-sm);
-    cursor: pointer;
-    transition: background var(--mv-transition-hover),
-                border-color var(--mv-transition-hover);
-  }
-
-  .btn-primary {
-    background: var(--mv-color-status-running-bg);
-    border: var(--mv-border-width-thin) solid var(--mv-color-status-running-border);
-    color: var(--mv-color-status-running-text);
-  }
-
-  .btn-primary:hover:not(:disabled) {
-    background: var(--mv-color-status-running-border);
-    color: var(--mv-color-text-primary);
-  }
-
-  .btn-primary:focus {
-    outline: none;
-    box-shadow: var(--mv-shadow-focus);
-  }
-
-  .btn:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
-
-  /* スピナー */
-  .spinner {
-    width: var(--mv-icon-size-xs);
-    height: var(--mv-icon-size-xs);
-    border: var(--mv-border-width-default) solid transparent;
-    border-top-color: currentColor;
-    border-radius: var(--mv-radius-full);
-    animation: spin 0.8s linear infinite;
-  }
-
-  @keyframes spin {
-    to {
-      transform: rotate(360deg);
-    }
   }
 </style>

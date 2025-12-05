@@ -1,9 +1,10 @@
 <script lang="ts">
   import { createEventDispatcher } from 'svelte';
+  import { Button, Badge } from '../../design-system';
   // @ts-ignore - Wails自動生成ファイル
   import { RunTask } from '../../../wailsjs/go/main/App';
   import { selectedTask, selectedTaskId } from '../../stores';
-  import { statusLabels, statusToCssClass } from '../../types';
+  import { statusLabels } from '../../types';
 
   const dispatch = createEventDispatcher<{
     close: void;
@@ -35,7 +36,7 @@
   }
 
   $: task = $selectedTask;
-  $: statusClass = task ? statusToCssClass(task.status) : '';
+  $: badgeStatus = task ? task.status.toLowerCase() as 'pending' | 'ready' | 'running' | 'succeeded' | 'failed' | 'canceled' | 'blocked' : 'pending';
   $: canRun = task && task.status !== 'RUNNING';
 </script>
 
@@ -44,13 +45,7 @@
     <!-- ヘッダー -->
     <header class="panel-header">
       <h2 class="panel-title">タスク詳細</h2>
-      <button
-        class="btn-close"
-        on:click={handleClose}
-        aria-label="閉じる"
-      >
-        ×
-      </button>
+      <Button variant="ghost" size="small" on:click={handleClose} label="×" />
     </header>
 
     <!-- コンテンツ -->
@@ -58,26 +53,24 @@
       <!-- タスク名とステータス -->
       <div class="task-header">
         <h3 class="task-title">{task.title}</h3>
-        <div class="status-badge status-{statusClass}">
-          {statusLabels[task.status]}
-        </div>
+        <Badge status={badgeStatus} label={statusLabels[task.status]} />
       </div>
 
       <!-- アクション -->
       <div class="actions">
-        <button
-          class="btn btn-primary"
+        <Button
+          variant="primary"
           on:click={handleRun}
-          disabled={!canRun || isRunning}
+          disabled={!canRun}
+          loading={isRunning}
+          loadingLabel="実行中..."
         >
-          {#if isRunning}
-            実行中...
-          {:else if task.status === 'RUNNING'}
+          {#if task.status === 'RUNNING'}
             実行中
           {:else}
             タスクを実行
           {/if}
-        </button>
+        </Button>
       </div>
 
       <!-- メタ情報 -->
@@ -155,27 +148,6 @@
     margin: 0;
   }
 
-  .btn-close {
-    width: var(--mv-input-height-sm);
-    height: var(--mv-input-height-sm);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: transparent;
-    border: none;
-    border-radius: var(--mv-radius-sm);
-    color: var(--mv-color-text-secondary);
-    font-size: var(--mv-font-size-lg);
-    cursor: pointer;
-    transition: background var(--mv-transition-hover),
-                color var(--mv-transition-hover);
-  }
-
-  .btn-close:hover {
-    background: var(--mv-color-surface-hover);
-    color: var(--mv-color-text-primary);
-  }
-
   /* パネルコンテンツ */
   .panel-content {
     flex: 1;
@@ -201,88 +173,10 @@
     word-break: break-word;
   }
 
-  /* ステータスバッジ */
-  .status-badge {
-    display: inline-flex;
-    align-items: center;
-    align-self: flex-start;
-    padding: var(--mv-spacing-xxs) var(--mv-spacing-xs);
-    border-radius: var(--mv-radius-sm);
-    font-size: var(--mv-font-size-xs);
-    font-weight: var(--mv-font-weight-bold);
-    text-transform: uppercase;
-    letter-spacing: var(--mv-letter-spacing-wide);
-  }
-
-  .status-badge.status-pending {
-    background: var(--mv-color-status-pending-bg);
-    color: var(--mv-color-status-pending-text);
-  }
-
-  .status-badge.status-ready {
-    background: var(--mv-color-status-ready-bg);
-    color: var(--mv-color-status-ready-text);
-  }
-
-  .status-badge.status-running {
-    background: var(--mv-color-status-running-bg);
-    color: var(--mv-color-status-running-text);
-  }
-
-  .status-badge.status-succeeded {
-    background: var(--mv-color-status-succeeded-bg);
-    color: var(--mv-color-status-succeeded-text);
-  }
-
-  .status-badge.status-failed {
-    background: var(--mv-color-status-failed-bg);
-    color: var(--mv-color-status-failed-text);
-  }
-
-  .status-badge.status-canceled {
-    background: var(--mv-color-status-canceled-bg);
-    color: var(--mv-color-status-canceled-text);
-  }
-
-  .status-badge.status-blocked {
-    background: var(--mv-color-status-blocked-bg);
-    color: var(--mv-color-status-blocked-text);
-  }
-
   /* アクション */
   .actions {
     display: flex;
     gap: var(--mv-spacing-xs);
-  }
-
-  .btn {
-    flex: 1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: var(--mv-spacing-sm) var(--mv-spacing-md);
-    font-size: var(--mv-font-size-sm);
-    font-weight: var(--mv-font-weight-medium);
-    border: var(--mv-border-width-thin) solid var(--mv-color-border-default);
-    border-radius: var(--mv-radius-sm);
-    cursor: pointer;
-    transition: background var(--mv-transition-hover),
-                border-color var(--mv-transition-hover);
-  }
-
-  .btn-primary {
-    background: var(--mv-color-status-running-bg);
-    border-color: var(--mv-color-status-running-border);
-    color: var(--mv-color-status-running-text);
-  }
-
-  .btn-primary:hover:not(:disabled) {
-    background: var(--mv-color-status-running-border);
-  }
-
-  .btn:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
   }
 
   /* メタ情報セクション */

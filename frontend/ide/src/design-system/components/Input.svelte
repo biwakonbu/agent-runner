@@ -78,6 +78,7 @@
     on:change={handleChange}
     on:focus
     on:blur
+    on:keydown
   />
   {#if error && errorMessage}
     <span class="error-message">{errorMessage}</span>

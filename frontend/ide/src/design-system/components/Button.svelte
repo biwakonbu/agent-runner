@@ -21,6 +21,11 @@
   export let disabled = false;
 
   /**
+   * ローディング状態
+   */
+  export let loading = false;
+
+  /**
    * ボタンのタイプ
    */
   export let type: 'button' | 'submit' | 'reset' = 'button';
@@ -30,23 +35,40 @@
    */
   export let label = '';
 
+  /**
+   * ローディング時のラベル
+   */
+  export let loadingLabel = '';
+
   const dispatch = createEventDispatcher();
 
   function handleClick(event: MouseEvent) {
-    if (!disabled) {
+    if (!disabled && !loading) {
       dispatch('click', event);
     }
   }
+
+  $: isDisabled = disabled || loading;
 </script>
 
 <button
   {type}
-  {disabled}
+  disabled={isDisabled}
   class="button variant-{variant} size-{size}"
-  class:disabled
+  class:disabled={isDisabled}
+  class:loading
   on:click={handleClick}
 >
-  {#if label}
+  {#if loading}
+    <span class="spinner"></span>
+    {#if loadingLabel}
+      {loadingLabel}
+    {:else if label}
+      {label}
+    {:else}
+      <slot />
+    {/if}
+  {:else if label}
     {label}
   {:else}
     <slot />
@@ -145,5 +167,21 @@
   .button:focus-visible {
     outline: var(--mv-focus-ring-width) solid var(--mv-color-border-focus);
     outline-offset: var(--mv-focus-ring-offset);
+  }
+
+  /* スピナー */
+  .spinner {
+    width: var(--mv-icon-size-xs);
+    height: var(--mv-icon-size-xs);
+    border: var(--mv-border-width-default) solid transparent;
+    border-top-color: currentColor;
+    border-radius: var(--mv-radius-full);
+    animation: spin 0.8s linear infinite;
+  }
+
+  @keyframes spin {
+    to {
+      transform: rotate(360deg);
+    }
   }
 </style>

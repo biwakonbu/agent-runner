@@ -1,5 +1,6 @@
 <script lang="ts">
   import { createEventDispatcher } from 'svelte';
+  import { Button } from '../../design-system';
   import { viewport, zoomPercent, taskCountsByStatus } from '../../stores';
   import type { TaskStatus } from '../../types';
 
@@ -24,10 +25,10 @@
   <div class="toolbar-left">
     <h1 class="app-title">multiverse IDE</h1>
 
-    <button class="btn btn-primary" on:click={handleCreateTask}>
+    <Button variant="primary" size="small" on:click={handleCreateTask}>
       <span class="btn-icon">+</span>
       新規タスク
-    </button>
+    </Button>
   </div>
 
   <!-- 中央：ステータスサマリ -->
@@ -47,14 +48,12 @@
   <!-- 右側：ズームコントロール -->
   <div class="toolbar-right">
     <div class="zoom-controls">
-      <button
-        class="btn btn-icon-only"
+      <Button
+        variant="ghost"
+        size="small"
         on:click={() => viewport.zoomOut()}
-        aria-label="ズームアウト"
-        title="ズームアウト (-)"
-      >
-        −
-      </button>
+        label="−"
+      />
 
       <button
         class="zoom-value"
@@ -65,14 +64,12 @@
         {$zoomPercent}%
       </button>
 
-      <button
-        class="btn btn-icon-only"
+      <Button
+        variant="ghost"
+        size="small"
         on:click={() => viewport.zoomIn()}
-        aria-label="ズームイン"
-        title="ズームイン (+)"
-      >
-        +
-      </button>
+        label="+"
+      />
     </div>
   </div>
 </header>
@@ -118,55 +115,9 @@
     margin: 0;
   }
 
-  /* ボタン基本スタイル */
-  .btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: var(--mv-spacing-xxs);
-    padding: var(--mv-spacing-xs) var(--mv-spacing-sm);
-    font-size: var(--mv-font-size-sm);
-    font-weight: var(--mv-font-weight-medium);
-    color: var(--mv-color-text-primary);
-    background: var(--mv-color-surface-secondary);
-    border: var(--mv-border-width-thin) solid var(--mv-color-border-default);
-    border-radius: var(--mv-radius-sm);
-    cursor: pointer;
-    transition: background var(--mv-transition-hover),
-                border-color var(--mv-transition-hover);
-  }
-
-  .btn:hover {
-    background: var(--mv-color-surface-hover);
-    border-color: var(--mv-color-border-strong);
-  }
-
-  .btn:focus {
-    outline: none;
-    border-color: var(--mv-color-border-focus);
-    box-shadow: var(--mv-shadow-focus);
-  }
-
-  .btn-primary {
-    background: var(--mv-color-status-ready-bg);
-    border-color: var(--mv-color-status-ready-border);
-    color: var(--mv-color-status-ready-text);
-  }
-
-  .btn-primary:hover {
-    background: var(--mv-color-status-ready-border);
-  }
-
   .btn-icon {
     font-size: var(--mv-font-size-lg);
     line-height: 1;
-  }
-
-  .btn-icon-only {
-    width: var(--mv-icon-size-xl);
-    height: var(--mv-icon-size-xl);
-    padding: 0;
-    font-size: var(--mv-font-size-lg);
   }
 
   /* ステータスサマリ */
@@ -216,15 +167,6 @@
     border: var(--mv-border-width-thin) solid var(--mv-color-border-default);
     border-radius: var(--mv-radius-sm);
     padding: var(--mv-spacing-xxs);
-  }
-
-  .zoom-controls .btn-icon-only {
-    border: none;
-    background: transparent;
-  }
-
-  .zoom-controls .btn-icon-only:hover {
-    background: var(--mv-color-surface-hover);
   }
 
   .zoom-value {

@@ -5,6 +5,7 @@
   import { GridCanvas } from './lib/grid';
   import { Toolbar } from './lib/toolbar';
   import { DetailPanel } from './lib/panel';
+  import { Button } from './design-system';
   import { tasks, selectedTask, selectedTaskId } from './stores';
   import type { Task } from './types';
   // @ts-ignore - Wails自動生成ファイル
@@ -86,9 +87,7 @@
         >
           <header class="modal-header">
             <h2 id="create-task-title">新規タスク作成</h2>
-            <button class="btn-close" on:click={onCreateCancel} aria-label="閉じる">
-              ×
-            </button>
+            <Button variant="ghost" size="small" on:click={onCreateCancel} label="×" />
           </header>
           <TaskCreate on:created={onTaskCreated} />
         </div>
@@ -152,24 +151,4 @@
     margin: 0;
   }
 
-  .btn-close {
-    width: var(--mv-icon-size-xl);
-    height: var(--mv-icon-size-xl);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: transparent;
-    border: none;
-    border-radius: var(--mv-radius-sm);
-    color: var(--mv-color-text-secondary);
-    font-size: var(--mv-font-size-xl);
-    cursor: pointer;
-    transition: background var(--mv-transition-hover),
-                color var(--mv-transition-hover);
-  }
-
-  .btn-close:hover {
-    background: var(--mv-color-surface-hover);
-    color: var(--mv-color-text-primary);
-  }
 </style>

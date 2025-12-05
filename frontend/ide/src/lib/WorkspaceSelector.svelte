@@ -1,5 +1,6 @@
 <script lang="ts">
   import { createEventDispatcher } from 'svelte';
+  import { Button } from '../design-system';
   // @ts-ignore - Wails自動生成ファイル
   import { SelectWorkspace } from '../../wailsjs/go/main/App';
 
@@ -38,17 +39,18 @@
     <div class="action-section">
       <p class="instruction">プロジェクトを選択して開始</p>
 
-      <button class="btn btn-primary" on:click={select} disabled={isLoading}>
-        {#if isLoading}
-          <span class="spinner"></span>
-          読み込み中...
-        {:else}
-          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
-          </svg>
-          Workspaceを開く
-        {/if}
-      </button>
+      <Button
+        variant="primary"
+        size="large"
+        on:click={select}
+        loading={isLoading}
+        loadingLabel="読み込み中..."
+      >
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+        </svg>
+        Workspaceを開く
+      </Button>
     </div>
 
     <!-- ヒント -->
@@ -113,66 +115,9 @@
     margin: 0;
   }
 
-  /* ボタン */
-  .btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: var(--mv-spacing-xs);
-    padding: var(--mv-spacing-sm) var(--mv-spacing-lg);
-    font-size: var(--mv-font-size-md);
-    font-weight: var(--mv-font-weight-medium);
-    border-radius: var(--mv-radius-md);
-    cursor: pointer;
-    transition: background var(--mv-transition-hover),
-                border-color var(--mv-transition-hover),
-                transform var(--mv-transition-hover);
-  }
-
-  .btn:active:not(:disabled) {
-    transform: var(--mv-transform-press);
-  }
-
-  .btn-primary {
-    background: var(--mv-color-status-ready-bg);
-    border: var(--mv-border-width-default) solid var(--mv-color-status-ready-border);
-    color: var(--mv-color-status-ready-text);
-  }
-
-  .btn-primary:hover:not(:disabled) {
-    background: var(--mv-color-status-ready-border);
-    color: var(--mv-color-text-primary);
-  }
-
-  .btn-primary:focus {
-    outline: none;
-    box-shadow: var(--mv-shadow-selected);
-  }
-
-  .btn:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-  }
-
   .icon {
     width: var(--mv-icon-size-md);
     height: var(--mv-icon-size-md);
-  }
-
-  /* スピナー */
-  .spinner {
-    width: var(--mv-icon-size-sm);
-    height: var(--mv-icon-size-sm);
-    border: var(--mv-border-width-default) solid transparent;
-    border-top-color: currentColor;
-    border-radius: var(--mv-radius-full);
-    animation: spin 0.8s linear infinite;
-  }
-
-  @keyframes spin {
-    to {
-      transform: rotate(360deg);
-    }
   }
 
   /* ヒント */
