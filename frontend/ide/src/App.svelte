@@ -6,11 +6,18 @@
   import { Toolbar } from "./lib/toolbar";
   import { DetailPanel } from "./lib/panel";
   import { Button } from "./design-system";
-  import { tasks, selectedTask, selectedTaskId, poolSummaries } from "./stores";
+  import {
+    tasks,
+    selectedTask,
+    selectedTaskId,
+    poolSummaries,
+    chatStore,
+  } from "./stores";
   import { Logger } from "./services/logger";
   import type { Task, PoolSummary } from "./types";
   // @ts-ignore - Wails自動生成ファイル
   import { ListTasks, GetPoolSummaries } from "../wailsjs/go/main/App";
+  import FloatingChatWindow from "./lib/components/chat/FloatingChatWindow.svelte";
 
   const log = Logger.withComponent("App");
 
@@ -18,22 +25,41 @@
   let showCreateModal = false;
   let interval: ReturnType<typeof setInterval> | null = null;
 
+  // Chat State
+  let isChatVisible = true;
+  let chatPosition = { x: 0, y: 0 };
+
+  onMount(() => {
+    chatStore.init();
+    // Calculate initial position (Bottom-Right)
+    // 600px width, 350px height, 20px padding
+    const width = 600;
+    const height = 350;
+    const padding = 20;
+    chatPosition = {
+      x: window.innerWidth - width - padding,
+      y: window.innerHeight - height - padding,
+    };
+  });
+
   // タスク一覧を読み込み
   async function loadTasks() {
     if (!workspaceId) return;
     try {
       const result = await ListTasks();
       // Wails生成型からローカル型へ変換
-      const taskList: Task[] = (result || []).map((t): Task => ({
-        id: t.id,
-        title: t.title,
-        status: t.status as Task['status'],
-        poolId: t.poolId,
-        createdAt: t.createdAt,
-        updatedAt: t.updatedAt,
-        startedAt: t.startedAt,
-        doneAt: t.doneAt
-      }));
+      const taskList: Task[] = (result || []).map(
+        (t): Task => ({
+          id: t.id,
+          title: t.title,
+          status: t.status as Task["status"],
+          poolId: t.poolId,
+          createdAt: t.createdAt,
+          updatedAt: t.updatedAt,
+          startedAt: t.startedAt,
+          doneAt: t.doneAt,
+        })
+      );
       log.debug("tasks loaded", { count: taskList.length });
       tasks.setTasks(taskList);
     } catch (e) {
@@ -136,10 +162,54 @@
         </div>
       </div>
     {/if}
+
+    <!-- チャットウィンドウ -->
+    {#if isChatVisible}
+      <FloatingChatWindow
+        messages={$chatStore}
+        initialPosition={chatPosition}
+        on:send={(e) => chatStore.sendMessage(e.detail)}
+        on:close={() => (isChatVisible = false)}
+      />
+    {/if}
+
+    <!-- チャット再表示ボタン (簡易FAB) -->
+    {#if !isChatVisible}
+      <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
+      <div
+        class="chat-fab"
+        on:click={() => (isChatVisible = true)}
+        role="button"
+        aria-label="Open Chat"
+      >
+        💬
+      </div>
+    {/if}
   {/if}
 </main>
 
 <style>
+  .chat-fab {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    width: 48px;
+    height: 48px;
+    background: var(--mv-color-surface-primary);
+    border: 1px solid var(--mv-color-border-default);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    cursor: pointer;
+    z-index: 1000;
+    font-size: 20px;
+  }
+  .chat-fab:hover {
+    background: var(--mv-color-surface-hover);
+  }
+
   .app {
     height: 100vh;
     display: flex;

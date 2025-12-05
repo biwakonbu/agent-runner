@@ -267,3 +267,25 @@ func (s *TaskStore) GetPoolSummaries() ([]PoolSummary, error) {
 
 	return summaries, nil
 }
+
+// Pool represents a worker pool configuration.
+type Pool struct {
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	Description string `json:"description,omitempty"`
+}
+
+// DefaultPools はデフォルトの Pool 定義を返す
+// 将来的には worker-pools.json から読み込む
+var DefaultPools = []Pool{
+	{ID: "default", Name: "Default", Description: "汎用タスク実行用"},
+	{ID: "codegen", Name: "Codegen", Description: "コード生成タスク用"},
+	{ID: "test", Name: "Test", Description: "テスト実行タスク用"},
+}
+
+// GetAvailablePools は利用可能な Pool 一覧を返す
+func (s *TaskStore) GetAvailablePools() []Pool {
+	// TODO: worker-pools.json から読み込む実装を追加
+	// 現時点ではデフォルト Pool を返す
+	return DefaultPools
+}

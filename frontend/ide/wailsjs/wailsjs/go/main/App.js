@@ -10,12 +10,24 @@ export function GetWorkspace(arg1) {
   return window['go']['main']['App']['GetWorkspace'](arg1);
 }
 
+export function ListRecentWorkspaces() {
+  return window['go']['main']['App']['ListRecentWorkspaces']();
+}
+
 export function ListTasks() {
   return window['go']['main']['App']['ListTasks']();
 }
 
 export function LoadWorkspace(arg1) {
   return window['go']['main']['App']['LoadWorkspace'](arg1);
+}
+
+export function OpenWorkspaceByID(arg1) {
+  return window['go']['main']['App']['OpenWorkspaceByID'](arg1);
+}
+
+export function RemoveWorkspace(arg1) {
+  return window['go']['main']['App']['RemoveWorkspace'](arg1);
 }
 
 export function RunTask(arg1) {

@@ -1,25 +1,54 @@
 <script lang="ts">
-  import { createEventDispatcher } from "svelte";
+  import { createEventDispatcher, onMount } from "svelte";
   import { Button, Input } from "../design-system";
   import { Logger } from "../services/logger";
   // @ts-ignore - Wails自動生成ファイル
-  import { CreateTask } from "../../wailsjs/go/main/App";
+  import { CreateTask, GetAvailablePools } from "../../wailsjs/go/main/App";
 
   const log = Logger.withComponent("TaskCreate");
   const dispatch = createEventDispatcher<{
     created: void;
   }>();
 
-  let title = "";
-  let poolId = "default";
-  let isSubmitting = false;
-  let error = "";
+  // Pool の型定義
+  interface Pool {
+    id: string;
+    name: string;
+    description?: string;
+  }
 
-  const pools = [
+  // デフォルト Pool 一覧
+  const defaultPools: Pool[] = [
     { id: "default", name: "Default" },
     { id: "codegen", name: "Codegen" },
     { id: "test", name: "Test" },
   ];
+
+  let title = "";
+  let poolId = "default";
+  let isSubmitting = false;
+  let error = "";
+  let pools: Pool[] = [];
+  let loadingPools = true;
+
+  // Pool 一覧を取得
+  onMount(async () => {
+    try {
+      const result = await GetAvailablePools();
+      if (result && result.length > 0) {
+        pools = result;
+        log.info("loaded available pools", { count: pools.length });
+      } else {
+        pools = defaultPools;
+        log.warn("no pools returned, using defaults");
+      }
+    } catch (e) {
+      log.error("failed to load pools", { error: e });
+      pools = defaultPools;
+    } finally {
+      loadingPools = false;
+    }
+  });
 
   async function handleSubmit() {
     if (!title.trim()) {
@@ -72,11 +101,15 @@
       id="task-pool"
       class="form-select"
       bind:value={poolId}
-      disabled={isSubmitting}
+      disabled={isSubmitting || loadingPools}
     >
-      {#each pools as pool}
-        <option value={pool.id}>{pool.name}</option>
-      {/each}
+      {#if loadingPools}
+        <option value="">読み込み中...</option>
+      {:else}
+        {#each pools as pool}
+          <option value={pool.id}>{pool.name}</option>
+        {/each}
+      {/if}
     </select>
   </div>
 
@@ -85,7 +118,7 @@
     <Button
       type="submit"
       variant="primary"
-      disabled={!title.trim()}
+      disabled={!title.trim() || loadingPools}
       loading={isSubmitting}
       loadingLabel="作成中..."
     >

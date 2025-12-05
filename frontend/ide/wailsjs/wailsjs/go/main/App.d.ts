@@ -7,9 +7,15 @@ export function CreateTask(arg1:string,arg2:string):Promise<orchestrator.Task>;
 
 export function GetWorkspace(arg1:string):Promise<ide.Workspace>;
 
+export function ListRecentWorkspaces():Promise<Array<ide.WorkspaceSummary>>;
+
 export function ListTasks():Promise<Array<orchestrator.Task>>;
 
 export function LoadWorkspace(arg1:string):Promise<string>;
+
+export function OpenWorkspaceByID(arg1:string):Promise<string>;
+
+export function RemoveWorkspace(arg1:string):Promise<void>;
 
 export function RunTask(arg1:string):Promise<void>;
 

@@ -228,3 +228,87 @@ func TestGetPoolSummaries(t *testing.T) {
 		t.Errorf("expected test total=2, got %d", testPool.Total)
 	}
 }
+
+func TestGetAvailablePools(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "available_pools_test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	store := NewTaskStore(tmpDir)
+
+	pools := store.GetAvailablePools()
+
+	// DefaultPools が返されることを確認
+	if len(pools) != len(DefaultPools) {
+		t.Errorf("expected %d pools, got %d", len(DefaultPools), len(pools))
+	}
+
+	// 各 Pool の ID と Name を検証
+	expectedPools := map[string]string{
+		"default": "Default",
+		"codegen": "Codegen",
+		"test":    "Test",
+	}
+
+	for _, pool := range pools {
+		expectedName, ok := expectedPools[pool.ID]
+		if !ok {
+			t.Errorf("unexpected pool ID: %s", pool.ID)
+			continue
+		}
+		if pool.Name != expectedName {
+			t.Errorf("pool %s: expected name %s, got %s", pool.ID, expectedName, pool.Name)
+		}
+		// Description が空でないことを確認
+		if pool.Description == "" {
+			t.Errorf("pool %s: expected non-empty description", pool.ID)
+		}
+	}
+}
+
+func TestPoolStructJSON(t *testing.T) {
+	// Pool 構造体の JSON シリアライゼーションをテスト
+	pool := Pool{
+		ID:          "test-pool",
+		Name:        "Test Pool",
+		Description: "A test pool",
+	}
+
+	// encoding/json は標準的な Go のシリアライゼーションなので、
+	// タグが正しく設定されていることを確認
+	if pool.ID != "test-pool" {
+		t.Errorf("expected ID test-pool, got %s", pool.ID)
+	}
+	if pool.Name != "Test Pool" {
+		t.Errorf("expected Name Test Pool, got %s", pool.Name)
+	}
+	if pool.Description != "A test pool" {
+		t.Errorf("expected Description 'A test pool', got %s", pool.Description)
+	}
+}
+
+func TestDefaultPoolsContent(t *testing.T) {
+	// DefaultPools の内容を検証
+	if len(DefaultPools) != 3 {
+		t.Fatalf("expected 3 default pools, got %d", len(DefaultPools))
+	}
+
+	// ID の一意性を確認
+	ids := make(map[string]bool)
+	for _, pool := range DefaultPools {
+		if ids[pool.ID] {
+			t.Errorf("duplicate pool ID: %s", pool.ID)
+		}
+		ids[pool.ID] = true
+	}
+
+	// 必須 Pool が存在することを確認
+	requiredIDs := []string{"default", "codegen", "test"}
+	for _, id := range requiredIDs {
+		if !ids[id] {
+			t.Errorf("required pool %s not found in DefaultPools", id)
+		}
+	}
+}

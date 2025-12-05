@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"path/filepath"
+	"time"
 
 	"github.com/biwakonbu/agent-runner/internal/ide"
 	"github.com/biwakonbu/agent-runner/internal/logging"
@@ -76,10 +78,13 @@ func (a *App) LoadWorkspace(path string) string {
 	if err != nil {
 		a.logger.Info("creating new workspace", slog.String("path", path))
 		// Create new workspace if not exists
+		now := time.Now()
 		ws = &ide.Workspace{
-			Version:     "1.0",
-			ProjectRoot: path,
-			DisplayName: path, // Simplified for now
+			Version:      "1.0",
+			ProjectRoot:  path,
+			DisplayName:  filepath.Base(path),
+			CreatedAt:    now,
+			LastOpenedAt: now,
 		}
 		if err := a.workspaceStore.SaveWorkspace(ws); err != nil {
 			a.logger.Error("failed to save workspace", slog.Any("error", err))
@@ -87,6 +92,12 @@ func (a *App) LoadWorkspace(path string) string {
 			return ""
 		}
 		a.logger.Info("new workspace created", slog.String("id", a.workspaceStore.GetWorkspaceID(path)))
+	} else {
+		// Update lastOpenedAt for existing workspace
+		ws.LastOpenedAt = time.Now()
+		if err := a.workspaceStore.SaveWorkspace(ws); err != nil {
+			a.logger.Error("failed to update workspace", slog.Any("error", err))
+		}
 	}
 
 	a.currentWS = ws
@@ -225,5 +236,58 @@ func (a *App) RunTask(taskID string) error {
 		}
 	}()
 
+	return nil
+}
+
+// ListRecentWorkspaces は最近使用したワークスペース一覧を返す
+func (a *App) ListRecentWorkspaces() []ide.WorkspaceSummary {
+	a.logger.Debug("listing recent workspaces")
+	summaries, err := a.workspaceStore.ListWorkspaces()
+	if err != nil {
+		a.logger.Error("failed to list workspaces", slog.Any("error", err))
+		return []ide.WorkspaceSummary{}
+	}
+	a.logger.Info("recent workspaces listed", slog.Int("count", len(summaries)))
+	return summaries
+}
+
+// OpenWorkspaceByID は既存ワークスペースを ID で開く
+func (a *App) OpenWorkspaceByID(id string) string {
+	a.logger.Info("opening workspace by ID", slog.String("id", id))
+	ws, err := a.workspaceStore.LoadWorkspace(id)
+	if err != nil {
+		a.logger.Error("failed to load workspace", slog.String("id", id), slog.Any("error", err))
+		return ""
+	}
+
+	// Update lastOpenedAt
+	ws.LastOpenedAt = time.Now()
+	if err := a.workspaceStore.SaveWorkspace(ws); err != nil {
+		a.logger.Error("failed to update workspace", slog.Any("error", err))
+		return ""
+	}
+
+	a.currentWS = ws
+
+	// Initialize TaskStore and Scheduler for this workspace
+	wsDir := a.workspaceStore.GetWorkspaceDir(id)
+	a.taskStore = orchestrator.NewTaskStore(wsDir)
+	queue := ipc.NewFilesystemQueue(wsDir)
+	a.scheduler = orchestrator.NewScheduler(a.taskStore, queue)
+	a.executor = orchestrator.NewExecutor("./agent-runner", a.taskStore)
+
+	a.logger.Info("workspace opened successfully", slog.String("id", id))
+	return id
+}
+
+// RemoveWorkspace はワークスペースを履歴から削除
+func (a *App) RemoveWorkspace(id string) error {
+	a.logger.Info("removing workspace", slog.String("id", id))
+	err := a.workspaceStore.RemoveWorkspace(id)
+	if err != nil {
+		a.logger.Error("failed to remove workspace", slog.String("id", id), slog.Any("error", err))
+		return err
+	}
+	a.logger.Info("workspace removed", slog.String("id", id))
 	return nil
 }

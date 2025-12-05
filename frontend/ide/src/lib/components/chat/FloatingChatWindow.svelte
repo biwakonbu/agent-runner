@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { createEventDispatcher } from "svelte";
   import ChatMessage from "./ChatMessage.svelte";
   import ChatInput from "./ChatInput.svelte";
 
@@ -13,7 +14,25 @@
   let tabs = ["General", "Log"];
   let activeTab = "General";
 
-  // Mock messages for display if empty
+  let isMinimized = false;
+
+  function toggleMinimize() {
+    isMinimized = !isMinimized;
+    // Adjust position if minimized to avoid jumping?
+    // Actually, since it's top/left, shrinking height pulls bottom up (visually),
+    // but 'top' stays same, so it shrinks downwards from top.
+    // If we want it to stick to bottom, we'd need to adjust top.
+    // But for now simple height shrink is fine.
+  }
+
+  // Use createEventDispatcher for close
+  const dispatch = createEventDispatcher();
+
+  function closeWindow() {
+    dispatch("close");
+  }
+
+  // チャットメッセージ
   export let messages: Array<{
     id: string;
     role: "user" | "assistant" | "system";
@@ -23,6 +42,9 @@
 
   function startDrag(e: MouseEvent) {
     if (e.button !== 0) return; // Only left click
+    // Don't drag if clicking buttons
+    if ((e.target as HTMLElement).closest(".window-controls")) return;
+
     isDragging = true;
     const rect = windowEl.getBoundingClientRect();
     // Calculate offset from the top-left corner of the element
@@ -59,9 +81,11 @@
     window.removeEventListener("mouseup", stopDrag);
   }
 
+  // チャット機能は将来実装予定
+  // 現在は入力を受け付けるが、バックエンド API が未実装のため
+  // システムメッセージでその旨を通知する
   function handleSend(e: CustomEvent<string>) {
     const text = e.detail;
-    // Add user message
     messages = [
       ...messages,
       {
@@ -71,8 +95,6 @@
         timestamp: new Date().toISOString(),
       },
     ];
-
-    // Mock response after delay
     setTimeout(() => {
       messages = [
         ...messages,
@@ -92,6 +114,7 @@
 <!-- svelte-ignore a11y-no-static-element-interactions -->
 <div
   class="floating-window"
+  class:minimized={isMinimized}
   style="top: {position.y}px; left: {position.x}px;"
   bind:this={windowEl}
 >
@@ -108,42 +131,59 @@
         </div>
       {/each}
     </div>
-    <!-- <div class="controls"> -->
-    <!-- Plus button or settings cog could go here -->
-    <!-- </div> -->
+    <div class="window-controls">
+      <!-- Minimize Button -->
+      <button
+        class="control-btn"
+        on:click|stopPropagation={toggleMinimize}
+        aria-label="Minimize"
+      >
+        _
+      </button>
+      <!-- Close Button -->
+      <button
+        class="control-btn close"
+        on:click|stopPropagation={closeWindow}
+        aria-label="Close"
+      >
+        ×
+      </button>
+    </div>
   </div>
 
-  <div class="content">
-    {#if activeTab === "General"}
-      {#each messages as msg (msg.id)}
-        <ChatMessage
-          role={msg.role}
-          content={msg.content}
-          timestamp={msg.timestamp}
-        />
-      {/each}
-    {:else if activeTab === "Log"}
-      <!-- Filter showing only system/log messages could go here -->
-      <div class="log-placeholder">
-        <ChatMessage
-          role="system"
-          content="[System] Log tab selected."
-          timestamp={new Date().toISOString()}
-        />
-        {#each messages.filter((m) => m.role === "system") as msg (msg.id)}
+  {#if !isMinimized}
+    <div class="content">
+      {#if activeTab === "General"}
+        {#each messages as msg (msg.id)}
           <ChatMessage
             role={msg.role}
             content={msg.content}
             timestamp={msg.timestamp}
           />
         {/each}
-      </div>
-    {/if}
-  </div>
+      {:else if activeTab === "Log"}
+        <!-- Filter showing only system/log messages could go here -->
+        <div class="log-placeholder">
+          <ChatMessage
+            role="system"
+            content="[System] Log tab selected."
+            timestamp={new Date().toISOString()}
+          />
+          {#each messages.filter((m) => m.role === "system") as msg (msg.id)}
+            <ChatMessage
+              role={msg.role}
+              content={msg.content}
+              timestamp={msg.timestamp}
+            />
+          {/each}
+        </div>
+      {/if}
+    </div>
 
-  <div class="footer">
-    <ChatInput on:send={handleSend} />
-  </div>
+    <div class="footer">
+      <ChatInput on:send={handleSend} />
+    </div>
+  {/if}
 </div>
 
 <style>
@@ -164,6 +204,12 @@
     flex-direction: column;
     z-index: 1000;
     overflow: hidden;
+    transition: height 0.2s cubic-bezier(0.16, 1, 0.3, 1); /* Animation for minimize */
+  }
+
+  .floating-window.minimized {
+    height: 32px; /* Header height only */
+    background: rgba(0, 0, 0, 0.5); /* Darker when minimized */
   }
 
   .floating-window:focus-within {
@@ -178,6 +224,7 @@
     height: var(--mv-icon-size-xl);
     display: flex;
     align-items: flex-end; /* Tabs sit at the bottom of header */
+    justify-content: space-between; /* Space between tabs and controls */
     padding: 0 var(--mv-spacing-xs);
     cursor: grab;
     user-select: none;
@@ -185,6 +232,35 @@
 
     /* Subtle separation */
     background: var(--mv-color-surface-overlay);
+  }
+
+  .window-controls {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-bottom: 4px; /* Align with tab vertical center roughly */
+  }
+
+  .control-btn {
+    background: transparent;
+    border: none;
+    color: var(--mv-color-text-muted);
+    cursor: pointer;
+    font-family: var(--mv-font-mono);
+    font-size: 14px;
+    padding: 0 4px;
+    line-height: 1;
+    opacity: 0.7;
+    transition: opacity 0.2s;
+  }
+
+  .control-btn:hover {
+    opacity: 1;
+    color: var(--mv-color-text-primary);
+  }
+
+  .control-btn.close:hover {
+    color: var(--mv-primitive-flamingo-1); /* Red for close */
   }
 
   .header:active {

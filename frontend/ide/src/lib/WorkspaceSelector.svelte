@@ -1,7 +1,6 @@
 <script lang="ts">
   import { createEventDispatcher, onMount } from 'svelte';
-  import { Button } from '../design-system';
-  import { WelcomeHeader, RecentWorkspaceList } from './welcome';
+  import { WelcomeHeader, RecentWorkspaceList, OpenWorkspaceButton } from './welcome';
   import type { WorkspaceSummary } from '../schemas';
   // @ts-ignore - Wails自動生成ファイル
   import { SelectWorkspace, ListRecentWorkspaces, OpenWorkspaceByID, RemoveWorkspace } from '../../wailsjs/go/main/App';
@@ -89,20 +88,10 @@
 
     <!-- アクション -->
     <div class="action-section">
-      <Button
-        variant="primary"
-        size="large"
-        on:click={selectNew}
+      <OpenWorkspaceButton
         loading={isLoading}
-        loadingLabel="読み込み中..."
-      >
-        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
-          <line x1="12" y1="11" x2="12" y2="17" />
-          <line x1="9" y1="14" x2="15" y2="14" />
-        </svg>
-        フォルダを開く
-      </Button>
+        on:click={selectNew}
+      />
     </div>
 
     <!-- ヒント -->
@@ -145,11 +134,6 @@
     gap: var(--mv-spacing-md);
     width: 100%;
     padding-top: var(--mv-spacing-md);
-  }
-
-  .icon {
-    width: var(--mv-icon-size-md);
-    height: var(--mv-icon-size-md);
   }
 
   /* ヒント */

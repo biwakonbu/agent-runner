@@ -1,4 +1,14 @@
-console.log('[Mock] Wails bindings loaded');
+/**
+ * E2E テスト用 Wails バインディングモック
+ *
+ * このファイルは VITE_TEST_E2E=true 環境でのみ使用されます。
+ * 本番環境（wails dev / wails build）では使用されません。
+ *
+ * 使用方法:
+ * - E2E テスト実行: VITE_TEST_E2E=true npm run dev
+ * - 通常開発: wails dev（このファイルは無視される）
+ */
+console.log('[Mock] Wails E2E test bindings loaded');
 
 // モックワークスペースデータ
 const mockWorkspaces = [
@@ -86,4 +96,13 @@ export function ListAttempts(taskId) {
 export function GetPoolSummaries() {
     console.log("[Mock] GetPoolSummaries called");
     return Promise.resolve([]);
+}
+
+export function GetAvailablePools() {
+    console.log("[Mock] GetAvailablePools called");
+    return Promise.resolve([
+        { id: "default", name: "Default", description: "汎用タスク実行用" },
+        { id: "codegen", name: "Codegen", description: "コード生成タスク用" },
+        { id: "test", name: "Test", description: "テスト実行タスク用" }
+    ]);
 }

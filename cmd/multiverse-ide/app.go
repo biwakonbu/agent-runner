@@ -219,3 +219,12 @@ func (a *App) GetPoolSummaries() []orchestrator.PoolSummary {
 	}
 	return summaries
 }
+
+// GetAvailablePools returns the list of available worker pools.
+func (a *App) GetAvailablePools() []orchestrator.Pool {
+	if a.taskStore == nil {
+		// taskStore がない場合でもデフォルト Pool を返す
+		return orchestrator.DefaultPools
+	}
+	return a.taskStore.GetAvailablePools()
+}
