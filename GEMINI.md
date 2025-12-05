@@ -18,6 +18,10 @@
 
 ## ビルドと実行
 
+### パッケージマネージャー
+
+このプロジェクトでは **pnpm** を使用します。npm や yarn は使用しないでください。
+
 ### 全体ビルド (IDE)
 
 ```bash
@@ -34,6 +38,19 @@ wails build
   ```bash
   go build ./cmd/multiverse-orchestrator
   ```
+
+### フロントエンド開発
+
+```bash
+cd frontend/ide
+pnpm install
+pnpm dev          # 開発サーバー起動
+pnpm check        # Svelte 型チェック
+pnpm lint         # ESLint (oxlint) チェック
+pnpm lint:css     # Stylelint チェック
+pnpm test:e2e     # Playwright E2E テスト
+pnpm storybook    # Storybook 起動
+```
 
 ## 開発の規約
 

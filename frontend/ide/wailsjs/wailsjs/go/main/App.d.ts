@@ -9,6 +9,10 @@ export function GetWorkspace(arg1:string):Promise<ide.Workspace>;
 
 export function ListTasks():Promise<Array<orchestrator.Task>>;
 
+export function LoadWorkspace(arg1:string):Promise<string>;
+
 export function RunTask(arg1:string):Promise<void>;
+
+export function ScheduleTask(arg1:string):Promise<void>;
 
 export function SelectWorkspace():Promise<string>;

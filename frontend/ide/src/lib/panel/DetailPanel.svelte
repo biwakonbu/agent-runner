@@ -2,15 +2,18 @@
   import { createEventDispatcher } from 'svelte';
   import { Button, Badge } from '../../design-system';
   // @ts-ignore - Wails自動生成ファイル
-  import { RunTask } from '../../../wailsjs/go/main/App';
+  import { RunTask, ListAttempts } from '../../../wailsjs/go/main/App';
   import { selectedTask, selectedTaskId } from '../../stores';
-  import { statusLabels } from '../../types';
+  import { statusLabels, attemptStatusLabels } from '../../types';
+  import type { Attempt, AttemptStatus } from '../../types';
 
   const dispatch = createEventDispatcher<{
     close: void;
   }>();
 
   let isRunning = false;
+  let attempts: Attempt[] = [];
+  let loadingAttempts = false;
 
   async function handleRun() {
     if (!$selectedTask || isRunning) return;
@@ -18,6 +21,8 @@
     isRunning = true;
     try {
       await RunTask($selectedTask.id);
+      // 実行後にAttempt一覧を更新
+      await loadAttempts($selectedTask.id);
     } catch (e) {
       console.error('タスク実行エラー:', e);
     } finally {
@@ -35,9 +40,48 @@
     return new Date(dateString).toLocaleString('ja-JP');
   }
 
+  async function loadAttempts(taskId: string) {
+    loadingAttempts = true;
+    try {
+      const result = await ListAttempts(taskId);
+      // 新しい順にソート
+      attempts = (result || []).sort((a: Attempt, b: Attempt) =>
+        new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime()
+      );
+    } catch (e) {
+      console.error('Attempt一覧取得エラー:', e);
+      attempts = [];
+    } finally {
+      loadingAttempts = false;
+    }
+  }
+
+  function getAttemptStatusClass(status: AttemptStatus): string {
+    switch (status) {
+      case 'SUCCEEDED':
+        return 'succeeded';
+      case 'FAILED':
+      case 'TIMEOUT':
+        return 'failed';
+      case 'RUNNING':
+      case 'STARTING':
+        return 'running';
+      case 'CANCELED':
+        return 'canceled';
+      default:
+        return 'pending';
+    }
+  }
+
   $: task = $selectedTask;
   $: badgeStatus = task ? task.status.toLowerCase() as 'pending' | 'ready' | 'running' | 'succeeded' | 'failed' | 'canceled' | 'blocked' : 'pending';
   $: canRun = task && task.status !== 'RUNNING';
+  // タスクが変わったらAttempt一覧を読み込む
+  $: if (task) {
+    loadAttempts(task.id);
+  } else {
+    attempts = [];
+  }
 </script>
 
 <aside class="detail-panel" class:open={!!task}>
@@ -107,6 +151,33 @@
             </div>
           {/if}
         </dl>
+      </div>
+
+      <!-- 実行履歴セクション -->
+      <div class="attempts-section">
+        <h4 class="section-title">実行履歴</h4>
+
+        {#if loadingAttempts}
+          <p class="loading-text">読み込み中...</p>
+        {:else if attempts.length === 0}
+          <p class="empty-text">まだ実行履歴がありません</p>
+        {:else}
+          <ul class="attempts-list">
+            {#each attempts as attempt (attempt.id)}
+              <li class="attempt-item">
+                <div class="attempt-header">
+                  <span class="attempt-status status-{getAttemptStatusClass(attempt.status)}">
+                    {attemptStatusLabels[attempt.status]}
+                  </span>
+                  <span class="attempt-time">{formatDate(attempt.startedAt)}</span>
+                </div>
+                {#if attempt.errorSummary}
+                  <p class="attempt-error">{attempt.errorSummary}</p>
+                {/if}
+              </li>
+            {/each}
+          </ul>
+        {/if}
       </div>
     </div>
   {:else}
@@ -233,5 +304,92 @@
     justify-content: center;
     color: var(--mv-color-text-muted);
     font-size: var(--mv-font-size-sm);
+  }
+
+  /* 実行履歴セクション */
+  .attempts-section {
+    border-top: var(--mv-border-width-thin) solid var(--mv-color-border-subtle);
+    padding-top: var(--mv-spacing-md);
+  }
+
+  .loading-text,
+  .empty-text {
+    font-size: var(--mv-font-size-sm);
+    color: var(--mv-color-text-muted);
+    margin: 0;
+  }
+
+  .attempts-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--mv-spacing-xs);
+  }
+
+  .attempt-item {
+    background: var(--mv-color-surface-secondary);
+    border: var(--mv-border-width-thin) solid var(--mv-color-border-subtle);
+    border-radius: var(--mv-radius-sm);
+    padding: var(--mv-spacing-sm);
+  }
+
+  .attempt-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--mv-spacing-xs);
+  }
+
+  .attempt-status {
+    font-size: var(--mv-font-size-xs);
+    font-weight: var(--mv-font-weight-semibold);
+    padding: var(--mv-spacing-xxs) var(--mv-spacing-xs);
+    border-radius: var(--mv-radius-sm);
+  }
+
+  .attempt-status.status-succeeded {
+    background: var(--mv-color-status-succeeded-bg);
+    color: var(--mv-color-status-succeeded-text);
+  }
+
+  .attempt-status.status-failed {
+    background: var(--mv-color-status-failed-bg);
+    color: var(--mv-color-status-failed-text);
+  }
+
+  .attempt-status.status-running {
+    background: var(--mv-color-status-running-bg);
+    color: var(--mv-color-status-running-text);
+  }
+
+  .attempt-status.status-canceled {
+    background: var(--mv-color-status-canceled-bg);
+    color: var(--mv-color-status-canceled-text);
+  }
+
+  .attempt-status.status-pending {
+    background: var(--mv-color-status-pending-bg);
+    color: var(--mv-color-status-pending-text);
+  }
+
+  .attempt-time {
+    font-size: var(--mv-font-size-xs);
+    color: var(--mv-color-text-muted);
+    font-family: var(--mv-font-mono);
+  }
+
+  .attempt-error {
+    margin: var(--mv-spacing-xs) 0 0;
+    font-size: var(--mv-font-size-xs);
+    color: var(--mv-color-status-failed-text);
+    background: var(--mv-color-status-failed-bg);
+    padding: var(--mv-spacing-xs);
+    border-radius: var(--mv-radius-sm);
+    word-break: break-word;
+    white-space: pre-wrap;
+    max-height: var(--mv-container-max-height-error);
+    overflow-y: auto;
   }
 </style>

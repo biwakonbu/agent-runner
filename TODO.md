@@ -61,8 +61,42 @@ Based on `PRD.md`.
 
 ---
 
+## M1.2: Orchestrator CLI / Daemon ✅ 完了
+
+- [x] **Orchestrator CLI (`cmd/multiverse-orchestrator`)**
+  - [x] Main entrypoint implementation
+  - [x] IPC Queue Consumer (Polling/Events)
+  - [x] Integrate with `Executor` to run queued tasks
+
+---
+
+## M1.3: E2E Verification ✅ 完了
+
+- [x] **ビルド検証**
+
+  - [x] `wails build` → `build/bin/multiverse-ide.app` 生成成功
+  - [x] `agent-runner` バイナリ生成成功
+
+- [x] **テスト検証**
+  - [x] Go Unit Tests: 7 packages passed
+  - [x] Orchestrator Tests: 2 tests passed
+  - [x] Playwright E2E Tests: 2 tests passed (タスクリスト表示、タスク作成フロー)
+
+---
+
 ## 次のステップ
 
-1. アプリの起動テスト: `open build/bin/multiverse-ide.app`
-2. Task 作成 → Run → ステータス確認の E2E テスト
-3. エラーハンドリングの改善
+### 優先度: 高
+
+1. **手動 E2E フロー確認**: `open build/bin/multiverse-ide.app` で実際にアプリを起動し、タスク作成 → 実行 → 結果確認の動作を検証
+2. **Orchestrator 統合テスト**: IDE → Queue → Orchestrator → agent-runner の統合フローテスト
+
+### 優先度: 中
+
+3. **エラーハンドリング改善**: 各レイヤー(IDE, Orchestrator, Core)でのエラー表示とリカバリ
+4. **IPC Queue テスト追加**: `internal/orchestrator/ipc` にユニットテスト追加
+
+### 優先度: 低
+
+5. **UI 改善**: タスク実行中のプログレス表示、ログビューア実装
+6. **ドキュメント更新**: テスト戦略、デプロイ手順の文書化

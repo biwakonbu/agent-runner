@@ -1,15 +1,18 @@
 <script lang="ts">
-  import { onMount, onDestroy } from 'svelte';
-  import WorkspaceSelector from './lib/WorkspaceSelector.svelte';
-  import TaskCreate from './lib/TaskCreate.svelte';
-  import { GridCanvas } from './lib/grid';
-  import { Toolbar } from './lib/toolbar';
-  import { DetailPanel } from './lib/panel';
-  import { Button } from './design-system';
-  import { tasks, selectedTask, selectedTaskId } from './stores';
-  import type { Task } from './types';
+  import { onMount, onDestroy } from "svelte";
+  import WorkspaceSelector from "./lib/WorkspaceSelector.svelte";
+  import TaskCreate from "./lib/TaskCreate.svelte";
+  import { GridCanvas } from "./lib/grid";
+  import { Toolbar } from "./lib/toolbar";
+  import { DetailPanel } from "./lib/panel";
+  import { Button } from "./design-system";
+  import { tasks, selectedTask, selectedTaskId, poolSummaries } from "./stores";
+  import { Logger } from "./services/logger";
+  import type { Task, PoolSummary } from "./types";
   // @ts-ignore - Wails自動生成ファイル
-  import { ListTasks } from '../wailsjs/go/main/App';
+  import { ListTasks, GetPoolSummaries } from "../wailsjs/go/main/App";
+
+  const log = Logger.withComponent("App");
 
   let workspaceId: string | null = null;
   let showCreateModal = false;
@@ -20,38 +23,62 @@
     if (!workspaceId) return;
     try {
       const taskList: Task[] = await ListTasks();
+      log.debug("tasks loaded", { count: taskList.length });
       tasks.setTasks(taskList);
     } catch (e) {
-      console.error('タスク読み込みエラー:', e);
+      log.error("failed to load tasks", { error: e });
     }
+  }
+
+  // Pool別サマリを読み込み
+  async function loadPoolSummaries() {
+    if (!workspaceId) return;
+    try {
+      const summaries: PoolSummary[] = await GetPoolSummaries();
+      log.debug("pool summaries loaded", { count: summaries?.length ?? 0 });
+      poolSummaries.setSummaries(summaries || []);
+    } catch (e) {
+      log.error("failed to load pool summaries", { error: e });
+    }
+  }
+
+  // データ読み込み（タスク + Poolサマリ）
+  async function loadData() {
+    await Promise.all([loadTasks(), loadPoolSummaries()]);
   }
 
   // Workspace選択時
   function onWorkspaceSelected(event: CustomEvent<string>) {
     workspaceId = event.detail;
-    loadTasks();
+    log.info("workspace selected", { workspaceId });
+    loadData();
     // 2秒間隔でポーリング
-    interval = setInterval(loadTasks, 2000);
+    interval = setInterval(loadData, 2000);
+    log.info("polling started", { interval: 2000 });
   }
 
   // タスク作成モーダルを開く
   function handleCreateTask() {
+    log.debug("opening create task modal");
     showCreateModal = true;
   }
 
   // タスク作成完了
   function onTaskCreated() {
+    log.info("task created, refreshing task list");
     showCreateModal = false;
     loadTasks();
   }
 
   // タスク作成キャンセル
   function onCreateCancel() {
+    log.debug("create task cancelled");
     showCreateModal = false;
   }
 
   onDestroy(() => {
     if (interval) {
+      log.info("polling stopped");
       clearInterval(interval);
     }
   });
@@ -87,7 +114,12 @@
         >
           <header class="modal-header">
             <h2 id="create-task-title">新規タスク作成</h2>
-            <Button variant="ghost" size="small" on:click={onCreateCancel} label="×" />
+            <Button
+              variant="ghost"
+              size="small"
+              on:click={onCreateCancel}
+              label="×"
+            />
           </header>
           <TaskCreate on:created={onTaskCreated} />
         </div>
@@ -141,7 +173,8 @@
     align-items: center;
     justify-content: space-between;
     padding: var(--mv-spacing-md);
-    border-bottom: var(--mv-border-width-thin) solid var(--mv-color-border-subtle);
+    border-bottom: var(--mv-border-width-thin) solid
+      var(--mv-color-border-subtle);
   }
 
   .modal-header h2 {
@@ -150,5 +183,4 @@
     color: var(--mv-color-text-primary);
     margin: 0;
   }
-
 </style>

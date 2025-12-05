@@ -228,6 +228,7 @@
   --mv-container-max-width-xs: 320px;
   --mv-container-max-width-sm: 480px;
   --mv-container-max-height-modal: 80vh;
+  --mv-container-max-height-error: 100px;
 
   /* ========================================
      アイコンサイズ

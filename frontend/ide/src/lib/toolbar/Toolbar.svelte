@@ -1,14 +1,14 @@
 <script lang="ts">
   import { createEventDispatcher } from 'svelte';
   import { Button } from '../../design-system';
-  import { viewport, zoomPercent, taskCountsByStatus } from '../../stores';
+  import { viewport, zoomPercent, taskCountsByStatus, poolSummaries } from '../../stores';
   import type { TaskStatus } from '../../types';
 
   const dispatch = createEventDispatcher<{
     createTask: void;
   }>();
 
-  // ステータスサマリの表示設定
+  // ステータスサマリの表示設定（フォールバック用）
   const statusDisplay: { key: TaskStatus; label: string; showCount: boolean }[] = [
     { key: 'RUNNING', label: '実行中', showCount: true },
     { key: 'PENDING', label: '待機', showCount: true },
@@ -18,6 +18,9 @@
   function handleCreateTask() {
     dispatch('createTask');
   }
+
+  // Pool別サマリがある場合はそれを表示、なければステータス別サマリを表示
+  $: hasPoolSummaries = $poolSummaries.length > 0;
 </script>
 
 <header class="toolbar">
@@ -31,18 +34,43 @@
     </Button>
   </div>
 
-  <!-- 中央：ステータスサマリ -->
+  <!-- 中央：Pool別サマリ or ステータスサマリ -->
   <div class="toolbar-center">
-    <div class="status-summary">
-      {#each statusDisplay as { key, label, showCount }}
-        {#if showCount && $taskCountsByStatus[key] > 0}
-          <div class="status-badge status-{key.toLowerCase()}">
-            <span class="status-count">{$taskCountsByStatus[key]}</span>
-            <span class="status-label">{label}</span>
+    {#if hasPoolSummaries}
+      <!-- Pool別サマリ -->
+      <div class="pool-summary">
+        {#each $poolSummaries as pool (pool.poolId)}
+          <div class="pool-badge">
+            <span class="pool-name">{pool.poolId}</span>
+            <span class="pool-separator">:</span>
+            {#if pool.running > 0}
+              <span class="pool-stat running">{pool.running} 実行中</span>
+            {/if}
+            {#if pool.queued > 0}
+              <span class="pool-stat queued">{pool.queued} 待機</span>
+            {/if}
+            {#if pool.failed > 0}
+              <span class="pool-stat failed">{pool.failed} 失敗</span>
+            {/if}
+            {#if pool.running === 0 && pool.queued === 0 && pool.failed === 0}
+              <span class="pool-stat idle">{pool.total} タスク</span>
+            {/if}
           </div>
-        {/if}
-      {/each}
-    </div>
+        {/each}
+      </div>
+    {:else}
+      <!-- フォールバック: ステータス別サマリ -->
+      <div class="status-summary">
+        {#each statusDisplay as { key, label, showCount }}
+          {#if showCount && $taskCountsByStatus[key] > 0}
+            <div class="status-badge status-{key.toLowerCase()}">
+              <span class="status-count">{$taskCountsByStatus[key]}</span>
+              <span class="status-label">{label}</span>
+            </div>
+          {/if}
+        {/each}
+      </div>
+    {/if}
   </div>
 
   <!-- 右側：ズームコントロール -->
@@ -183,5 +211,57 @@
 
   .zoom-value:hover {
     color: var(--mv-color-text-primary);
+  }
+
+  /* Pool別サマリ */
+  .pool-summary {
+    display: flex;
+    gap: var(--mv-spacing-md);
+  }
+
+  .pool-badge {
+    display: flex;
+    align-items: center;
+    gap: var(--mv-spacing-xxs);
+    padding: var(--mv-spacing-xxs) var(--mv-spacing-sm);
+    background: var(--mv-color-surface-secondary);
+    border: var(--mv-border-width-thin) solid var(--mv-color-border-default);
+    border-radius: var(--mv-radius-sm);
+    font-size: var(--mv-font-size-xs);
+  }
+
+  .pool-name {
+    font-weight: var(--mv-font-weight-semibold);
+    color: var(--mv-color-text-primary);
+    font-family: var(--mv-font-mono);
+  }
+
+  .pool-separator {
+    color: var(--mv-color-text-muted);
+  }
+
+  .pool-stat {
+    padding: var(--mv-spacing-xxs) var(--mv-spacing-xs);
+    border-radius: var(--mv-radius-sm);
+    font-weight: var(--mv-font-weight-medium);
+  }
+
+  .pool-stat.running {
+    background: var(--mv-color-status-running-bg);
+    color: var(--mv-color-status-running-text);
+  }
+
+  .pool-stat.queued {
+    background: var(--mv-color-status-pending-bg);
+    color: var(--mv-color-status-pending-text);
+  }
+
+  .pool-stat.failed {
+    background: var(--mv-color-status-failed-bg);
+    color: var(--mv-color-status-failed-text);
+  }
+
+  .pool-stat.idle {
+    color: var(--mv-color-text-muted);
   }
 </style>

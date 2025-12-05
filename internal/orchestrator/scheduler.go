@@ -2,8 +2,9 @@ package orchestrator
 
 import (
 	"fmt"
-	"log"
+	"log/slog"
 
+	"github.com/biwakonbu/agent-runner/internal/logging"
 	"github.com/biwakonbu/agent-runner/internal/orchestrator/ipc"
 )
 
@@ -11,6 +12,7 @@ import (
 type Scheduler struct {
 	TaskStore *TaskStore
 	Queue     *ipc.FilesystemQueue
+	logger    *slog.Logger
 }
 
 // NewScheduler creates a new Scheduler.
@@ -18,6 +20,7 @@ func NewScheduler(ts *TaskStore, q *ipc.FilesystemQueue) *Scheduler {
 	return &Scheduler{
 		TaskStore: ts,
 		Queue:     q,
+		logger:    logging.WithComponent(slog.Default(), "scheduler"),
 	}
 }
 
@@ -47,9 +50,18 @@ func (s *Scheduler) ScheduleTask(taskID string) error {
 	}
 
 	if err := s.Queue.Enqueue(job); err != nil {
+		s.logger.Error("failed to enqueue job",
+			slog.String("job_id", job.ID),
+			slog.String("task_id", task.ID),
+			slog.Any("error", err),
+		)
 		return fmt.Errorf("failed to enqueue job: %w", err)
 	}
 
-	log.Printf("Task %s scheduled as job %s in pool %s", task.ID, job.ID, task.PoolID)
+	s.logger.Info("task scheduled",
+		slog.String("task_id", task.ID),
+		slog.String("job_id", job.ID),
+		slog.String("pool_id", task.PoolID),
+	)
 	return nil
 }

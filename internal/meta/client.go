@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/biwakonbu/agent-runner/internal/logging"
 	"gopkg.in/yaml.v3"
 )
 
@@ -22,6 +23,7 @@ type Client struct {
 	model        string
 	systemPrompt string
 	client       *http.Client
+	logger       *slog.Logger
 }
 
 func NewClient(kind, apiKey, model, systemPrompt string) *Client {
@@ -34,7 +36,13 @@ func NewClient(kind, apiKey, model, systemPrompt string) *Client {
 		model:        model,
 		systemPrompt: systemPrompt,
 		client:       &http.Client{Timeout: 60 * time.Second},
+		logger:       logging.WithComponent(slog.Default(), "meta-client"),
 	}
+}
+
+// SetLogger sets a custom logger for the client
+func (c *Client) SetLogger(logger *slog.Logger) {
+	c.logger = logging.WithComponent(logger, "meta-client")
 }
 
 // ... (keep existing structs)
@@ -99,6 +107,9 @@ func (c *Client) callLLM(ctx context.Context, systemPrompt, userPrompt string) (
 	const maxRetries = 3
 	const baseDelay = 1 * time.Second
 
+	logger := logging.WithTraceID(c.logger, ctx)
+	start := time.Now()
+
 	reqBody := chatRequest{
 		Model: c.model,
 		Messages: []message{
@@ -110,6 +121,15 @@ func (c *Client) callLLM(ctx context.Context, systemPrompt, userPrompt string) (
 	if err != nil {
 		return "", err
 	}
+
+	logger.Info("calling LLM",
+		slog.String("model", c.model),
+		slog.Int("request_size", len(jsonBody)),
+	)
+	logger.Debug("LLM request",
+		slog.String("system_prompt", systemPrompt),
+		slog.String("user_prompt", userPrompt),
+	)
 
 	var lastErr error
 	for attempt := 0; attempt <= maxRetries; attempt++ {
@@ -131,11 +151,12 @@ func (c *Client) callLLM(ctx context.Context, systemPrompt, userPrompt string) (
 			// Retryable error, continue to next attempt
 			if attempt < maxRetries {
 				delay := baseDelay * time.Duration(1<<uint(attempt))
-				slog.Warn("LLM request failed, retrying",
-					"attempt", attempt+1,
-					"max_retries", maxRetries,
-					"delay_seconds", delay.Seconds(),
-					"error", err.Error())
+				logger.Warn("LLM request failed, retrying",
+					slog.Int("attempt", attempt+1),
+					slog.Int("max_retries", maxRetries),
+					slog.Float64("delay_seconds", delay.Seconds()),
+					slog.Any("error", err),
+				)
 				select {
 				case <-time.After(delay):
 					// Continue to next attempt
@@ -167,11 +188,12 @@ func (c *Client) callLLM(ctx context.Context, systemPrompt, userPrompt string) (
 			// Retryable error (5xx, 429), continue to next attempt
 			if attempt < maxRetries {
 				delay := baseDelay * time.Duration(1<<uint(attempt))
-				slog.Warn("LLM request failed with retryable status, retrying",
-					"attempt", attempt+1,
-					"max_retries", maxRetries,
-					"status_code", resp.StatusCode,
-					"delay_seconds", delay.Seconds())
+				logger.Warn("LLM request failed with retryable status, retrying",
+					slog.Int("attempt", attempt+1),
+					slog.Int("max_retries", maxRetries),
+					slog.Int("status_code", resp.StatusCode),
+					slog.Float64("delay_seconds", delay.Seconds()),
+				)
 				select {
 				case <-time.After(delay):
 					// Continue to next attempt
@@ -192,7 +214,13 @@ func (c *Client) callLLM(ctx context.Context, systemPrompt, userPrompt string) (
 			return "", fmt.Errorf("no choices returned from LLM")
 		}
 
-		return result.Choices[0].Message.Content, nil
+		responseContent := result.Choices[0].Message.Content
+		logger.Info("LLM call completed",
+			slog.Int("response_size", len(responseContent)),
+			logging.LogDuration(start),
+		)
+		logger.Debug("LLM response", slog.String("content", responseContent))
+		return responseContent, nil
 	}
 
 	// Max retries exceeded
@@ -436,5 +464,6 @@ func NewMockClient() *Client {
 		apiKey: "",
 		model:  "mock",
 		client: &http.Client{Timeout: 60 * time.Second},
+		logger: logging.WithComponent(slog.Default(), "meta-client-mock"),
 	}
 }

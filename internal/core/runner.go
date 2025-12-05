@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/biwakonbu/agent-runner/internal/logging"
 	"github.com/biwakonbu/agent-runner/internal/meta"
 	"github.com/biwakonbu/agent-runner/pkg/config"
 	"gopkg.in/yaml.v3"
@@ -56,6 +57,8 @@ func NewRunner(cfg *config.TaskConfig, m MetaClient, w WorkerExecutor, n NoteWri
 
 // Run executes the task
 func (r *Runner) Run(ctx context.Context) (*TaskContext, error) {
+	start := time.Now()
+
 	// 1. Initialize TaskContext
 	taskCtx := &TaskContext{
 		ID:        r.Config.Task.ID,
@@ -64,14 +67,26 @@ func (r *Runner) Run(ctx context.Context) (*TaskContext, error) {
 		State:     StatePending,
 		StartedAt: time.Now(),
 	}
+
+	// Create logger with trace ID and task context
+	logger := logging.WithTraceID(r.Logger, ctx)
+	logger = logging.WithComponent(logger, "runner")
+	logger.Info("starting task execution",
+		slog.String("task_id", taskCtx.ID),
+		slog.String("task_title", taskCtx.Title),
+		slog.String("state", string(taskCtx.State)),
+	)
+
 	if taskCtx.RepoPath == "" {
 		taskCtx.RepoPath = "."
 	}
 	absRepo, err := filepath.Abs(taskCtx.RepoPath)
 	if err != nil {
+		logger.Error("failed to resolve repo path", slog.Any("error", err))
 		return taskCtx, fmt.Errorf("failed to resolve repo path: %w", err)
 	}
 	taskCtx.RepoPath = absRepo
+	logger.Debug("repo path resolved", slog.String("repo_path", absRepo))
 
 	// Load PRD
 	if r.Config.Task.PRD.Text != "" {
@@ -88,15 +103,24 @@ func (r *Runner) Run(ctx context.Context) (*TaskContext, error) {
 
 	// 2. Plan Task
 	taskCtx.State = StatePlanning
+	logger.Info("state transition", slog.String("from", string(StatePending)), slog.String("to", string(StatePlanning)))
 
 	// Record PlanTask request
 	planRequestYAML := fmt.Sprintf("type: plan_task\nversion: 1\npayload:\n  prd: %q", taskCtx.PRDText)
 
+	logger.Info("calling Meta.PlanTask")
+	logger.Debug("PlanTask request", slog.Int("prd_length", len(taskCtx.PRDText)))
+	planStart := time.Now()
 	plan, err := r.Meta.PlanTask(ctx, taskCtx.PRDText)
 	if err != nil {
+		logger.Error("PlanTask failed", slog.Any("error", err), logging.LogDuration(planStart))
 		taskCtx.State = StateFailed
 		return taskCtx, fmt.Errorf("planning failed: %w", err)
 	}
+	logger.Info("PlanTask completed",
+		slog.Int("criteria_count", len(plan.AcceptanceCriteria)),
+		logging.LogDuration(planStart),
+	)
 
 	// Record PlanTask response
 	planRespData := map[string]interface{}{
@@ -125,16 +149,25 @@ func (r *Runner) Run(ctx context.Context) (*TaskContext, error) {
 
 	// 3. Start Container for the task
 	taskCtx.State = StateRunning
+	logger.Info("state transition", slog.String("from", string(StatePlanning)), slog.String("to", string(StateRunning)))
 
 	// Start persistent container
+	logger.Info("starting worker container")
+	containerStart := time.Now()
 	if err := r.Worker.Start(ctx); err != nil {
+		logger.Error("failed to start container", slog.Any("error", err), logging.LogDuration(containerStart))
 		taskCtx.State = StateFailed
 		return taskCtx, fmt.Errorf("failed to start container: %w", err)
 	}
+	logger.Info("worker container started", logging.LogDuration(containerStart))
+
 	// Ensure container is stopped at the end
 	defer func() {
+		logger.Info("stopping worker container")
 		if err := r.Worker.Stop(ctx); err != nil {
-			r.Logger.Warn("Failed to stop container", "error", err)
+			logger.Warn("failed to stop container", slog.Any("error", err))
+		} else {
+			logger.Info("worker container stopped")
 		}
 	}()
 
@@ -143,7 +176,9 @@ func (r *Runner) Run(ctx context.Context) (*TaskContext, error) {
 	if maxLoops <= 0 {
 		maxLoops = 10 // Default value
 	}
+	logger.Info("starting execution loop", slog.Int("max_loops", maxLoops))
 	for i := 0; i < maxLoops; i++ {
+		logger.Info("execution loop iteration", slog.Int("loop", i+1), slog.Int("max", maxLoops))
 		// Prepare summary
 		var metaACs []meta.AcceptanceCriterion
 		for _, ac := range taskCtx.AcceptanceCriteria {
@@ -164,11 +199,18 @@ func (r *Runner) Run(ctx context.Context) (*TaskContext, error) {
 		summaryBytes, _ := yaml.Marshal(summary)
 		nextActionReqYAML := string(summaryBytes)
 
+		logger.Info("calling Meta.NextAction", slog.Int("worker_runs_count", len(taskCtx.WorkerRuns)))
+		actionStart := time.Now()
 		action, err := r.Meta.NextAction(ctx, summary)
 		if err != nil {
+			logger.Error("NextAction failed", slog.Any("error", err), logging.LogDuration(actionStart))
 			taskCtx.State = StateFailed
 			return taskCtx, fmt.Errorf("next_action failed: %w", err)
 		}
+		logger.Info("NextAction completed",
+			slog.String("action", action.Decision.Action),
+			logging.LogDuration(actionStart),
+		)
 
 		// Record NextAction response
 		actionRespData := map[string]interface{}{
@@ -253,8 +295,12 @@ func (r *Runner) Run(ctx context.Context) (*TaskContext, error) {
 			break
 		} else if action.Decision.Action == "run_worker" {
 			// Execute Worker
+			logger.Info("executing worker", slog.Int("prompt_length", len(action.WorkerCall.Prompt)))
+			logger.Debug("worker prompt", slog.String("prompt", action.WorkerCall.Prompt))
+			workerStart := time.Now()
 			res, err := r.Worker.RunWorker(ctx, action.WorkerCall.Prompt, r.Config.Runner.Worker.Env)
 			if err != nil {
+				logger.Error("worker execution failed", slog.Any("error", err), logging.LogDuration(workerStart))
 				// Worker execution failed (system error), record it but maybe continue?
 				// For now, let's record error in result and continue loop, Meta might retry.
 				res = &WorkerRunResult{
@@ -263,6 +309,13 @@ func (r *Runner) Run(ctx context.Context) (*TaskContext, error) {
 					Error:      err,
 					Summary:    "Worker execution failed: " + err.Error(),
 				}
+			} else {
+				logger.Info("worker execution completed",
+					slog.Int("exit_code", res.ExitCode),
+					slog.Int("output_length", len(res.RawOutput)),
+					logging.LogDuration(workerStart),
+				)
+				logger.Debug("worker output", slog.String("output", res.RawOutput))
 			}
 			taskCtx.WorkerRuns = append(taskCtx.WorkerRuns, *res)
 		} else {
@@ -281,10 +334,18 @@ func (r *Runner) Run(ctx context.Context) (*TaskContext, error) {
 
 	// 5. Finish
 	taskCtx.FinishedAt = time.Now()
+	logger.Info("task execution finished",
+		slog.String("final_state", string(taskCtx.State)),
+		slog.Int("worker_runs_count", len(taskCtx.WorkerRuns)),
+		slog.Int("meta_calls_count", len(taskCtx.MetaCalls)),
+		logging.LogDuration(start),
+	)
 
 	// Write Note
 	if err := r.Note.Write(taskCtx); err != nil {
-		r.Logger.Warn("failed to write task note", "err", err)
+		logger.Warn("failed to write task note", slog.Any("error", err))
+	} else {
+		logger.Info("task note written", slog.String("task_id", taskCtx.ID))
 	}
 
 	return taskCtx, nil

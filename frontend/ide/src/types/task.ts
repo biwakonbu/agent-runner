@@ -11,4 +11,8 @@ export {
   type TaskNode,
   statusToCssClass,
   statusLabels,
+  type AttemptStatus,
+  type Attempt,
+  attemptStatusLabels,
+  type PoolSummary,
 } from '../schemas';

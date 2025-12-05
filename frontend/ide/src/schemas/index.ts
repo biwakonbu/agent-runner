@@ -72,3 +72,49 @@ export const statusLabels: Record<TaskStatus, string> = {
   CANCELED: 'キャンセル',
   BLOCKED: 'ブロック',
 };
+
+// AttemptStatus スキーマ
+export const AttemptStatusSchema = z.enum([
+  'STARTING',
+  'RUNNING',
+  'SUCCEEDED',
+  'FAILED',
+  'TIMEOUT',
+  'CANCELED',
+]);
+
+export type AttemptStatus = z.infer<typeof AttemptStatusSchema>;
+
+// Attempt スキーマ
+export const AttemptSchema = z.object({
+  id: z.string(),
+  taskId: z.string(),
+  status: AttemptStatusSchema,
+  startedAt: z.string().datetime({ offset: true }).or(z.string()),
+  finishedAt: z.string().datetime({ offset: true }).or(z.string()).optional(),
+  errorSummary: z.string().optional(),
+});
+
+export type Attempt = z.infer<typeof AttemptSchema>;
+
+// AttemptStatusの表示名
+export const attemptStatusLabels: Record<AttemptStatus, string> = {
+  STARTING: '開始中',
+  RUNNING: '実行中',
+  SUCCEEDED: '成功',
+  FAILED: '失敗',
+  TIMEOUT: 'タイムアウト',
+  CANCELED: 'キャンセル',
+};
+
+// PoolSummary スキーマ
+export const PoolSummarySchema = z.object({
+  poolId: z.string(),
+  running: z.number(),
+  queued: z.number(),
+  failed: z.number(),
+  total: z.number(),
+  counts: z.record(z.string(), z.number()),
+});
+
+export type PoolSummary = z.infer<typeof PoolSummarySchema>;

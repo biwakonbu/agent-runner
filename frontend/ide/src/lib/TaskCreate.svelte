@@ -1,47 +1,52 @@
 <script lang="ts">
-  import { createEventDispatcher } from 'svelte';
-  import { Button, Input } from '../design-system';
+  import { createEventDispatcher } from "svelte";
+  import { Button, Input } from "../design-system";
+  import { Logger } from "../services/logger";
   // @ts-ignore - Wails自動生成ファイル
-  import { CreateTask } from '../../wailsjs/go/main/App';
+  import { CreateTask } from "../../wailsjs/go/main/App";
 
+  const log = Logger.withComponent("TaskCreate");
   const dispatch = createEventDispatcher<{
     created: void;
   }>();
 
-  let title = '';
-  let poolId = 'default';
+  let title = "";
+  let poolId = "default";
   let isSubmitting = false;
-  let error = '';
+  let error = "";
 
   const pools = [
-    { id: 'default', name: 'Default' },
-    { id: 'codegen', name: 'Codegen' },
-    { id: 'test', name: 'Test' },
+    { id: "default", name: "Default" },
+    { id: "codegen", name: "Codegen" },
+    { id: "test", name: "Test" },
   ];
 
   async function handleSubmit() {
     if (!title.trim()) {
-      error = 'タイトルを入力してください';
+      error = "タイトルを入力してください";
+      log.warn("submission blocked: title is empty");
       return;
     }
 
-    error = '';
+    error = "";
     isSubmitting = true;
+    log.info("creating task", { title: title.trim(), poolId });
 
     try {
       await CreateTask(title.trim(), poolId);
-      title = '';
-      dispatch('created');
+      log.info("task created successfully", { title: title.trim() });
+      title = "";
+      dispatch("created");
     } catch (e) {
-      console.error('タスク作成エラー:', e);
-      error = 'タスクの作成に失敗しました';
+      log.error("task creation failed", { error: e });
+      error = "タスクの作成に失敗しました";
     } finally {
       isSubmitting = false;
     }
   }
 
   function handleKeydown(event: KeyboardEvent) {
-    if (event.key === 'Enter' && !event.shiftKey) {
+    if (event.key === "Enter" && !event.shiftKey) {
       event.preventDefault();
       handleSubmit();
     }
@@ -119,8 +124,9 @@
     background: var(--mv-color-surface-secondary);
     border: var(--mv-border-width-thin) solid var(--mv-color-border-default);
     border-radius: var(--mv-radius-sm);
-    transition: border-color var(--mv-transition-hover),
-                box-shadow var(--mv-transition-hover);
+    transition:
+      border-color var(--mv-transition-hover),
+      box-shadow var(--mv-transition-hover);
     cursor: pointer;
     appearance: none;
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23888888' d='M6 8L1 3h10z'/%3E%3C/svg%3E");

@@ -5,8 +5,11 @@
  */
 
 import { writable, derived } from 'svelte/store';
-import type { Task, TaskNode, TaskStatus } from '../types';
+import type { Task, TaskNode, TaskStatus, PoolSummary } from '../types';
 import { grid, gridToCanvas } from '../design-system';
+import { Logger } from '../services/logger';
+
+const log = Logger.withComponent('TaskStore');
 
 // タスク一覧ストア
 function createTasksStore() {
@@ -16,15 +19,20 @@ function createTasksStore() {
     subscribe,
 
     // タスク一覧を設定
-    setTasks: (tasks: Task[]) => set(tasks),
+    setTasks: (tasks: Task[]) => {
+      log.info('tasks updated', { count: tasks.length });
+      set(tasks);
+    },
 
     // タスクを追加
     addTask: (task: Task) => {
+      log.info('task added', { taskId: task.id, title: task.title });
       update((tasks) => [...tasks, task]);
     },
 
     // タスクを更新
     updateTask: (taskId: string, updates: Partial<Task>) => {
+      log.debug('task updated', { taskId, updates });
       update((tasks) =>
         tasks.map((t) => (t.id === taskId ? { ...t, ...updates } : t))
       );
@@ -32,13 +40,18 @@ function createTasksStore() {
 
     // タスクを削除
     removeTask: (taskId: string) => {
+      log.info('task removed', { taskId });
       update((tasks) => tasks.filter((t) => t.id !== taskId));
     },
 
     // クリア
-    clear: () => set([]),
+    clear: () => {
+      log.info('tasks cleared');
+      set([]);
+    },
   };
 }
+
 
 // 選択状態ストア
 function createSelectionStore() {
@@ -110,3 +123,16 @@ export const gridBounds = derived(taskNodes, ($nodes) => {
     height: maxY + grid.cellHeight + grid.gap,
   };
 });
+
+// Pool別サマリストア
+function createPoolSummariesStore() {
+  const { subscribe, set } = writable<PoolSummary[]>([]);
+
+  return {
+    subscribe,
+    setSummaries: (summaries: PoolSummary[]) => set(summaries),
+    clear: () => set([]),
+  };
+}
+
+export const poolSummaries = createPoolSummariesStore();

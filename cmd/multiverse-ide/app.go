@@ -4,10 +4,12 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/biwakonbu/agent-runner/internal/ide"
 	"github.com/biwakonbu/agent-runner/internal/orchestrator"
 	"github.com/biwakonbu/agent-runner/internal/orchestrator/ipc"
+	"github.com/google/uuid"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
@@ -119,12 +121,12 @@ func (a *App) CreateTask(title string, poolID string) *orchestrator.Task {
 	}
 
 	task := &orchestrator.Task{
-		ID:     fmt.Sprintf("task-%d", os.Getpid()), // Simplified ID generation
-		Title:  title,
-		Status: orchestrator.TaskStatusPending,
-		PoolID: poolID,
+		ID:        uuid.New().String(),
+		Title:     title,
+		Status:    orchestrator.TaskStatusPending,
+		PoolID:    poolID,
+		CreatedAt: time.Now(),
 	}
-	// In reality, use a better ID generator (UUID)
 
 	if err := a.taskStore.SaveTask(task); err != nil {
 		runtime.LogErrorf(a.ctx, "Failed to save task: %v", err)
@@ -139,4 +141,32 @@ func (a *App) RunTask(taskID string) error {
 		return fmt.Errorf("scheduler not initialized")
 	}
 	return a.scheduler.ScheduleTask(taskID)
+}
+
+// ListAttempts returns all attempts for a given task.
+func (a *App) ListAttempts(taskID string) []orchestrator.Attempt {
+	if a.taskStore == nil {
+		return []orchestrator.Attempt{}
+	}
+
+	attempts, err := a.taskStore.ListAttemptsByTaskID(taskID)
+	if err != nil {
+		runtime.LogErrorf(a.ctx, "Failed to list attempts: %v", err)
+		return []orchestrator.Attempt{}
+	}
+	return attempts
+}
+
+// GetPoolSummaries returns task count summaries by pool.
+func (a *App) GetPoolSummaries() []orchestrator.PoolSummary {
+	if a.taskStore == nil {
+		return []orchestrator.PoolSummary{}
+	}
+
+	summaries, err := a.taskStore.GetPoolSummaries()
+	if err != nil {
+		runtime.LogErrorf(a.ctx, "Failed to get pool summaries: %v", err)
+		return []orchestrator.PoolSummary{}
+	}
+	return summaries
 }

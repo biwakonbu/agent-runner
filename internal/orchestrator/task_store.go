@@ -176,3 +176,94 @@ func (s *TaskStore) SaveAttempt(attempt *Attempt) error {
 
 	return nil
 }
+
+// ListAttemptsByTaskID returns all attempts for a given task ID.
+func (s *TaskStore) ListAttemptsByTaskID(taskID string) ([]Attempt, error) {
+	dir := s.GetAttemptDir()
+	entries, err := os.ReadDir(dir)
+	if os.IsNotExist(err) {
+		return []Attempt{}, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to read attempts directory: %w", err)
+	}
+
+	var attempts []Attempt
+	for _, entry := range entries {
+		if entry.IsDir() || filepath.Ext(entry.Name()) != ".json" {
+			continue
+		}
+
+		attempt, err := s.LoadAttempt(entry.Name()[:len(entry.Name())-5])
+		if err != nil {
+			continue
+		}
+
+		if attempt.TaskID == taskID {
+			attempts = append(attempts, *attempt)
+		}
+	}
+
+	return attempts, nil
+}
+
+// PoolSummary represents task counts by status for a pool.
+type PoolSummary struct {
+	PoolID  string         `json:"poolId"`
+	Running int            `json:"running"`
+	Queued  int            `json:"queued"`
+	Failed  int            `json:"failed"`
+	Total   int            `json:"total"`
+	Counts  map[string]int `json:"counts"`
+}
+
+// GetPoolSummaries returns task count summaries by pool.
+func (s *TaskStore) GetPoolSummaries() ([]PoolSummary, error) {
+	dir := s.GetTaskDir()
+	entries, err := os.ReadDir(dir)
+	if os.IsNotExist(err) {
+		return []PoolSummary{}, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to read tasks directory: %w", err)
+	}
+
+	// poolID -> status -> count
+	poolCounts := make(map[string]map[TaskStatus]int)
+
+	for _, entry := range entries {
+		if entry.IsDir() || filepath.Ext(entry.Name()) != ".jsonl" {
+			continue
+		}
+
+		id := entry.Name()[:len(entry.Name())-6]
+		task, err := s.LoadTask(id)
+		if err != nil {
+			continue
+		}
+
+		if poolCounts[task.PoolID] == nil {
+			poolCounts[task.PoolID] = make(map[TaskStatus]int)
+		}
+		poolCounts[task.PoolID][task.Status]++
+	}
+
+	// Convert to PoolSummary slice
+	var summaries []PoolSummary
+	for poolID, statusCounts := range poolCounts {
+		summary := PoolSummary{
+			PoolID:  poolID,
+			Running: statusCounts[TaskStatusRunning],
+			Queued:  statusCounts[TaskStatusPending] + statusCounts[TaskStatusReady],
+			Failed:  statusCounts[TaskStatusFailed],
+			Counts:  make(map[string]int),
+		}
+		for status, count := range statusCounts {
+			summary.Counts[string(status)] = count
+			summary.Total += count
+		}
+		summaries = append(summaries, summary)
+	}
+
+	return summaries, nil
+}

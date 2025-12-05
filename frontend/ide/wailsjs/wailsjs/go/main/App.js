@@ -14,8 +14,16 @@ export function ListTasks() {
   return window['go']['main']['App']['ListTasks']();
 }
 
+export function LoadWorkspace(arg1) {
+  return window['go']['main']['App']['LoadWorkspace'](arg1);
+}
+
 export function RunTask(arg1) {
   return window['go']['main']['App']['RunTask'](arg1);
+}
+
+export function ScheduleTask(arg1) {
+  return window['go']['main']['App']['ScheduleTask'](arg1);
 }
 
 export function SelectWorkspace() {
