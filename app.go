@@ -51,14 +51,19 @@ func (a *App) SelectWorkspace() string {
 		return ""
 	}
 
-	id := a.workspaceStore.GetWorkspaceID(selection)
+	return a.LoadWorkspace(selection)
+}
+
+// LoadWorkspace loads a workspace from a given path.
+func (a *App) LoadWorkspace(path string) string {
+	id := a.workspaceStore.GetWorkspaceID(path)
 	ws, err := a.workspaceStore.LoadWorkspace(id)
 	if err != nil {
 		// Create new workspace if not exists
 		ws = &ide.Workspace{
 			Version:     "1.0",
-			ProjectRoot: selection,
-			DisplayName: selection, // Simplified for now
+			ProjectRoot: path,
+			DisplayName: path, // Simplified for now
 		}
 		if err := a.workspaceStore.SaveWorkspace(ws); err != nil {
 			runtime.LogErrorf(a.ctx, "Failed to save workspace: %v", err)
@@ -79,6 +84,14 @@ func (a *App) SelectWorkspace() string {
 	a.executor = orchestrator.NewExecutor("./agent-runner", a.taskStore)
 
 	return id
+}
+
+// ScheduleTask adds a task to the execution queue
+func (a *App) ScheduleTask(taskID string) error {
+	if a.scheduler == nil {
+		return fmt.Errorf("scheduler not initialized")
+	}
+	return a.scheduler.ScheduleTask(taskID)
 }
 
 // GetWorkspace returns the workspace details.

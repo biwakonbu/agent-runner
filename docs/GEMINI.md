@@ -11,6 +11,7 @@
 - `core-specification.md`: AgentRunner Core の詳細仕様。
 - `meta-protocol.md`: LLM との通信プロトコル (YAML) 定義。
 - `orchestrator-spec.md`: **[新規]** Orchestrator のアーキテクチャと IPC 仕様。
+- `testing-strategy.md`: **[新規]** E2E テストの設計と方針。
 
 ### 2. `design/` (設計書)
 

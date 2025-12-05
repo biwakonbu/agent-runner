@@ -8,6 +8,7 @@ require (
 	github.com/docker/docker v24.0.7+incompatible
 	github.com/google/uuid v1.6.0
 	github.com/leanovate/gopter v0.2.11
+	github.com/stretchr/testify v1.10.0
 	github.com/wailsapp/wails/v2 v2.11.0
 	gopkg.in/yaml.v3 v3.0.1
 )
@@ -15,6 +16,7 @@ require (
 require (
 	github.com/Microsoft/go-winio v0.6.1 // indirect
 	github.com/bep/debounce v1.2.1 // indirect
+	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/distribution/reference v0.5.0 // indirect
 	github.com/docker/distribution v2.8.3+incompatible // indirect
 	github.com/docker/go-connections v0.6.0 // indirect
@@ -38,6 +40,7 @@ require (
 	github.com/opencontainers/image-spec v1.1.1 // indirect
 	github.com/pkg/browser v0.0.0-20240102092130-5ac0b6a4141c // indirect
 	github.com/pkg/errors v0.9.1 // indirect
+	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/samber/lo v1.49.1 // indirect
 	github.com/tkrajina/go-reflector v0.5.8 // indirect

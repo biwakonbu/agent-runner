@@ -15,10 +15,12 @@
     "knip": "knip",
     "check:all": "pnpm check && pnpm lint && pnpm lint:css && pnpm knip",
     "storybook": "storybook dev -p 6006",
-    "build-storybook": "storybook build"
+    "build-storybook": "storybook build",
+    "test:e2e": "VITE_TEST_E2E=true playwright test"
   },
   "devDependencies": {
     "@chromatic-com/storybook": "^1.9.0",
+    "@playwright/test": "^1.57.0",
     "@storybook/addon-essentials": "^8.4.7",
     "@storybook/addon-interactions": "^8.4.7",
     "@storybook/addon-links": "^8.4.7",
@@ -26,6 +28,7 @@
     "@storybook/svelte-vite": "^8.4.7",
     "@sveltejs/vite-plugin-svelte": "^3.0.2",
     "@tsconfig/svelte": "^5.0.2",
+    "@types/node": "^24.10.1",
     "knip": "^5.71.0",
     "oxlint": "^1.31.0",
     "postcss-html": "^1.8.0",
