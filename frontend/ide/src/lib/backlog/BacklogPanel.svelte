@@ -203,7 +203,7 @@
   }
 
   .backlog-item.failure {
-    border-left: 3px solid var(--mv-color-status-failed-text);
+    border-left: var(--mv-border-width-thick) solid var(--mv-color-status-failed-text);
   }
 
   .item-header {
@@ -215,11 +215,11 @@
   }
 
   .type-badge {
-    padding: 2px 6px;
+    padding: var(--mv-spacing-xxs) var(--mv-spacing-xs);
     border-radius: var(--mv-radius-sm);
     font-weight: var(--mv-font-weight-medium);
     text-transform: uppercase;
-    font-size: 10px;
+    font-size: var(--mv-font-size-xxs);
   }
 
   .type-badge.failure {
@@ -256,7 +256,7 @@
     margin: 0 0 var(--mv-spacing-xs);
     font-size: var(--mv-font-size-xs);
     color: var(--mv-color-text-secondary);
-    line-height: 1.4;
+    line-height: var(--mv-line-height-relaxed);
   }
 
   .error-detail {
@@ -313,7 +313,7 @@
   .dialog-overlay {
     position: fixed;
     inset: 0;
-    background: rgba(0, 0, 0, 0.5);
+    background: var(--mv-color-overlay);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -324,8 +324,8 @@
     background: var(--mv-color-surface-primary);
     border-radius: var(--mv-radius-lg);
     padding: var(--mv-spacing-lg);
-    min-width: 400px;
-    max-width: 90vw;
+    min-width: var(--mv-dialog-min-width);
+    max-width: var(--mv-dialog-max-width);
     box-shadow: var(--mv-shadow-modal);
   }
 

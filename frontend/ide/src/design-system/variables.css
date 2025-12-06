@@ -75,6 +75,7 @@
   --mv-color-surface-selected: var(--mv-primitive-polar-night-2); /* より明るく */
   --mv-color-surface-node: var(--mv-primitive-deep-4);      /* 元 deep[3] */
   --mv-color-surface-overlay: rgba(0, 0, 0, 0.6);
+  --mv-color-overlay: rgba(0, 0, 0, 0.5);
 
   /* ========================================
      セマンティックカラー: ボーダー
@@ -170,6 +171,13 @@
   --mv-color-status-blocked-text: var(--mv-primitive-aurora-purple);
 
   /* ========================================
+     ステータスカラー: RetryWait（リトライ待機 - Orange）
+     ======================================== */
+  --mv-color-status-retry-wait-bg: #2d2420; /* Dark Orange/Brown */
+  --mv-color-status-retry-wait-border: var(--mv-primitive-aurora-orange);
+  --mv-color-status-retry-wait-text: var(--mv-primitive-aurora-orange);
+
+  /* ========================================
      スペーシング: グリッド
      ======================================== */
   --mv-grid-cell-width: 160px;
@@ -239,6 +247,10 @@
   --mv-container-max-height-modal: 80vh;
   --mv-container-max-height-error: 100px;
   --mv-container-max-height-list: 320px;
+
+  /* ダイアログ */
+  --mv-dialog-min-width: 400px;
+  --mv-dialog-max-width: 90vw;
 
   /* フローティングウィンドウ */
   --mv-floating-window-width: 600px;
@@ -340,6 +352,7 @@
     monospace;
   --mv-font-display: "Rajdhani", var(--mv-font-sans);  /* FF風/Mech風のシャープで曲線的なフォント */
 
+  --mv-font-size-xxs: 8px;
   --mv-font-size-xs: 10px;
   --mv-font-size-sm: 12px;
   --mv-font-size-md: 14px;
