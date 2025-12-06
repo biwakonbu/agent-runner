@@ -67,7 +67,12 @@
     display: flex;
     flex-direction: column;
     height: 100%;
-    background: var(--mv-color-surface-node); /* primary -> node (#272b36) */
+    background: var(--mv-color-surface-base);
+    background-image: radial-gradient(
+      var(--mv-color-border-subtle) 1px,
+      transparent 1px
+    );
+    background-size: 20px 20px;
   }
 
   /* ツリービュー */

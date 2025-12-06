@@ -1,7 +1,9 @@
 <script lang="ts">
   import WBSGraphView from "./WBSGraphView.svelte";
   import { tasks } from "../../stores/taskStore";
-  import type { Task, PhaseName } from "../../types";
+  import type { Task } from "../../types";
+
+  type PhaseName = "概念設計" | "実装設計" | "実装" | "検証";
 
   export let taskCount = 5;
   export let completedRatio = 0.4;
@@ -58,7 +60,8 @@
     width: var(--mv-size-preview-width);
     height: var(--mv-size-preview-height);
     background: var(--mv-color-surface-primary);
-    border-radius: var(--mv-radius-md, 8px);
+    border-radius: var(--mv-radius-md);
     overflow: hidden;
+    border: var(--mv-border-width-sm) solid var(--mv-color-border-subtle);
   }
 </style>

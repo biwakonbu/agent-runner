@@ -18,9 +18,9 @@
 
 <header class="wbs-header">
   <div class="header-title">
-    <h2>作業分解構造</h2>
+    <h2>Work Breakdown Structure</h2>
     <span class="task-count">
-      {completed} / {total} タスク完了
+      {completed} / {total} Tasks Completed
     </span>
   </div>
 
@@ -41,16 +41,16 @@
     <button
       class="action-btn"
       on:click={() => expandedNodes.expandAll()}
-      title="すべて展開"
+      title="Expand All"
     >
-      ↕ 全展開
+      ↕ Expand All
     </button>
     <button
       class="action-btn"
       on:click={() => expandedNodes.collapseAll()}
-      title="すべて折りたたむ"
+      title="Collapse All"
     >
-      ⇕ 全折
+      ⇕ Collapse All
     </button>
   </div>
 </header>

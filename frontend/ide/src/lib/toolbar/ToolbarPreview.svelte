@@ -11,6 +11,8 @@
     viewModeChange: "graph" | "wbs";
   }>();
 
+  import BrandFull from "../components/brand/BrandFull.svelte";
+
   // Props（Store依存を排除）
   export let poolSummaries: PoolSummary[] = [];
   export let overallProgress = { percentage: 0, completed: 0, total: 0 };
@@ -70,7 +72,7 @@
 <header class="toolbar">
   <!-- 左側：タイトルと操作 -->
   <div class="toolbar-left">
-    <h1 class="app-title">multiverse IDE</h1>
+    <BrandFull size="sm" />
 
     <Button variant="primary" size="small" on:click={handleCreateTask}>
       <span class="btn-icon">+</span>
@@ -157,7 +159,12 @@
     <!-- ズームコントロール（グラフモードのみ表示） -->
     {#if isGraphMode}
       <div class="zoom-controls">
-        <Button variant="ghost" size="small" on:click={handleZoomOut} label="−" />
+        <Button
+          variant="ghost"
+          size="small"
+          on:click={handleZoomOut}
+          label="−"
+        />
 
         <button
           class="zoom-value"
@@ -168,7 +175,12 @@
           {zoomPercent}%
         </button>
 
-        <Button variant="ghost" size="small" on:click={handleZoomIn} label="+" />
+        <Button
+          variant="ghost"
+          size="small"
+          on:click={handleZoomIn}
+          label="+"
+        />
       </div>
     {/if}
   </div>

@@ -29,12 +29,13 @@ export interface WBSNode {
 const phaseOrder: PhaseName[] = ['概念設計', '実装設計', '実装', '検証', ''];
 
 // フェーズのラベル
+// フェーズのラベル
 const phaseLabels: Record<PhaseName, string> = {
-  概念設計: '概念設計',
-  実装設計: '実装設計',
-  実装: '実装',
-  検証: '検証',
-  '': 'その他',
+  概念設計: 'Concept Design',
+  実装設計: 'Architecture Design',
+  実装: 'Implementation',
+  検証: 'Verification',
+  '': 'Other',
 };
 
 // 折りたたみ状態ストア

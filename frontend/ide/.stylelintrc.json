@@ -25,6 +25,12 @@
     "color-function-alias-notation": null,
     "alpha-value-notation": null,
     "declaration-property-value-keyword-no-deprecated": null,
+    "property-no-vendor-prefix": [
+      true,
+      {
+        "ignoreProperties": ["background-clip"]
+      }
+    ],
     "function-disallowed-list": [
       "rgb",
       "rgba",

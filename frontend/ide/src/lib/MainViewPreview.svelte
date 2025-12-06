@@ -42,7 +42,7 @@
     BLOCKED: 0,
   };
 
-  // 詳細パネル
+  // 詳細パネル (現在非表示のため未使用だが、Storybookのargs型エラー回避のため残す)
   export let selectedTask: Task | null = null;
   export let attempts: Attempt[] = [];
   export let isTaskRunning = false;
@@ -85,38 +85,52 @@
   function handleOpenChat() {
     dispatch("openChat");
   }
-
-  $: isGraphMode = viewMode === "graph";
 </script>
 
 <main class="app">
   <!-- ツールバー -->
-  <ToolbarPreview
-    {viewMode}
-    {zoomPercent}
-    {overallProgress}
-    {poolSummaries}
-    {taskCountsByStatus}
-    on:createTask={handleCreateTask}
-  />
+  <div class="toolbar-overlay">
+    <ToolbarPreview
+      {viewMode}
+      {zoomPercent}
+      {overallProgress}
+      {poolSummaries}
+      {taskCountsByStatus}
+      on:createTask={handleCreateTask}
+    />
+  </div>
 
   <!-- メインコンテンツ -->
   <div class="main-content">
-    <!-- Graph/WBS ビュー切り替え -->
-    {#if isGraphMode}
+    <!-- 常にGraphViewを描画し、canvasとして機能させる -->
+    <div
+      class="canvas-layer"
+      style:visibility={viewMode === "graph" ? "visible" : "hidden"}
+    >
       <WBSGraphView />
-    {:else}
-      <WBSListView />
+    </div>
+
+    <!-- Listモード時はオーバーレイとして表示 -->
+    {#if viewMode === "wbs"}
+      <div class="list-overlay">
+        <WBSListView />
+      </div>
     {/if}
 
-    <!-- 詳細パネル -->
-    <DetailPanelPreview
-      task={selectedTask}
-      {attempts}
-      isRunning={isTaskRunning}
-      on:close={handleClosePanel}
-      on:run={handleRunTask}
-    />
+    <!-- 詳細パネル (一旦無効化中) -->
+    <!--
+    {#if selectedTask}
+       <div class="detail-panel-overlay">
+        <DetailPanelPreview
+          task={selectedTask}
+          {attempts}
+          isRunning={isTaskRunning}
+          on:close={handleClosePanel}
+          on:run={handleRunTask}
+        />
+       </div>
+    {/if}
+    -->
   </div>
 
   <!-- タスク作成モーダル -->
@@ -201,10 +215,36 @@
     overflow: hidden;
   }
 
+  /* Toolbar is overlaid logic not strictly in App.svelte?
+     Wait, App.svelte puts Toolbar *above* main-content in flex column.
+     So keep Toolbar where it is.
+     Correcting template structure to match App.svelte (Toolbar NOT overlay).
+  */
+
   .main-content {
-    display: flex;
+    display: block; /* Flex -> Block */
+    position: relative;
     flex: 1;
     overflow: hidden;
+    background: var(--mv-color-surface-base);
+  }
+
+  .canvas-layer {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+  }
+
+  .list-overlay {
+    position: absolute;
+    inset: var(--mv-spacing-md);
+    z-index: 10;
+    background: var(--mv-color-surface-primary);
+    border-radius: var(--mv-radius-lg);
+    box-shadow: var(--mv-shadow-modal);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
   }
 
   /* モーダルオーバーレイ */
