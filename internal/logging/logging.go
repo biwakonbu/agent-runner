@@ -4,8 +4,11 @@ package logging
 
 import (
 	"context"
+	"fmt"
+	"io"
 	"log/slog"
 	"os"
+	"path/filepath"
 	"time"
 )
 
@@ -187,4 +190,85 @@ func (w WorkerLogContext) ToAttrs() []slog.Attr {
 		slog.Int("exit_code", w.ExitCode),
 		slog.Float64("duration_ms", w.DurationMs),
 	}
+}
+
+// FileLoggerConfig holds configuration for file-based logging.
+type FileLoggerConfig struct {
+	// LogDir is the directory where log files are stored.
+	LogDir string
+
+	// FilePrefix is the prefix for log file names (e.g., "multiverse-ide").
+	FilePrefix string
+
+	// Config is the base logger configuration.
+	Config Config
+}
+
+// FileLoggerResult contains the created logger and cleanup function.
+type FileLoggerResult struct {
+	// Logger is the configured slog.Logger.
+	Logger *slog.Logger
+
+	// LogFilePath is the path to the created log file.
+	LogFilePath string
+
+	// Close should be called to close the log file when done.
+	Close func() error
+}
+
+// NewFileLogger creates a logger that writes to both stderr and a file.
+// The log file is created with a timestamp-based name for each startup.
+// Returns a FileLoggerResult with the logger and a cleanup function.
+func NewFileLogger(cfg FileLoggerConfig) (*FileLoggerResult, error) {
+	// デフォルト値の設定
+	if cfg.LogDir == "" {
+		homeDir, err := os.UserHomeDir()
+		if err != nil {
+			return nil, fmt.Errorf("failed to get home directory: %w", err)
+		}
+		cfg.LogDir = filepath.Join(homeDir, ".multiverse", "logs")
+	}
+
+	if cfg.FilePrefix == "" {
+		cfg.FilePrefix = "multiverse"
+	}
+
+	// ログディレクトリを作成
+	if err := os.MkdirAll(cfg.LogDir, 0755); err != nil {
+		return nil, fmt.Errorf("failed to create log directory: %w", err)
+	}
+
+	// タイムスタンプベースのファイル名を生成
+	timestamp := time.Now().Format("2006-01-02_15-04-05")
+	logFileName := fmt.Sprintf("%s_%s.log", cfg.FilePrefix, timestamp)
+	logFilePath := filepath.Join(cfg.LogDir, logFileName)
+
+	// ログファイルを作成（追記モード）
+	logFile, err := os.OpenFile(logFilePath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create log file: %w", err)
+	}
+
+	// stderr とファイルの両方に出力する MultiWriter を作成
+	multiWriter := io.MultiWriter(os.Stderr, logFile)
+
+	opts := &slog.HandlerOptions{
+		Level:     cfg.Config.Level,
+		AddSource: cfg.Config.AddSource,
+	}
+
+	var handler slog.Handler
+	if cfg.Config.JSONFormat {
+		handler = slog.NewJSONHandler(multiWriter, opts)
+	} else {
+		handler = slog.NewTextHandler(multiWriter, opts)
+	}
+
+	logger := slog.New(handler)
+
+	return &FileLoggerResult{
+		Logger:      logger,
+		LogFilePath: logFilePath,
+		Close:       logFile.Close,
+	}, nil
 }

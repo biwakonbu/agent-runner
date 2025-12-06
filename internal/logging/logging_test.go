@@ -5,6 +5,8 @@ import (
 	"context"
 	"encoding/json"
 	"log/slog"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -208,4 +210,129 @@ func TestJSONFormat(t *testing.T) {
 	if _, ok := result["level"]; !ok {
 		t.Error("JSON log should have 'level' field")
 	}
+}
+
+func TestNewFileLogger(t *testing.T) {
+	// 一時ディレクトリを作成
+	tmpDir := t.TempDir()
+
+	t.Run("creates log file and writes to it", func(t *testing.T) {
+		result, err := NewFileLogger(FileLoggerConfig{
+			LogDir:     tmpDir,
+			FilePrefix: "test-app",
+			Config:     DefaultConfig(),
+		})
+		if err != nil {
+			t.Fatalf("NewFileLogger failed: %v", err)
+		}
+		defer result.Close()
+
+		// ログファイルパスが設定されていること
+		if result.LogFilePath == "" {
+			t.Error("LogFilePath should not be empty")
+		}
+
+		// ファイルが存在すること
+		if _, err := os.Stat(result.LogFilePath); os.IsNotExist(err) {
+			t.Errorf("Log file should exist at %s", result.LogFilePath)
+		}
+
+		// ファイル名のフォーマット確認
+		fileName := filepath.Base(result.LogFilePath)
+		if !strings.HasPrefix(fileName, "test-app_") {
+			t.Errorf("Log file name should start with 'test-app_', got: %s", fileName)
+		}
+		if !strings.HasSuffix(fileName, ".log") {
+			t.Errorf("Log file name should end with '.log', got: %s", fileName)
+		}
+
+		// ログを書き込み
+		result.Logger.Info("test message", "key", "value")
+
+		// ファイルにログが書き込まれていること
+		content, err := os.ReadFile(result.LogFilePath)
+		if err != nil {
+			t.Fatalf("Failed to read log file: %v", err)
+		}
+		if !strings.Contains(string(content), "test message") {
+			t.Errorf("Log file should contain 'test message', got: %s", string(content))
+		}
+	})
+
+	t.Run("creates directory if not exists", func(t *testing.T) {
+		nestedDir := filepath.Join(tmpDir, "nested", "logs")
+
+		result, err := NewFileLogger(FileLoggerConfig{
+			LogDir:     nestedDir,
+			FilePrefix: "nested-test",
+			Config:     DefaultConfig(),
+		})
+		if err != nil {
+			t.Fatalf("NewFileLogger failed: %v", err)
+		}
+		defer result.Close()
+
+		// ディレクトリが作成されていること
+		if _, err := os.Stat(nestedDir); os.IsNotExist(err) {
+			t.Errorf("Log directory should be created at %s", nestedDir)
+		}
+	})
+
+	t.Run("uses default values when not specified", func(t *testing.T) {
+		// LogDir を一時ディレクトリに設定（デフォルトの ~/.multiverse/logs を使わない）
+		result, err := NewFileLogger(FileLoggerConfig{
+			LogDir: tmpDir,
+			Config: DefaultConfig(),
+		})
+		if err != nil {
+			t.Fatalf("NewFileLogger failed: %v", err)
+		}
+		defer result.Close()
+
+		// デフォルトプレフィックス "multiverse" が使われていること
+		fileName := filepath.Base(result.LogFilePath)
+		if !strings.HasPrefix(fileName, "multiverse_") {
+			t.Errorf("Log file name should start with 'multiverse_' by default, got: %s", fileName)
+		}
+	})
+
+	t.Run("JSON format works", func(t *testing.T) {
+		result, err := NewFileLogger(FileLoggerConfig{
+			LogDir:     tmpDir,
+			FilePrefix: "json-test",
+			Config:     ProductionConfig(), // JSON format
+		})
+		if err != nil {
+			t.Fatalf("NewFileLogger failed: %v", err)
+		}
+		defer result.Close()
+
+		result.Logger.Info("json test", "foo", "bar")
+
+		content, err := os.ReadFile(result.LogFilePath)
+		if err != nil {
+			t.Fatalf("Failed to read log file: %v", err)
+		}
+
+		// JSON として解析可能か確認
+		var logEntry map[string]interface{}
+		if err := json.Unmarshal(content, &logEntry); err != nil {
+			t.Errorf("Log content should be valid JSON: %v\nContent: %s", err, string(content))
+		}
+	})
+}
+
+func TestNewFileLogger_ErrorCases(t *testing.T) {
+	t.Run("fails with invalid directory path", func(t *testing.T) {
+		// 書き込み不可能なパス（ルートディレクトリ直下に作成しようとする）
+		// macOS/Linux では /proc は読み取り専用
+		_, err := NewFileLogger(FileLoggerConfig{
+			LogDir:     "/proc/invalid-log-dir",
+			FilePrefix: "test",
+			Config:     DefaultConfig(),
+		})
+		if err == nil {
+			t.Error("NewFileLogger should fail with invalid directory")
+		}
+	})
 }
