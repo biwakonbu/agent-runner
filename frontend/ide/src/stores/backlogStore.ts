@@ -11,14 +11,14 @@ import {
     GetBacklogItems,
     ResolveBacklogItem as WailsResolveBacklogItem,
     DeleteBacklogItem as WailsDeleteBacklogItem,
-    type BacklogItem,
-} from '../../wailsjs/wailsjs/go/main/App';
+} from '../../wailsjs/go/main/App';
+import { orchestrator } from '../../wailsjs/go/models';
 import { Logger } from '../services/logger';
 
 const log = Logger.withComponent('BacklogStore');
 
-export type { BacklogItem };
-export type BacklogType = 'FAILURE' | 'QUESTION' | 'BLOCKER';
+export type BacklogType = orchestrator.BacklogType;
+export type BacklogItem = orchestrator.BacklogItem;
 
 // バックログアイテム一覧ストア
 function createBacklogStore() {

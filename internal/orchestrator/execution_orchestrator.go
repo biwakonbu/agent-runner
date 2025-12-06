@@ -27,15 +27,14 @@ type ExecutionOrchestrator struct {
 	TaskStore    *TaskStore
 	Queue        *ipc.FilesystemQueue
 	EventEmitter EventEmitter
+	BacklogStore *BacklogStore
+	RetryPolicy  *RetryPolicy
 
 	state   ExecutionState
 	stateMu sync.RWMutex
 
 	stopCh   chan struct{}
 	resumeCh chan struct{}
-
-	// For MVP, we use a simple loop ticker or immediate trigger
-	// To support Pause/Resume cleanly, maybe just checking state in loop is enough for MVP
 
 	logger *slog.Logger
 }
@@ -47,6 +46,7 @@ func NewExecutionOrchestrator(
 	taskStore *TaskStore,
 	queue *ipc.FilesystemQueue,
 	eventEmitter EventEmitter,
+	backlogStore *BacklogStore,
 ) *ExecutionOrchestrator {
 	return &ExecutionOrchestrator{
 		Scheduler:    scheduler,
@@ -54,6 +54,8 @@ func NewExecutionOrchestrator(
 		TaskStore:    taskStore,
 		Queue:        queue,
 		EventEmitter: eventEmitter,
+		BacklogStore: backlogStore,
+		RetryPolicy:  DefaultRetryPolicy(),
 		state:        ExecutionStateIdle,
 		stopCh:       nil,
 		resumeCh:     make(chan struct{}),
@@ -171,12 +173,33 @@ func (e *ExecutionOrchestrator) runLoop(ctx context.Context, stopCh <-chan struc
 		case <-ticker.C:
 			// Check state
 			if e.State() != ExecutionStateRunning {
-				continue // Skip if paused or idle (if idle we should probably exit, but Start spins this up)
+				continue // Skip if paused or idle
 			}
 
 			if e.State() == ExecutionStateIdle {
-				// Should theoretically cycle back to ensure we stop if someone called Stop()
 				return
+			}
+
+			// 0-a. Reset Retry Tasks (RETRY_WAIT -> PENDING when backoff expired)
+			if e.Scheduler != nil {
+				if reset, err := e.Scheduler.ResetRetryTasks(); err != nil {
+					e.logger.Error("failed to reset retry tasks", slog.Any("error", err))
+				} else {
+					for _, id := range reset {
+						e.emitTaskStateChange(id, TaskStatusRetryWait, TaskStatusPending)
+					}
+				}
+			}
+
+			// 0-b. Update Blocked Tasks (BLOCKED -> PENDING when dependencies satisfied)
+			if e.Scheduler != nil {
+				if unblocked, err := e.Scheduler.UpdateBlockedTasks(); err != nil {
+					e.logger.Error("failed to update blocked tasks", slog.Any("error", err))
+				} else {
+					for _, id := range unblocked {
+						e.emitTaskStateChange(id, TaskStatusBlocked, TaskStatusPending)
+					}
+				}
 			}
 
 			// 1. Schedule Ready Tasks
@@ -208,36 +231,33 @@ func (e *ExecutionOrchestrator) processJob(ctx context.Context, job *ipc.Job) {
 	task, err := e.TaskStore.LoadTask(job.TaskID)
 	if err != nil {
 		e.logger.Error("failed to load task for job", slog.String("task_id", job.TaskID), slog.Any("error", err))
-		// Mark job as failed/completed?
 		_ = e.Queue.Complete(job.ID, job.PoolID)
 		return
 	}
 
-	// Execute Task
-	// Update status via Scheduler or straight here? Executor updates status.
-	oldStatus := task.Status
-	attempt, err := e.Executor.ExecuteTask(ctx, task)
+	// 試行回数はタスクから取得するのでインクリメントは不要
 
-	// Emit Task State Change
-	// Executor updates DB but maybe doesn't emit event?
-	// Executor is "dumb", Orchestrator should probably emit.
-	// But Executor updates file.
-	// Let's emit here for UI updates
-	if e.EventEmitter != nil {
-		// Fetch latest status
-		latestTask, loadErr := e.TaskStore.LoadTask(job.TaskID)
-		if loadErr == nil && latestTask != nil {
-			e.EventEmitter.Emit(EventTaskStateChange, TaskStateChangeEvent{
-				TaskID:    latestTask.ID,
-				OldStatus: oldStatus,
-				NewStatus: latestTask.Status,
-				Timestamp: time.Now(),
-			})
-		}
+	// Execute Task
+	oldStatus := task.Status
+	attempt, execErr := e.Executor.ExecuteTask(ctx, task)
+
+	// Fetch latest status
+	latestTask, loadErr := e.TaskStore.LoadTask(job.TaskID)
+	if loadErr == nil && latestTask != nil {
+		e.emitTaskStateChange(latestTask.ID, oldStatus, latestTask.Status)
 	}
 
-	if err != nil {
-		e.logger.Error("task execution failed", slog.String("task_id", task.ID), slog.Any("error", err))
+	if execErr != nil {
+		e.logger.Error("task execution failed", slog.String("task_id", task.ID), slog.Any("error", execErr))
+		// HandleFailure でリトライ/バックログ追加を判断
+		// 最新の試行回数を渡す（既にExecuteTask内で失敗Attemptが保存されている可能性があるが、ここではタスクのAttemptCountを使う）
+		// ただし、タスク実行前にAttemptCountをインクリメントしていないので、現在値+1を渡すべきか？
+		// RetryPolicyは "次の試行" が何回目かを判定するロジックではなく、"現在の失敗" が何回目の試行かを判定する
+		// ExecuteTaskが失敗した時点で1回カウントされるべき。
+		// ここでは task.AttemptCount + 1 を渡すのが適切
+		if handleErr := e.HandleFailure(task, execErr, task.AttemptCount+1); handleErr != nil {
+			e.logger.Error("failed to handle task failure", slog.String("task_id", task.ID), slog.Any("error", handleErr))
+		}
 	} else {
 		e.logger.Info("task execution succeeded", slog.String("task_id", task.ID), slog.String("status", string(attempt.Status)))
 	}
@@ -245,5 +265,81 @@ func (e *ExecutionOrchestrator) processJob(ctx context.Context, job *ipc.Job) {
 	// Complete Job
 	if err := e.Queue.Complete(job.ID, job.PoolID); err != nil {
 		e.logger.Error("failed to complete job", slog.String("job_id", job.ID), slog.Any("error", err))
+	}
+}
+
+// emitTaskStateChange はタスク状態変更イベントを発行する
+func (e *ExecutionOrchestrator) emitTaskStateChange(taskID string, oldStatus, newStatus TaskStatus) {
+	if e.EventEmitter != nil {
+		e.EventEmitter.Emit(EventTaskStateChange, TaskStateChangeEvent{
+			TaskID:    taskID,
+			OldStatus: oldStatus,
+			NewStatus: newStatus,
+			Timestamp: time.Now(),
+		})
+	}
+}
+
+// HandleFailure はタスク失敗時の処理を行う
+// PRD FR-P3-004 に基づき、リトライまたはバックログ追加を判断する
+func (e *ExecutionOrchestrator) HandleFailure(task *Task, execErr error, attemptNum int) error {
+	if e.RetryPolicy == nil {
+		e.logger.Warn("no retry policy configured, skipping failure handling")
+		return nil
+	}
+
+	nextAction := e.RetryPolicy.DetermineNextAction(attemptNum)
+
+	switch nextAction {
+	case NextActionRetry:
+		// リトライをスケジュール (DB更新)
+		backoff := e.RetryPolicy.CalculateBackoff(attemptNum)
+		nextRetryAt := time.Now().Add(backoff)
+
+		e.logger.Info("scheduling retry (persisted)",
+			slog.String("task_id", task.ID),
+			slog.Int("attempt", attemptNum),
+			slog.Duration("backoff", backoff),
+			slog.Time("next_retry_at", nextRetryAt),
+		)
+
+		task.Status = TaskStatusRetryWait
+		task.AttemptCount = attemptNum // 失敗した今回の回数を保存
+		task.NextRetryAt = &nextRetryAt
+
+		if err := e.TaskStore.SaveTask(task); err != nil {
+			return fmt.Errorf("failed to save retry state: %w", err)
+		}
+
+		e.emitTaskStateChange(task.ID, TaskStatusFailed, TaskStatusRetryWait)
+		return nil
+
+	case NextActionBacklog:
+		// バックログに追加
+		if e.BacklogStore == nil {
+			e.logger.Warn("no backlog store configured, cannot add to backlog")
+			return nil
+		}
+		e.logger.Info("adding task to backlog for human review",
+			slog.String("task_id", task.ID),
+			slog.Int("attempts", attemptNum),
+		)
+		item := CreateFailureItem(task.ID, task.Title, execErr, attemptNum)
+		if err := e.BacklogStore.Add(item); err != nil {
+			return fmt.Errorf("failed to add to backlog: %w", err)
+		}
+		// バックログ追加イベントを発行
+		if e.EventEmitter != nil {
+			e.EventEmitter.Emit(EventBacklogAdded, item)
+		}
+		return nil
+
+	case NextActionFail:
+		// 失敗としてマーク（既に Executor で実施済み）
+		e.logger.Warn("task permanently failed", slog.String("task_id", task.ID))
+		return nil
+
+	default:
+		return nil
 	}
 }

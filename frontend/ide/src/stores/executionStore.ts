@@ -6,7 +6,7 @@
  */
 
 import { writable } from 'svelte/store';
-import { EventsOn } from '../../wailsjs/runtime/runtime';
+import { EventsOn } from '../../wailsjs/wailsjs/runtime/runtime';
 import { StartExecution, PauseExecution, ResumeExecution, StopExecution } from '../../wailsjs/go/main/App';
 
 export type ExecutionState = 'IDLE' | 'RUNNING' | 'PAUSED';

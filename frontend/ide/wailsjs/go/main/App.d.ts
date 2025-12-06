@@ -31,3 +31,19 @@ export function CreateChatSession():Promise<any>;
 export function SendChatMessage(arg1:string,arg2:string):Promise<any>;
 
 export function GetChatHistory(arg1:string):Promise<Array<any>>;
+
+// Execution API
+export function StartExecution():Promise<void>;
+
+export function PauseExecution():Promise<void>;
+
+export function ResumeExecution():Promise<void>;
+
+export function StopExecution():Promise<void>;
+
+// Backlog API
+export function GetBacklogItems():Promise<Array<orchestrator.BacklogItem>>;
+
+export function ResolveBacklogItem(arg1:string,arg2:string):Promise<void>;
+
+export function DeleteBacklogItem(arg1:string):Promise<void>;

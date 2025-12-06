@@ -149,6 +149,39 @@ export namespace orchestrator {
 	    }
 	}
 
+	export type BacklogType = 'FAILURE' | 'QUESTION' | 'BLOCKER';
+
+	export class BacklogItem {
+	    id: string;
+	    taskId: string;
+	    type: BacklogType;
+	    title: string;
+	    description: string;
+	    priority: number;
+	    // Go type: time
+	    createdAt: any;
+	    // Go type: time
+	    resolvedAt?: any;
+	    resolution?: string;
+
+	    static createFrom(source: any = {}) {
+	        return new BacklogItem(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.taskId = source["taskId"];
+	        this.type = source["type"];
+	        this.title = source["title"];
+	        this.description = source["description"];
+	        this.priority = source["priority"];
+	        this.createdAt = source["createdAt"];
+	        this.resolvedAt = source["resolvedAt"];
+	        this.resolution = source["resolution"];
+	    }
+	}
+
 	export class Task {
 	    id: string;
 	    title: string;

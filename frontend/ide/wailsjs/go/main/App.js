@@ -57,3 +57,33 @@ export function SendChatMessage(arg1, arg2) {
 export function GetChatHistory(arg1) {
   return window['go']['main']['App']['GetChatHistory'](arg1);
 }
+
+// Execution API
+export function StartExecution() {
+  return window['go']['main']['App']['StartExecution']();
+}
+
+export function PauseExecution() {
+  return window['go']['main']['App']['PauseExecution']();
+}
+
+export function ResumeExecution() {
+  return window['go']['main']['App']['ResumeExecution']();
+}
+
+export function StopExecution() {
+  return window['go']['main']['App']['StopExecution']();
+}
+
+// Backlog API
+export function GetBacklogItems() {
+  return window['go']['main']['App']['GetBacklogItems']();
+}
+
+export function ResolveBacklogItem(arg1, arg2) {
+  return window['go']['main']['App']['ResolveBacklogItem'](arg1, arg2);
+}
+
+export function DeleteBacklogItem(arg1) {
+  return window['go']['main']['App']['DeleteBacklogItem'](arg1);
+}

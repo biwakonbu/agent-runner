@@ -95,21 +95,23 @@ func (a *App) SelectWorkspace() string {
 	}
 	executor := orchestrator.NewExecutor(agentRunnerPath, a.taskStore)
 	eventEmitter := orchestrator.NewWailsEventEmitter(a.ctx)
+
+	// Initialize BacklogStore (before ExecutionOrchestrator)
+	a.backlogStore = orchestrator.NewBacklogStore(wsDir)
+
 	a.executionOrchestrator = orchestrator.NewExecutionOrchestrator(
 		a.scheduler,
 		executor,
 		a.taskStore,
 		queue,
 		eventEmitter,
+		a.backlogStore,
 	)
 
 	// Initialize ChatHandler with mock Meta client (TODO: configurable)
 	sessionStore := chat.NewChatSessionStore(wsDir)
 	metaClient := meta.NewMockClient()
 	a.chatHandler = chat.NewHandler(metaClient, a.taskStore, sessionStore, id, ws.ProjectRoot, eventEmitter)
-
-	// Initialize BacklogStore
-	a.backlogStore = orchestrator.NewBacklogStore(wsDir)
 
 	return id
 }
@@ -163,21 +165,23 @@ func (a *App) OpenWorkspaceByID(id string) string {
 	}
 	executor := orchestrator.NewExecutor(agentRunnerPath, a.taskStore)
 	eventEmitter := orchestrator.NewWailsEventEmitter(a.ctx)
+
+	// Initialize BacklogStore (ExecutionOrchestrator depends on it)
+	a.backlogStore = orchestrator.NewBacklogStore(wsDir)
+
 	a.executionOrchestrator = orchestrator.NewExecutionOrchestrator(
 		a.scheduler,
 		executor,
 		a.taskStore,
 		queue,
 		eventEmitter,
+		a.backlogStore,
 	)
 
 	// Initialize ChatHandler with mock Meta client (TODO: configurable)
 	sessionStore := chat.NewChatSessionStore(wsDir)
 	metaClient := meta.NewMockClient()
 	a.chatHandler = chat.NewHandler(metaClient, a.taskStore, sessionStore, id, ws.ProjectRoot, eventEmitter)
-
-	// Initialize BacklogStore
-	a.backlogStore = orchestrator.NewBacklogStore(wsDir)
 
 	return id
 }

@@ -34,6 +34,7 @@ const (
 	EventTaskStateChange      = "task:stateChange"
 	EventExecutionStateChange = "execution:stateChange"
 	EventChatProgress         = "chat:progress"
+	EventBacklogAdded         = "backlog:added"
 )
 
 // TaskStateChangeEvent represents a task state change event

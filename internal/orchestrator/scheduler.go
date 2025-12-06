@@ -3,6 +3,7 @@ package orchestrator
 import (
 	"fmt"
 	"log/slog"
+	"time"
 
 	"github.com/biwakonbu/agent-runner/internal/logging"
 	"github.com/biwakonbu/agent-runner/internal/orchestrator/ipc"
@@ -197,4 +198,38 @@ func (s *Scheduler) SetBlockedStatusForPendingWithUnsatisfiedDeps() ([]string, e
 	}
 
 	return blocked, nil
+}
+
+// ResetRetryTasks checks for tasks in RETRY_WAIT status that are ready to be retried
+// (NextRetryAt <= now) and resets them to PENDING.
+func (s *Scheduler) ResetRetryTasks() ([]string, error) {
+	tasks, err := s.TaskStore.ListTasksByStatus(TaskStatusRetryWait)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list retry-wait tasks: %w", err)
+	}
+
+	now := time.Now()
+	reset := []string{}
+
+	for i := range tasks {
+		task := &tasks[i]
+		if task.NextRetryAt != nil && !now.Before(*task.NextRetryAt) {
+			// Time to retry
+			task.Status = TaskStatusPending
+			task.NextRetryAt = nil // Clear retry time
+			if err := s.TaskStore.SaveTask(task); err != nil {
+				s.logger.Warn("failed to reset retry task",
+					slog.String("task_id", task.ID),
+					slog.Any("error", err),
+				)
+				continue
+			}
+			reset = append(reset, task.ID)
+			s.logger.Info("task reset for retry (wait time elapsed)",
+				slog.String("task_id", task.ID),
+			)
+		}
+	}
+
+	return reset, nil
 }

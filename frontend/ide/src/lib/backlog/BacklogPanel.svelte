@@ -97,9 +97,6 @@
             </div>
             <h4 class="item-title">{item.title}</h4>
             <p class="item-description">{item.description}</p>
-            {#if item.metadata?.error}
-              <pre class="error-detail">{item.metadata.error}</pre>
-            {/if}
             <div class="item-actions">
               <button
                 class="btn-resolve"

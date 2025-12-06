@@ -22,6 +22,7 @@ const (
 	TaskStatusFailed    TaskStatus = "FAILED"
 	TaskStatusCanceled  TaskStatus = "CANCELED"
 	TaskStatusBlocked   TaskStatus = "BLOCKED"
+	TaskStatusRetryWait TaskStatus = "RETRY_WAIT"
 )
 
 // Task represents a unit of work.
@@ -44,6 +45,10 @@ type Task struct {
 	PhaseName          string   `json:"phaseName,omitempty"`          // フェーズ名
 	SourceChatID       *string  `json:"sourceChatId,omitempty"`       // 生成元チャットセッションID
 	AcceptanceCriteria []string `json:"acceptanceCriteria,omitempty"` // 達成条件リスト
+
+	// リトライ管理用 (v2.0 Extension)
+	AttemptCount int        `json:"attemptCount,omitempty"` // 試行回数
+	NextRetryAt  *time.Time `json:"nextRetryAt,omitempty"`  // 次回リトライ予定時刻
 }
 
 // AttemptStatus represents the status of an attempt.
