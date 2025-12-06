@@ -350,6 +350,95 @@ Storybook用にストア非依存のプレビューコンポーネントを用�
 
 これにより単体でのデザイン確認・イテレーションが可能。
 
+## VRT（Visual Regression Testing）
+
+Storybook コンポーネントの視覚的な変更を検知するための Playwright ベースのテスト。
+
+### 実行方法
+
+```bash
+# スナップショット比較（通常の実行）
+pnpm test:vrt
+
+# スナップショット更新（意図的な変更後）
+pnpm test:vrt:update
+
+# 失敗時のレポート確認
+npx playwright show-report playwright-vrt-report
+```
+
+### VRT テスト方針
+
+#### 作業開始時の必須手順
+
+**UI 作業を始める前に必ずベーススナップショットを作成する。**
+
+```bash
+# 1. 作業開始前にスナップショットを作成
+pnpm test:vrt:update
+
+# 2. UI 変更作業を実施
+# ...
+
+# 3. コミット時に pre-commit フックで VRT が自動実行される
+git commit -m "..."
+```
+
+この手順により、意図しない UI 変更がコミットされることを防ぐ。
+
+#### pre-commit による自動チェック
+
+- **コミット時に VRT が自動実行される**（Step 3/5）
+- スナップショットとの差分があればコミットが拒否される
+- 意図的な変更の場合は `pnpm test:vrt:update` でスナップショットを更新
+
+#### 基本原則
+
+1. **意図した変更以外の失敗は原因を調査**
+   - 失敗したスナップショットの差分を確認
+   - 意図的な変更かどうかを判断
+   - 不明な場合は調査してから対処
+
+2. **問題の修正は正当な方法で**
+   - 他のコンポーネントに影響を与えない修正
+   - スタイルの変更は影響範囲を確認
+   - 必要に応じてスナップショットを更新
+
+3. **スナップショットの鮮度管理**
+   - 古いスナップショットは変更前に VRT 実施
+   - 不明な場合は git で過去コミットに遡って確認
+   - `git stash` + VRT 実行で現在との差分を確認
+
+4. **テスト必須**
+   - 状態不明のまま先に進まない
+   - VRT 実行で視覚的な整合性を確認
+   - 失敗は必ず解決してからコミット
+
+### ディレクトリ構成
+
+```
+tests/vrt/
+├── stories.ts                     # Storybook ストーリー取得ユーティリティ
+├── storybook.spec.ts              # VRT テスト本体
+└── storybook.spec.ts-snapshots/   # スナップショット保存先（.gitignore）
+    ├── design-system-button--primary-chromium-darwin.png
+    ├── grid-gridnode--running-chromium-darwin.png
+    └── ...
+```
+
+### 設定ファイル
+
+- `playwright-vrt.config.ts`: VRT 専用 Playwright 設定
+  - `maxDiffPixels: 100`: 許容差分ピクセル数
+  - `threshold: 0.2`: 許容差分率
+  - `animations: 'disabled'`: アニメーション無効化
+
+### 注意事項
+
+- スナップショットは OS 依存（darwin/linux 等）
+- ローカル開発用のため、同一マシンでの比較を前提
+- 新規コンポーネント追加時は `pnpm test:vrt:update` でスナップショット生成
+
 ## 技術スタック
 
 - **Svelte 4**: リアクティブ UI フレームワーク

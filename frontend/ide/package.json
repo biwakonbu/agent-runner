@@ -18,7 +18,9 @@
     "test:watch": "vitest",
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build",
-    "test:e2e": "VITE_TEST_E2E=true playwright test"
+    "test:e2e": "VITE_TEST_E2E=true playwright test",
+    "test:vrt": "playwright test --config=playwright-vrt.config.ts",
+    "test:vrt:update": "playwright test --config=playwright-vrt.config.ts --update-snapshots"
   },
   "devDependencies": {
     "@chromatic-com/storybook": "^1.9.0",

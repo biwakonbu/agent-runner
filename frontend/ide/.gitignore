@@ -39,3 +39,7 @@ playwright-report/
 blob-report/
 playwright/.cache/
 
+# VRT スナップショット（ローカル開発用）
+tests/vrt/**/*-snapshots/
+playwright-vrt-report/
+

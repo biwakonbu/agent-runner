@@ -106,3 +106,48 @@ export function GetAvailablePools() {
         { id: "test", name: "Test", description: "テスト実行タスク用" }
     ]);
 }
+
+export function GetTaskGraph() {
+    console.log("[Mock] GetTaskGraph called");
+    const tasks = JSON.parse(window.localStorage.getItem('mock_tasks') || '[]');
+    // 単純なグラフ構造を返す（すべてのタスクをノードとして、依存関係をエッジとして構築）
+    const nodes = tasks.map(t => ({
+        task: t,
+        col: 0,
+        row: 0
+    }));
+    const edges = [];
+    tasks.forEach(t => {
+        if (t.dependencies) {
+            t.dependencies.forEach(depId => {
+                edges.push({ from: depId, to: t.id, satisfied: false });
+            });
+        }
+    });
+    
+    return Promise.resolve({
+        nodes: nodes,
+        edges: edges,
+        blockedTasks: [],
+        readyTasks: []
+    });
+}
+
+export function SendChatMessage(sessionId, message) {
+    console.log("[Mock] SendChatMessage called", sessionId, message);
+    return Promise.resolve({
+        role: "assistant",
+        content: "Mock response",
+        tasks: []
+    });
+}
+
+export function GetChatHistory(sessionId) {
+    console.log("[Mock] GetChatHistory called", sessionId);
+    return Promise.resolve([]);
+}
+
+export function CreateChatSession() {
+    console.log("[Mock] CreateChatSession called");
+    return Promise.resolve("mock-session-" + Date.now());
+}

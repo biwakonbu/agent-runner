@@ -55,6 +55,7 @@
   }
 </script>
 
+<!-- svelte-ignore a11y-no-noninteractive-tabindex -->
 <div
   class="wbs-node"
   class:is-phase={isPhase}
