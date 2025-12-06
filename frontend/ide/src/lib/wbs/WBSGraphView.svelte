@@ -2,6 +2,7 @@
   import { onMount } from "svelte";
   import WBSGraphNode from "./WBSGraphNode.svelte";
   import WBSHeader from "./WBSHeader.svelte";
+  import ZoomControls from "./ZoomControls.svelte";
   import {
     wbsTree,
     expandedNodes,
@@ -63,7 +64,9 @@
 
     // ベジェ曲線で滑らかな接続
     const controlOffset = HORIZONTAL_GAP / 2;
-    return `M ${startX} ${startY} C ${startX + controlOffset} ${startY}, ${endX - controlOffset} ${endY}, ${endX} ${endY}`;
+    return `M ${startX} ${startY} C ${startX + controlOffset} ${startY}, ${
+      endX - controlOffset
+    } ${endY}, ${endX} ${endY}`;
   }
 
   // 親子関係からエッジを生成
@@ -101,64 +104,107 @@
     ...positionedNodes.map((n) => n.y + NODE_HEIGHT + PADDING)
   );
 
-  // ドラッグスクロール
+  // --- Zoom & Pan Logic ---
   let container: HTMLDivElement;
   let isDragging = false;
+  let scale = 0.5; // Default 50%
+  let translateX = 0;
+  let translateY = 0;
   let startX = 0;
   let startY = 0;
-  let scrollLeft = 0;
-  let scrollTop = 0;
 
   function handleMouseDown(e: MouseEvent) {
-    if (e.button !== 0) return;
+    if (e.button !== 0) return; // Only left click for pan (or consider middle click?)
+    // If clicking on a node (interactive element), propagation should be stopped there.
+    // Assuming container gets event only if background.
     isDragging = true;
-    startX = e.clientX;
-    startY = e.clientY;
-    scrollLeft = container.scrollLeft;
-    scrollTop = container.scrollTop;
+    startX = e.clientX - translateX;
+    startY = e.clientY - translateY;
+    container.style.cursor = "grabbing";
   }
 
   function handleMouseMove(e: MouseEvent) {
     if (!isDragging) return;
     e.preventDefault();
-    const deltaX = e.clientX - startX;
-    const deltaY = e.clientY - startY;
-    container.scrollLeft = scrollLeft - deltaX;
-    container.scrollTop = scrollTop - deltaY;
+    translateX = e.clientX - startX;
+    translateY = e.clientY - startY;
   }
 
   function handleMouseUp() {
     isDragging = false;
+    if (container) container.style.cursor = "grab";
+  }
+
+  function handleWheel(e: WheelEvent) {
+    if (e.ctrlKey || e.metaKey || true) {
+      // Always zoom on wheel for 'infinite canvas' feel?
+      // Or stick to standard scroll unless modifier key.
+      // Factorio/Figma: Wheel zooms.
+      e.preventDefault();
+      const zoomSensitivity = 0.001;
+      const delta = -e.deltaY * zoomSensitivity;
+      const newScale = Math.min(Math.max(0.1, scale + delta), 3.0);
+
+      // Adjust translation to zoom towards cursor
+      // (Optional: simple center zoom for now to keep implementation lighter,
+      //  or cursor zoom if calculation is easy)
+      // Simple implementation: Zoom centered or just zoom.
+      // Better implementation: Zoom towards cursor.
+      // Let's do simple zoom for this iteration to avoid complex math bugs initially,
+      // or just scale.
+      scale = newScale;
+    }
+  }
+
+  function onZoomIn() {
+    scale = Math.min(3.0, scale + 0.1);
+  }
+
+  function onZoomOut() {
+    scale = Math.max(0.1, scale - 0.1);
+  }
+
+  function onReset() {
+    scale = 1.0;
+    translateX = 0;
+    translateY = 0;
   }
 </script>
 
 <div class="wbs-graph-view">
-  <!-- ヘッダー -->
-  <WBSHeader />
+  <!-- ヘッダー (Absolute overlay) -->
+  <div class="header-overlay">
+    <WBSHeader />
+  </div>
 
   <!-- グラフキャンバス -->
+  <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
   <div
     class="graph-container"
-    class:dragging={isDragging}
     bind:this={container}
     on:mousedown={handleMouseDown}
     on:mousemove={handleMouseMove}
     on:mouseup={handleMouseUp}
     on:mouseleave={handleMouseUp}
+    on:wheel={handleWheel}
     role="application"
-    aria-label="WBS グラフ"
-    tabindex="0"
+    aria-label="WBS グラフキャンバス"
   >
     {#if positionedNodes.length === 0}
-      <div class="empty-state">
+      <div
+        class="empty-state"
+        style:transform={`translate(${translateX}px, ${translateY}px) scale(${scale})`}
+      >
         <p>タスクがありません</p>
         <p class="empty-hint">チャットからタスクを生成してください</p>
       </div>
     {:else}
       <div
-        class="canvas"
+        class="canvas-world"
+        style:transform={`translate(${translateX}px, ${translateY}px) scale(${scale})`}
         style:width="{canvasWidth}px"
         style:height="{canvasHeight}px"
+        style:transform-origin="0 0"
       >
         <!-- 接続線 (SVG) -->
         <svg
@@ -200,62 +246,61 @@
     {/if}
   </div>
 
+  <ZoomControls
+    {scale}
+    on:zoomIn={onZoomIn}
+    on:zoomOut={onZoomOut}
+    on:reset={onReset}
+  />
+
   <!-- 操作ヒント -->
   <div class="controls-hint">
-    <span>ドラッグでスクロール</span>
-    <span>ノードクリックで展開/折りたたみ</span>
+    <span>ドラッグ: 移動</span>
+    <span>ホイール: ズーム</span>
+    <span>クリック: 選択/展開</span>
   </div>
 </div>
 
 <style>
   .wbs-graph-view {
-    display: flex;
-    flex-direction: column;
-    height: 100%;
-    background: var(--mv-color-surface-node);
+    position: relative;
+    width: var(--mv-size-full);
+    height: var(--mv-size-full);
+    overflow: hidden;
+    background: var(--mv-color-surface-base);
+    background-image: radial-gradient(
+      var(--mv-color-border-subtle) 1px,
+      transparent 1px
+    );
+    background-size: 20px 20px;
   }
 
-  /* グラフコンテナ */
+  .header-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 10;
+    pointer-events: none; /* Let clicks pass through to canvas if not on header elements */
+  }
+
+  .header-overlay :global(*) {
+    pointer-events: auto;
+  }
+
   .graph-container {
-    flex: 1;
-    overflow: auto;
-    position: relative;
+    width: var(--mv-size-full);
+    height: var(--mv-size-full);
     cursor: grab;
     touch-action: none;
+    overflow: hidden;
   }
 
-  .graph-container.dragging {
-    cursor: grabbing;
-  }
-
-  /* カスタムスクロールバー */
-  .graph-container::-webkit-scrollbar {
-    width: var(--mv-scrollbar-width);
-    height: var(--mv-scrollbar-width);
-  }
-
-  .graph-container::-webkit-scrollbar-track {
-    background: var(--mv-color-surface-node);
-  }
-
-  .graph-container::-webkit-scrollbar-thumb {
-    background: var(--mv-color-border-default);
-    border-radius: var(--mv-scrollbar-radius);
-  }
-
-  .graph-container::-webkit-scrollbar-thumb:hover {
-    background: var(--mv-color-border-strong);
-  }
-
-  .graph-container::-webkit-scrollbar-corner {
-    background: var(--mv-color-surface-node);
-  }
-
-  /* キャンバス */
-  .canvas {
-    position: relative;
-    min-width: var(--mv-size-full);
-    min-height: var(--mv-size-full);
+  .canvas-world {
+    position: absolute;
+    top: 0;
+    left: 0;
+    will-change: transform;
   }
 
   /* 接続線 */
@@ -270,9 +315,6 @@
     fill: none;
     stroke: var(--mv-color-border-default);
     stroke-width: 2;
-    filter: drop-shadow(
-      0 0 2px var(--mv-color-border-subtle)
-    ); /* subtle glow */
     transition: stroke var(--mv-transition-hover);
   }
 
@@ -283,14 +325,15 @@
     left: 0;
   }
 
-  /* 空状態 */
   .empty-state {
     position: absolute;
     top: var(--mv-size-half);
     left: var(--mv-size-half);
-    transform: translate(-50%, -50%);
     text-align: center;
     color: var(--mv-color-text-muted);
+    margin-left: var(--mv-empty-state-margin-left);
+    margin-top: var(--mv-empty-state-margin-top);
+    width: var(--mv-empty-state-width);
   }
 
   .empty-state p {
@@ -303,19 +346,24 @@
 
   /* 操作ヒント */
   .controls-hint {
+    position: absolute;
+    bottom: var(--mv-spacing-lg);
+    right: var(--mv-spacing-lg);
     display: flex;
-    gap: var(--mv-spacing-sm);
-    padding: var(--mv-spacing-xs) var(--mv-spacing-md);
-    background: var(--mv-color-surface-secondary);
-    border-top: var(--mv-border-width-thin) solid var(--mv-color-border-subtle);
+    flex-direction: column;
+    gap: var(--mv-spacing-xs);
+    padding: var(--mv-spacing-sm);
+    background: var(--mv-color-surface-secondary); /* Semi-transparent? */
+    border-radius: var(--mv-radius-md);
+    box-shadow: var(--mv-shadow-card);
     font-size: var(--mv-font-size-xs);
     color: var(--mv-color-text-muted);
-    flex-shrink: 0;
+    pointer-events: none;
+    opacity: 0.8;
   }
 
   .controls-hint span {
-    background: var(--mv-color-surface-primary);
-    padding: var(--mv-spacing-xxs) var(--mv-spacing-xs);
-    border-radius: var(--mv-radius-sm);
+    background: transparent;
+    padding: 0;
   }
 </style>

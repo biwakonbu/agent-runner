@@ -57,6 +57,13 @@ function createChatStore() {
         try {
             // Wails バインディングを動的にインポート
             const module = await import('../../wailsjs/go/main/App');
+            
+            // window.go が存在することを確認（Storybook 等では存在しない）
+            if (!('go' in window)) {
+                console.warn('[Chat] window.go not found, using mock mode');
+                return false;
+            }
+
             wailsApp = module;
             return true;
         } catch {

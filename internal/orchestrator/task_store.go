@@ -17,6 +17,7 @@ const (
 	TaskStatusReady     TaskStatus = "READY"
 	TaskStatusRunning   TaskStatus = "RUNNING"
 	TaskStatusSucceeded TaskStatus = "SUCCEEDED"
+	TaskStatusCompleted TaskStatus = "COMPLETED"
 	TaskStatusFailed    TaskStatus = "FAILED"
 	TaskStatusCanceled  TaskStatus = "CANCELED"
 	TaskStatusBlocked   TaskStatus = "BLOCKED"

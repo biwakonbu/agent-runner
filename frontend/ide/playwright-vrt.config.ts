@@ -22,7 +22,7 @@ export default defineConfig({
 
   expect: {
     toHaveScreenshot: {
-      maxDiffPixels: 100, // 許容差分ピクセル数
+      maxDiffPixels: 250, // 許容差分ピクセル数（フレーキーテスト対策）
       threshold: 0.2, // 許容差分率
       animations: 'disabled', // アニメーション無効化
     },

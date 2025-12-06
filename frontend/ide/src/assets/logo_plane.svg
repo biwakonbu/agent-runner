@@ -1,0 +1,58 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- Left Wing (Light Side/Top) -->
+    <linearGradient id="finalPlaneLeft" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#88C0D0" /> <!-- Nord8 -->
+      <stop offset="100%" stop-color="#81A1C1" /> <!-- Nord9 -->
+    </linearGradient>
+
+    <!-- Right Wing (Shadow Side/Bottom) -->
+    <linearGradient id="finalPlaneRight" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#5E81AC" /> <!-- Nord10 -->
+      <stop offset="100%" stop-color="#434C5E" /> <!-- Nord2 -->
+    </linearGradient>
+    
+    <!-- Keel / Underside (Now Dark Shadow) -->
+    <linearGradient id="finalPlaneKeel" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#2E3440" /> <!-- Nord0 -->
+      <stop offset="100%" stop-color="#3B4252" /> <!-- Nord1 -->
+    </linearGradient>
+
+    <!-- Drop Shadow (adjusted for rotation) -->
+    <filter id="finalLift" x="-20%" y="-20%" width="140%" height="140%">
+      <feFlood flood-color="#000000" flood-opacity="0.4"/>
+      <feComposite operator="in" in2="SourceGraphic"/>
+      <feOffset dx="8" dy="8" result="offOut"/> <!-- Shadow cast bottom-right relative to screen -->
+      <feGaussianBlur stdDeviation="8" result="blur"/>
+      <feComposite operator="over" in="SourceGraphic" in2="blur"/>
+    </filter>
+  </defs>
+
+  <g filter="url(#finalLift)">
+      <!-- Rotation Group: Pointing Bottom-Left (approx 225 deg from top) -->
+      <!-- Center of rotation is 256, 256 -->
+      <!-- Originally pointing UP (-90 relative to trigonometric 0, or 0 relative to "Up") -->
+      <!-- Rotating -135 degrees (or 225) spins it to Bottom-Left -->
+      <g transform="rotate(-135, 256, 256)">
+          
+          <!-- The Classic Paper Plane Geometry (Drawing it as if pointing UP relative to its local group) -->
+          
+          <!-- Right Wing (Inside/Far) -->
+          <path d="M256 64 L416 384 L256 320 Z" 
+                fill="url(#finalPlaneRight)" />
+                
+          <!-- Left Wing (Near/Top) -->
+          <path d="M256 64 L96 384 L256 320 Z" 
+                fill="url(#finalPlaneLeft)" />
+
+          <!-- Center Fold Shadow -->
+          <path d="M256 64 L256 320 L192 352 Z" fill="#2E3440" opacity="0.2" />
+
+          <!-- Center Spine Highlight -->
+          <path d="M256 64 L256 320" stroke="#ECEFF4" stroke-width="2" stroke-opacity="0.5" />
+          
+          <!-- Keel (The "White part" -> Now Dark Body Color) -->
+          <path d="M256 320 L256 384 L272 326 Z" fill="url(#finalPlaneKeel)" />
+      </g>
+  </g>
+</svg>

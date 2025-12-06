@@ -25,3 +25,9 @@ export function RunTask(arg1:string):Promise<void>;
 export function SelectWorkspace():Promise<string>;
 
 export function GetAvailablePools():Promise<Array<{id: string, name: string, description?: string}>>;
+
+export function CreateChatSession():Promise<any>;
+
+export function SendChatMessage(arg1:string,arg2:string):Promise<any>;
+
+export function GetChatHistory(arg1:string):Promise<Array<any>>;

@@ -45,3 +45,15 @@ export function SelectWorkspace() {
 export function GetAvailablePools() {
   return window['go']['main']['App']['GetAvailablePools']();
 }
+
+export function CreateChatSession() {
+  return window['go']['main']['App']['CreateChatSession']();
+}
+
+export function SendChatMessage(arg1, arg2) {
+  return window['go']['main']['App']['SendChatMessage'](arg1, arg2);
+}
+
+export function GetChatHistory(arg1) {
+  return window['go']['main']['App']['GetChatHistory'](arg1);
+}

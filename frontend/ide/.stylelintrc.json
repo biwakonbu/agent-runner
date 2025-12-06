@@ -7,6 +7,12 @@
     "stylelint-declaration-strict-value"
   ],
   "rules": {
+    "selector-pseudo-class-no-unknown": [
+      true,
+      {
+        "ignorePseudoClasses": ["global"]
+      }
+    ],
     "color-no-hex": true,
     "color-named": "never",
     "import-notation": null,

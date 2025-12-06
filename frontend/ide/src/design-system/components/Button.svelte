@@ -40,6 +40,11 @@
    */
   export let loadingLabel = '';
 
+  /**
+   * ツールチップ用のタイトル属性
+   */
+  export let title = '';
+
   const dispatch = createEventDispatcher();
 
   function handleClick(event: MouseEvent) {
@@ -53,6 +58,7 @@
 
 <button
   {type}
+  {title}
   disabled={isDisabled}
   class="button variant-{variant} size-{size}"
   class:disabled={isDisabled}

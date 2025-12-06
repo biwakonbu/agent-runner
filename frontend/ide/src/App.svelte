@@ -129,16 +129,25 @@
     <Toolbar on:createTask={handleCreateTask} />
 
     <!-- メインコンテンツ -->
+    <!-- メインコンテンツ -->
     <div class="main-content">
-      <!-- Graph/WBS ビュー切り替え -->
-      {#if $viewMode === "graph"}
+      <!-- 常にGraphViewを描画し、canvasとして機能させる -->
+      <div
+        class="canvas-layer"
+        style:visibility={$viewMode === "graph" ? "visible" : "hidden"}
+      >
         <WBSGraphView />
-      {:else}
-        <WBSListView />
+      </div>
+
+      <!-- WBSモード時はオーバーレイとして表示（あるいはcanvas上に配置） -->
+      {#if $viewMode === "wbs"}
+        <div class="list-overlay">
+          <WBSListView />
+        </div>
       {/if}
 
-      <!-- 詳細パネル -->
-      <DetailPanel />
+      <!-- 詳細パネルはフローティングまたはオーバーレイとして扱う (一旦非表示/必要に応じて表示実装) -->
+      <!-- <DetailPanel /> -->
     </div>
 
     <!-- タスク作成モーダル -->
@@ -225,9 +234,29 @@
   }
 
   .main-content {
-    display: flex;
+    display: block; /* フレックスからブロックへ変更 (絶対配置のコンテナにするため) */
+    position: relative;
     flex: 1;
     overflow: hidden;
+    background: var(--mv-color-surface-base); /* Canvasの背景色 */
+  }
+
+  .canvas-layer {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+  }
+
+  .list-overlay {
+    position: absolute;
+    inset: var(--mv-spacing-md); /* 少し余白を持たせてフローティング感を出す */
+    z-index: 10;
+    background: var(--mv-color-surface-primary);
+    border-radius: var(--mv-radius-lg);
+    box-shadow: var(--mv-shadow-modal);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
   }
 
   /* モーダルオーバーレイ */
