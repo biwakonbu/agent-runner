@@ -31,6 +31,7 @@
     READY: '準備完了',
     RUNNING: '実行中',
     SUCCEEDED: '成功',
+    COMPLETED: '完了',
     FAILED: '失敗',
     CANCELED: 'キャンセル',
     BLOCKED: 'ブロック',

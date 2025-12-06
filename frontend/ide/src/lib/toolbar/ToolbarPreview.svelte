@@ -1,20 +1,31 @@
 <script lang="ts">
   import { createEventDispatcher } from "svelte";
   import { Button } from "../../design-system";
-  import {
-    viewport,
-    zoomPercent,
-    taskCountsByStatus,
-    poolSummaries,
-    viewMode,
-    overallProgress,
-  } from "../../stores";
-  import type { TaskStatus } from "../../types";
-  import ProgressBar from "../wbs/ProgressBar.svelte";
+  import type { TaskStatus, PoolSummary } from "../../types";
 
   const dispatch = createEventDispatcher<{
     createTask: void;
+    zoomIn: void;
+    zoomOut: void;
+    zoomReset: void;
+    viewModeChange: "graph" | "wbs";
   }>();
+
+  // Props（Store依存を排除）
+  export let poolSummaries: PoolSummary[] = [];
+  export let overallProgress = { percentage: 0, completed: 0, total: 0 };
+  export let viewMode: "graph" | "wbs" = "graph";
+  export let zoomPercent = 100;
+  export let taskCountsByStatus: Record<TaskStatus, number> = {
+    PENDING: 0,
+    READY: 0,
+    RUNNING: 0,
+    SUCCEEDED: 0,
+    COMPLETED: 0,
+    FAILED: 0,
+    CANCELED: 0,
+    BLOCKED: 0,
+  };
 
   // ステータスサマリの表示設定（フォールバック用）
   const statusDisplay: {
@@ -31,13 +42,29 @@
     dispatch("createTask");
   }
 
-  function toggleViewMode() {
-    viewMode.toggle();
+  function handleZoomIn() {
+    dispatch("zoomIn");
+  }
+
+  function handleZoomOut() {
+    dispatch("zoomOut");
+  }
+
+  function handleZoomReset() {
+    dispatch("zoomReset");
+  }
+
+  function setGraphMode() {
+    dispatch("viewModeChange", "graph");
+  }
+
+  function setWBSMode() {
+    dispatch("viewModeChange", "wbs");
   }
 
   // Pool別サマリがある場合はそれを表示、なければステータス別サマリを表示
-  $: hasPoolSummaries = $poolSummaries.length > 0;
-  $: isGraphMode = $viewMode === "graph";
+  $: hasPoolSummaries = poolSummaries.length > 0;
+  $: isGraphMode = viewMode === "graph";
 </script>
 
 <header class="toolbar">
@@ -56,7 +83,7 @@
     {#if hasPoolSummaries}
       <!-- Pool別サマリ -->
       <div class="pool-summary">
-        {#each $poolSummaries as pool (pool.poolId)}
+        {#each poolSummaries as pool (pool.poolId)}
           <div class="pool-badge">
             <span class="pool-name">{pool.poolId}</span>
             <span class="pool-separator">:</span>
@@ -79,9 +106,9 @@
       <!-- フォールバック: ステータス別サマリ -->
       <div class="status-summary">
         {#each statusDisplay as { key, label, showCount }}
-          {#if showCount && $taskCountsByStatus[key] > 0}
+          {#if showCount && taskCountsByStatus[key] > 0}
             <div class="status-badge status-{key.toLowerCase()}">
-              <span class="status-count">{$taskCountsByStatus[key]}</span>
+              <span class="status-count">{taskCountsByStatus[key]}</span>
               <span class="status-label">{label}</span>
             </div>
           {/if}
@@ -94,8 +121,13 @@
   <div class="toolbar-right">
     <!-- 進捗率バー -->
     <div class="progress-section">
-      <ProgressBar percentage={$overallProgress.percentage} size="mini" />
-      <span class="progress-text">{$overallProgress.percentage}%</span>
+      <div class="progress-bar-mini">
+        <div
+          class="progress-fill"
+          style:--progress="{overallProgress.percentage}%"
+        ></div>
+      </div>
+      <span class="progress-text">{overallProgress.percentage}%</span>
     </div>
 
     <!-- ビュー切り替え -->
@@ -103,7 +135,7 @@
       <button
         class="view-btn"
         class:active={isGraphMode}
-        on:click={() => viewMode.setGraph()}
+        on:click={setGraphMode}
         aria-label="グラフビュー"
         title="グラフビュー"
       >
@@ -113,7 +145,7 @@
       <button
         class="view-btn"
         class:active={!isGraphMode}
-        on:click={() => viewMode.setWBS()}
+        on:click={setWBSMode}
         aria-label="WBSビュー"
         title="WBSビュー"
       >
@@ -125,28 +157,18 @@
     <!-- ズームコントロール（グラフモードのみ表示） -->
     {#if isGraphMode}
       <div class="zoom-controls">
-        <Button
-          variant="ghost"
-          size="small"
-          on:click={() => viewport.zoomOut()}
-          label="−"
-        />
+        <Button variant="ghost" size="small" on:click={handleZoomOut} label="−" />
 
         <button
           class="zoom-value"
-          on:click={() => viewport.reset()}
+          on:click={handleZoomReset}
           aria-label="ズームリセット"
           title="リセット (0)"
         >
-          {$zoomPercent}%
+          {zoomPercent}%
         </button>
 
-        <Button
-          variant="ghost"
-          size="small"
-          on:click={() => viewport.zoomIn()}
-          label="+"
-        />
+        <Button variant="ghost" size="small" on:click={handleZoomIn} label="+" />
       </div>
     {/if}
   </div>
@@ -243,10 +265,10 @@
     align-items: center;
     gap: var(--mv-spacing-xxs);
     background: var(--mv-color-surface-secondary);
-    border: var(--mv-border-width-thin) solid var(--mv-color-glow-ambient); /* ボーダーをグロー色に */
+    border: var(--mv-border-width-thin) solid var(--mv-color-glow-ambient);
     border-radius: var(--mv-radius-sm);
     padding: var(--mv-spacing-xxs);
-    box-shadow: var(--mv-shadow-node-glow); /* 常時微発光 */
+    box-shadow: var(--mv-shadow-node-glow);
   }
 
   .zoom-value {
@@ -277,10 +299,10 @@
     gap: var(--mv-spacing-xxs);
     padding: var(--mv-spacing-xxs) var(--mv-spacing-sm);
     background: var(--mv-color-surface-secondary);
-    border: var(--mv-border-width-thin) solid var(--mv-color-glow-ambient); /* ボーダーをグロー色に */
+    border: var(--mv-border-width-thin) solid var(--mv-color-glow-ambient);
     border-radius: var(--mv-radius-sm);
     font-size: var(--mv-font-size-xs);
-    box-shadow: var(--mv-shadow-node-glow); /* 常時微発光 */
+    box-shadow: var(--mv-shadow-node-glow);
   }
 
   .pool-name {
@@ -318,11 +340,27 @@
     color: var(--mv-color-text-muted);
   }
 
-  /* 進捗バー（ミニ） - styles handled by ProgressBar component */
+  /* 進捗バー（ミニ） */
   .progress-section {
     display: flex;
     align-items: center;
     gap: var(--mv-spacing-xs);
+  }
+
+  .progress-bar-mini {
+    width: var(--mv-progress-bar-width-mini);
+    height: var(--mv-progress-bar-height-sm);
+    background: var(--mv-color-surface-secondary);
+    border-radius: var(--mv-radius-sm);
+    overflow: hidden;
+  }
+
+  .progress-fill {
+    height: 100%;
+    width: var(--progress, 0%);
+    background: var(--mv-color-status-succeeded-border);
+    border-radius: var(--mv-radius-sm);
+    transition: width var(--mv-duration-slow);
   }
 
   .progress-text {

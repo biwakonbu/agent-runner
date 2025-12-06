@@ -13,6 +13,7 @@ export const TaskStatusSchema = z.enum([
   'READY',
   'RUNNING',
   'SUCCEEDED',
+  'COMPLETED',
   'FAILED',
   'CANCELED',
   'BLOCKED',
@@ -30,6 +31,18 @@ export const PhaseNameSchema = z.enum([
 ]);
 
 export type PhaseName = z.infer<typeof PhaseNameSchema>;
+
+// フェーズ名からCSSクラス名への変換
+export function phaseToCssClass(phase: PhaseName | undefined | null): string {
+  if (!phase) return '';
+  const phaseMap: Record<string, string> = {
+    概念設計: 'phase-concept',
+    実装設計: 'phase-design',
+    実装: 'phase-impl',
+    検証: 'phase-verify',
+  };
+  return phaseMap[phase] || '';
+}
 
 // Task スキーマ
 export const TaskSchema = z.object({
@@ -98,7 +111,8 @@ export const statusLabels: Record<TaskStatus, string> = {
   PENDING: '待機中',
   READY: '準備完了',
   RUNNING: '実行中',
-  SUCCEEDED: '成功',
+  SUCCEEDED: '処理成功',
+  COMPLETED: '完了',
   FAILED: '失敗',
   CANCELED: 'キャンセル',
   BLOCKED: 'ブロック',

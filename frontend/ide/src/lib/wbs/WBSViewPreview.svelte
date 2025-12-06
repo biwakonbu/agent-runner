@@ -1,9 +1,10 @@
 <script lang="ts">
-  import WBSView from './WBSView.svelte';
-  import { tasks } from '../../stores/taskStore';
-  import { expandedNodes } from '../../stores/wbsStore';
-  import type { Task, PhaseName } from '../../types';
-  import { onMount, onDestroy } from 'svelte';
+  import WBSListView from "./WBSListView.svelte";
+  import { tasks } from "../../stores/taskStore";
+  import { expandedNodes } from "../../stores/wbsStore";
+  import type { Task } from "../../types";
+  import type { PhaseName } from "../../schemas";
+  import { onMount, onDestroy } from "svelte";
 
   // Props
   export let taskCount: number = 5;
@@ -13,30 +14,36 @@
   // サンプルタスクを生成
   function generateTasks(count: number, ratio: number): Task[] {
     const phases: PhaseName[] = showAllPhases
-      ? ['概念設計', '実装設計', '実装', '検証']
-      : ['実装'];
-    const statuses: Task['status'][] = ['PENDING', 'READY', 'RUNNING', 'SUCCEEDED', 'FAILED'];
+      ? ["概念設計", "実装設計", "実装", "検証"]
+      : ["実装"];
+    const statuses: Task["status"][] = [
+      "PENDING",
+      "READY",
+      "RUNNING",
+      "SUCCEEDED",
+      "FAILED",
+    ];
 
     const result: Task[] = [];
     const completedCount = Math.floor(count * ratio);
 
     for (let i = 0; i < count; i++) {
       const phase = phases[i % phases.length];
-      let status: Task['status'];
+      let status: Task["status"];
 
       if (i < completedCount) {
-        status = 'SUCCEEDED';
+        status = "SUCCEEDED";
       } else if (i === completedCount) {
-        status = 'RUNNING';
+        status = "RUNNING";
       } else {
-        status = statuses[i % 3] as Task['status']; // PENDING, READY, RUNNING
+        status = statuses[i % 3] as Task["status"]; // PENDING, READY, RUNNING
       }
 
       result.push({
         id: `task-${i + 1}`,
         title: `タスク ${i + 1}: ${phase}のサンプル`,
         status,
-        poolId: 'default',
+        poolId: "default",
         phaseName: phase,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
@@ -68,7 +75,7 @@
 </script>
 
 <div class="preview-container">
-  <WBSView />
+  <WBSListView />
 </div>
 
 <style>

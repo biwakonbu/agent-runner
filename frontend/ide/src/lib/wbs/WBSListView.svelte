@@ -1,10 +1,7 @@
 <script lang="ts">
+  import WBSHeader from "./WBSHeader.svelte";
   import WBSNode from "./WBSNode.svelte";
-  import {
-    wbsTree,
-    expandedNodes,
-    overallProgress,
-  } from "../../stores/wbsStore";
+  import { wbsTree, expandedNodes } from "../../stores/wbsStore";
   import type { WBSNode as WBSNodeType } from "../../stores/wbsStore";
 
   // 展開状態を取得
@@ -48,45 +45,7 @@
 
 <div class="wbs-list-view">
   <!-- ヘッダー：全体進捗 -->
-  <header class="wbs-header">
-    <div class="header-title">
-      <h2>作業分解構造</h2>
-      <span class="task-count">
-        {$overallProgress.completed} / {$overallProgress.total} タスク完了
-      </span>
-    </div>
-
-    <div class="header-progress">
-      <div class="progress-bar-large">
-        <div
-          class="progress-fill"
-          style:--progress="{$overallProgress.percentage}%"
-        ></div>
-      </div>
-      <span class="progress-percentage">
-        <span class="progress-number">{$overallProgress.percentage}</span><span
-          class="progress-symbol">%</span
-        >
-      </span>
-    </div>
-
-    <div class="header-actions">
-      <button
-        class="action-btn"
-        on:click={() => expandedNodes.expandAll()}
-        title="すべて展開"
-      >
-        ↕ 全展開
-      </button>
-      <button
-        class="action-btn"
-        on:click={() => expandedNodes.collapseAll()}
-        title="すべて折りたたむ"
-      >
-        ⇕ 全折
-      </button>
-    </div>
-  </header>
+  <WBSHeader />
 
   <!-- ツリービュー -->
   <div class="wbs-tree" role="tree" aria-label="WBS ツリー">
@@ -109,110 +68,6 @@
     flex-direction: column;
     height: 100%;
     background: var(--mv-color-surface-node); /* primary -> node (#272b36) */
-  }
-
-  /* ヘッダー */
-  .wbs-header {
-    display: flex;
-    flex-direction: column;
-    gap: var(--mv-spacing-sm);
-    padding: var(--mv-spacing-md);
-    border-bottom: var(--mv-border-width-thin) solid
-      var(--mv-color-border-subtle);
-    background: var(
-      --mv-color-surface-hover
-    ); /* secondary -> hover (#2d323e) */
-  }
-
-  .header-title {
-    display: flex;
-    align-items: baseline;
-    gap: var(--mv-spacing-sm);
-  }
-
-  .header-title h2 {
-    font-size: var(--mv-font-size-lg);
-    font-weight: var(--mv-font-weight-semibold);
-    color: var(--mv-color-text-primary);
-    margin: 0;
-  }
-
-  .task-count {
-    font-size: var(--mv-font-size-sm);
-    color: var(--mv-color-text-muted);
-  }
-
-  .header-progress {
-    display: flex;
-    align-items: center;
-    gap: var(--mv-spacing-sm);
-  }
-
-  .progress-bar-large {
-    flex: 1;
-    height: var(--mv-progress-bar-height-md);
-    background: var(--mv-progress-bar-bg);
-    border-radius: var(--mv-radius-sm);
-    overflow: hidden;
-    box-shadow: var(--mv-shadow-progress-bar);
-    border: var(--mv-border-panel);
-  }
-
-  .progress-fill {
-    height: 100%;
-    width: var(--progress, 0%);
-    background: var(--mv-progress-bar-fill);
-    border-radius: var(--mv-radius-sm);
-    transition: width var(--mv-duration-slow);
-    box-shadow: var(--mv-shadow-glow-sm);
-  }
-
-  .progress-percentage {
-    display: flex;
-    align-items: baseline;
-    font-family: var(--mv-font-mono);
-    color: var(--mv-progress-text-color);
-    min-width: var(--mv-progress-text-width-md);
-    justify-content: flex-end;
-    text-shadow: var(--mv-text-shadow-glow);
-  }
-
-  .progress-number {
-    font-family: var(--mv-font-display);
-    font-size: var(--mv-font-size-xl);
-    font-weight: var(--mv-font-weight-bold);
-    letter-spacing: var(--mv-letter-spacing-tight);
-  }
-
-  .progress-symbol {
-    font-size: var(--mv-font-size-sm);
-    font-weight: var(--mv-font-weight-semibold);
-    margin-left: var(--mv-border-width-thin);
-    opacity: 0.85;
-  }
-
-  .header-actions {
-    display: flex;
-    gap: var(--mv-spacing-xs);
-  }
-
-  .action-btn {
-    padding: var(--mv-spacing-xxs) var(--mv-spacing-sm);
-    font-size: var(--mv-font-size-xs);
-    font-weight: var(--mv-font-weight-medium);
-    color: var(--mv-color-text-secondary);
-    background: var(--mv-color-surface-primary);
-    border: var(--mv-border-width-thin) solid var(--mv-color-border-default);
-    border-radius: var(--mv-radius-sm);
-    cursor: pointer;
-    transition:
-      background-color var(--mv-transition-hover),
-      color var(--mv-transition-hover);
-  }
-
-  .action-btn:hover {
-    background: var(--mv-color-surface-hover);
-    color: var(--mv-color-text-primary);
   }
 
   /* ツリービュー */

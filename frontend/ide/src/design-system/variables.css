@@ -134,11 +134,19 @@
   --mv-color-status-running-glow: var(--mv-color-glow-running);
 
   /* ========================================
-     ステータスカラー: Succeeded（成功）
+     ステータスカラー: Succeeded（処理成功 - レビュー待ち）
      ======================================== */
-  --mv-color-status-succeeded-bg: #1a2822;
-  --mv-color-status-succeeded-border: var(--mv-primitive-pastel-green-dark);
-  --mv-color-status-succeeded-text: var(--mv-primitive-pastel-green-muted);
+  --mv-color-status-succeeded-bg: #1c2b31; /* Slightly lighter/richer Dark Teal */
+  --mv-color-status-succeeded-border: var(--mv-primitive-frost-1); /* Brighter Cyan */
+  --mv-color-status-succeeded-text: var(--mv-primitive-frost-1); /* Matching bright text */
+
+  /* ========================================
+     ステータスカラー: Completed（完了 - 承認済み）
+     ======================================== */
+  --mv-color-status-completed-bg: #1f3328; /* Richer Dark Green */
+  --mv-color-status-completed-border: var(--mv-primitive-aurora-green); /* Bright Green */
+  --mv-color-status-completed-text: var(--mv-primitive-aurora-green); /* Bright Green Text */
+  --mv-color-status-completed-glow: rgba(163, 190, 140, 0.6); /* Stronger opacity */
 
   /* ========================================
      ステータスカラー: Failed（失敗）
@@ -330,7 +338,7 @@
     "Helvetica Neue", Arial, sans-serif;
   --mv-font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
     monospace;
-  --mv-font-display: "Orbitron", var(--mv-font-sans);  /* FF風の未来的フォント */
+  --mv-font-display: "Rajdhani", var(--mv-font-sans);  /* FF風/Mech風のシャープで曲線的なフォント */
 
   --mv-font-size-xs: 10px;
   --mv-font-size-sm: 12px;
@@ -389,7 +397,7 @@
   --mv-shadow-button-glow: 0 0 8px rgba(136, 192, 208, 0.4);
   --mv-border-panel: var(--mv-border-width-thin) solid var(--mv-color-border-subtle);
   --mv-text-shadow-glow: 0 0 4px var(--mv-color-glow-focus);
-  --mv-shadow-progress-bar: 0 0 15px var(--mv-color-glow-focus), inset 0 1px 2px rgba(0, 0, 0, 0.2);
+  --mv-shadow-progress-bar: 0 0 2px var(--mv-color-glow-focus), inset 0 1px 2px rgba(0, 0, 0, 0.2);
   --mv-shadow-floating-window: 0 0 15px var(--mv-color-glow-focus), 0 4px 12px var(--mv-color-shadow-deep);
 
   /* ========================================

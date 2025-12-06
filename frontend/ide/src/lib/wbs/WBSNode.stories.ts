@@ -22,7 +22,7 @@ const meta = {
     },
     status: {
       control: { type: 'select' },
-      options: ['PENDING', 'READY', 'RUNNING', 'SUCCEEDED', 'FAILED', 'CANCELED', 'BLOCKED'],
+      options: ['PENDING', 'READY', 'RUNNING', 'SUCCEEDED', 'COMPLETED', 'FAILED', 'CANCELED', 'BLOCKED'],
       description: 'タスクのステータス',
     },
     level: {
@@ -159,6 +159,16 @@ export const TaskSucceeded: Story = {
     label: 'ログイン画面作成',
     phaseName: '実装',
     status: 'SUCCEEDED',
+    level: 1,
+  },
+};
+
+export const TaskCompleted: Story = {
+  args: {
+    type: 'task',
+    label: '完了済みタスク',
+    phaseName: '検証',
+    status: 'COMPLETED',
     level: 1,
   },
 };

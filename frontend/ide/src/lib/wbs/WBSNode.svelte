@@ -1,33 +1,24 @@
 <script lang="ts">
-  import type { WBSNode } from '../../stores/wbsStore';
-  import { expandedNodes, viewMode } from '../../stores/wbsStore';
-  import { selectedTaskId } from '../../stores';
-  import { statusToCssClass, statusLabels } from '../../types';
-  import type { PhaseName } from '../../types';
+  import type { WBSNode } from "../../stores/wbsStore";
+  import { expandedNodes, viewMode } from "../../stores/wbsStore";
+  import { selectedTaskId } from "../../stores";
+  import { phaseToCssClass, type PhaseName } from "../../schemas";
+  import StatusBadge from "./StatusBadge.svelte"; // Import new component
+  import ProgressBar from "./ProgressBar.svelte"; // Import ProgressBar
+  import { getProgressColor } from "./utils"; // Import color logic
 
   // Props
   export let node: WBSNode;
   export let expanded: boolean = true;
 
-  // フェーズ名からCSSクラス名への変換
-  function phaseToClass(phase: PhaseName | undefined): string {
-    if (!phase) return '';
-    const phaseMap: Record<string, string> = {
-      概念設計: 'phase-concept',
-      実装設計: 'phase-design',
-      実装: 'phase-impl',
-      検証: 'phase-verify',
-    };
-    return phaseMap[phase] || '';
-  }
-
-  $: isPhase = node.type === 'phase';
-  $: isTask = node.type === 'task';
+  $: isPhase = node.type === "phase";
+  $: isTask = node.type === "task";
   $: hasChildren = node.children.length > 0;
-  $: phaseClass = phaseToClass(node.phaseName);
-  $: statusClass = node.task ? statusToCssClass(node.task.status) : '';
+  $: phaseClass = phaseToCssClass(node.phaseName);
+  // statusClass removed as it's handled by StatusBadge
   $: isSelected = node.task && $selectedTaskId === node.task.id;
   $: progressPercent = node.progress.percentage;
+  $: progressColor = getProgressColor(progressPercent); // Get dynamic color
   $: indentStyle = `padding-left: ${node.level * 24 + 12}px`;
 
   function handleToggle(event: MouseEvent) {
@@ -44,7 +35,7 @@
   }
 
   function handleKeydown(event: KeyboardEvent) {
-    if (event.key === 'Enter' || event.key === ' ') {
+    if (event.key === "Enter" || event.key === " ") {
       event.preventDefault();
       if (isPhase && hasChildren) {
         expandedNodes.toggle(node.id);
@@ -61,19 +52,12 @@
   class:is-phase={isPhase}
   class:is-task={isTask}
   class:selected={isSelected}
-  class:status-pending={statusClass === 'pending'}
-  class:status-ready={statusClass === 'ready'}
-  class:status-running={statusClass === 'running'}
-  class:status-succeeded={statusClass === 'succeeded'}
-  class:status-failed={statusClass === 'failed'}
-  class:status-canceled={statusClass === 'canceled'}
-  class:status-blocked={statusClass === 'blocked'}
-  class:phase-concept={phaseClass === 'phase-concept'}
-  class:phase-design={phaseClass === 'phase-design'}
-  class:phase-impl={phaseClass === 'phase-impl'}
-  class:phase-verify={phaseClass === 'phase-verify'}
+  class:phase-concept={phaseClass === "phase-concept"}
+  class:phase-design={phaseClass === "phase-design"}
+  class:phase-impl={phaseClass === "phase-impl"}
+  class:phase-verify={phaseClass === "phase-verify"}
   style={indentStyle}
-  role={isPhase ? 'treeitem' : 'button'}
+  role={isPhase ? "treeitem" : "button"}
   tabindex="0"
   aria-expanded={isPhase && hasChildren ? expanded : undefined}
   aria-label={node.label}
@@ -85,9 +69,9 @@
     <button
       class="toggle-btn"
       on:click={handleToggle}
-      aria-label={expanded ? '折りたたむ' : '展開する'}
+      aria-label={expanded ? "折りたたむ" : "展開する"}
     >
-      <span class="toggle-icon" class:expanded>{expanded ? '▼' : '▶'}</span>
+      <span class="toggle-icon" class:expanded>{expanded ? "▼" : "▶"}</span>
     </button>
   {:else if isTask}
     <span class="task-bullet">•</span>
@@ -107,18 +91,18 @@
 
   <!-- ステータスバッジ（タスクのみ） -->
   {#if isTask && node.task}
-    <span class="status-badge">
-      {statusLabels[node.task.status]}
-    </span>
+    <StatusBadge status={node.task.status} />
   {/if}
 
   <!-- 進捗バー -->
   {#if isPhase}
     <div class="progress-container">
-      <div class="progress-bar">
-        <div class="progress-fill" style:--progress="{progressPercent}%"></div>
-      </div>
-      <span class="progress-text">
+      <ProgressBar percentage={progressPercent} size="sm" />
+      <span
+        class="progress-text"
+        style:color={progressColor.fill}
+        style:text-shadow="0 0 1px {progressColor.glow}"
+      >
         {node.progress.completed}/{node.progress.total}
         ({progressPercent}%)
       </span>
@@ -132,34 +116,57 @@
     align-items: center;
     gap: var(--mv-spacing-xs);
     height: var(--mv-wbs-node-height);
+    padding: 0 var(--mv-spacing-xs); /* Added padding */
     cursor: pointer;
     border-radius: var(--mv-radius-sm);
-    transition: background-color var(--mv-transition-hover);
+    border: var(--mv-border-width-thin) solid transparent; /* Prepare for border */
+    transition:
+      background-color var(--mv-transition-hover),
+      border-color var(--mv-transition-hover),
+      box-shadow var(--mv-transition-hover),
+      transform var(--mv-transition-hover);
     user-select: none;
+    position: relative; /* For absolute positioning if needed */
   }
 
   .wbs-node:hover {
     background: var(--mv-color-surface-hover);
+    border-color: var(--mv-color-border-subtle);
+    box-shadow: var(--mv-shadow-glow-sm);
   }
 
   .wbs-node:focus {
     outline: none;
     background: var(--mv-color-surface-hover);
+    border-color: var(--mv-color-border-focus);
     box-shadow: var(--mv-shadow-focus);
   }
 
   .wbs-node.selected {
     background: var(--mv-color-surface-selected);
+    border-color: var(--mv-color-border-focus);
+    box-shadow: var(--mv-shadow-focus);
   }
 
   /* フェーズノード */
   .wbs-node.is-phase {
     font-weight: var(--mv-font-weight-semibold);
     color: var(--mv-color-text-primary);
+    background: var(
+      --mv-color-surface-secondary
+    ); /* Slight background for phases */
+    border-color: var(--mv-color-border-subtle);
+  }
+
+  .wbs-node.is-phase:hover {
+    background: var(--mv-color-surface-hover);
+    border-color: var(--mv-color-border-default);
+    box-shadow: var(--mv-shadow-card);
   }
 
   .wbs-node.is-phase .node-label {
     font-size: var(--mv-font-size-base);
+    letter-spacing: 0.02em; /* Slightly wider for headers */
   }
 
   /* タスクノード */
@@ -170,6 +177,7 @@
 
   .wbs-node.is-task:hover {
     color: var(--mv-color-text-primary);
+    transform: translateX(2px); /* Micro-interaction */
   }
 
   /* トグルボタン */
@@ -185,12 +193,16 @@
     cursor: pointer;
     color: var(--mv-color-text-muted);
     border-radius: var(--mv-radius-sm);
-    transition: background-color var(--mv-transition-hover);
+    transition:
+      background-color var(--mv-transition-hover),
+      color var(--mv-transition-hover),
+      transform var(--mv-transition-hover);
   }
 
   .toggle-btn:hover {
     background: var(--mv-color-surface-secondary);
     color: var(--mv-color-text-primary);
+    transform: scale(1.1);
   }
 
   .toggle-icon {
@@ -201,8 +213,9 @@
   .task-bullet {
     width: var(--mv-wbs-toggle-size);
     text-align: center;
-    color: var(--mv-color-text-muted);
-    font-size: var(--mv-font-size-sm);
+    color: var(--mv-color-border-strong); /* Subtler bullet */
+    font-size: var(--mv-font-size-xs);
+    opacity: 0.5;
   }
 
   .spacer {
@@ -213,24 +226,30 @@
   .phase-indicator {
     width: var(--mv-wbs-phase-bar-width);
     height: var(--mv-wbs-toggle-size);
-    border-radius: var(--mv-radius-sm);
+    border-radius: var(--mv-radius-pill); /* Rounder */
     flex-shrink: 0;
+    box-shadow: 0 0 4px var(--phase-color); /* Glow using css variable hack or specific classes */
+    opacity: 0.8;
   }
 
   .phase-concept .phase-indicator {
     background: var(--mv-primitive-frost-3);
+    box-shadow: 0 0 5px var(--mv-primitive-frost-3);
   }
 
   .phase-design .phase-indicator {
     background: var(--mv-primitive-aurora-purple);
+    box-shadow: 0 0 5px var(--mv-primitive-aurora-purple);
   }
 
   .phase-impl .phase-indicator {
     background: var(--mv-primitive-aurora-green);
+    box-shadow: 0 0 5px var(--mv-primitive-aurora-green);
   }
 
   .phase-verify .phase-indicator {
     background: var(--mv-primitive-aurora-yellow);
+    box-shadow: 0 0 5px var(--mv-primitive-aurora-yellow);
   }
 
   /* ノードラベル */
@@ -239,52 +258,11 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    text-shadow: 0 0 1px rgba(0, 0, 0, 0.2);
   }
 
   /* ステータスバッジ */
-  .status-badge {
-    font-size: var(--mv-font-size-xs);
-    font-weight: var(--mv-font-weight-bold);
-    text-transform: uppercase;
-    letter-spacing: var(--mv-letter-spacing-wide);
-    padding: var(--mv-spacing-xxs) var(--mv-spacing-xs);
-    border-radius: var(--mv-radius-sm);
-  }
-
-  .status-pending .status-badge {
-    background: var(--mv-color-status-pending-bg);
-    color: var(--mv-color-status-pending-text);
-  }
-
-  .status-ready .status-badge {
-    background: var(--mv-color-status-ready-bg);
-    color: var(--mv-color-status-ready-text);
-  }
-
-  .status-running .status-badge {
-    background: var(--mv-color-status-running-bg);
-    color: var(--mv-color-status-running-text);
-  }
-
-  .status-succeeded .status-badge {
-    background: var(--mv-color-status-succeeded-bg);
-    color: var(--mv-color-status-succeeded-text);
-  }
-
-  .status-failed .status-badge {
-    background: var(--mv-color-status-failed-bg);
-    color: var(--mv-color-status-failed-text);
-  }
-
-  .status-canceled .status-badge {
-    background: var(--mv-color-status-canceled-bg);
-    color: var(--mv-color-status-canceled-text);
-  }
-
-  .status-blocked .status-badge {
-    background: var(--mv-color-status-blocked-bg);
-    color: var(--mv-color-status-blocked-text);
-  }
+  /* Logic moved to StatusBadge.svelte */
 
   /* 進捗バー */
   .progress-container {
@@ -292,22 +270,6 @@
     align-items: center;
     gap: var(--mv-spacing-xs);
     margin-left: auto;
-  }
-
-  .progress-bar {
-    width: var(--mv-progress-bar-width-sm);
-    height: var(--mv-progress-bar-height-sm);
-    background: var(--mv-color-surface-secondary);
-    border-radius: var(--mv-radius-sm);
-    overflow: hidden;
-  }
-
-  .progress-fill {
-    height: 100%;
-    width: var(--progress, 0%);
-    background: var(--mv-color-status-succeeded-border);
-    border-radius: var(--mv-radius-sm);
-    transition: width var(--mv-transition-hover);
   }
 
   .progress-text {

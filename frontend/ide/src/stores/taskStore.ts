@@ -95,6 +95,7 @@ export const taskCountsByStatus = derived(tasks, ($tasks) => {
     READY: 0,
     RUNNING: 0,
     SUCCEEDED: 0,
+    COMPLETED: 0,
     FAILED: 0,
     CANCELED: 0,
     BLOCKED: 0,

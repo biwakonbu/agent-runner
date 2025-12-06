@@ -1,19 +1,20 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import WBSNode from "./WBSNode.svelte";
+  import WBSGraphNode from "./WBSGraphNode.svelte";
+  import WBSHeader from "./WBSHeader.svelte";
   import {
     wbsTree,
     expandedNodes,
     overallProgress,
   } from "../../stores/wbsStore";
   import type { WBSNode as WBSNodeType } from "../../stores/wbsStore";
-
-  // グラフ描画用の定数
-  const NODE_WIDTH = 200;
-  const NODE_HEIGHT = 60;
-  const HORIZONTAL_GAP = 80;
-  const VERTICAL_GAP = 40;
-  const PADDING = 40;
+  import {
+    GRAPH_NODE_WIDTH as NODE_WIDTH,
+    GRAPH_NODE_HEIGHT as NODE_HEIGHT,
+    HORIZONTAL_GAP,
+    VERTICAL_GAP,
+    GRAPH_PADDING as PADDING,
+  } from "./utils";
 
   // ノード位置を計算
   interface PositionedNode {
@@ -129,71 +130,11 @@
   function handleMouseUp() {
     isDragging = false;
   }
-
-  function getPhaseClass(phaseName: string | undefined): string {
-    switch (phaseName) {
-      case "概念設計":
-        return "phase-concept";
-      case "実装設計":
-        return "phase-design";
-      case "実装":
-        return "phase-impl";
-      case "検証":
-        return "phase-verify";
-      default:
-        return "";
-    }
-  }
-
-  function getStatusClass(node: WBSNodeType): string {
-    if (node.type === "phase") {
-      return "";
-    }
-    return node.task ? `status-${node.task.status.toLowerCase()}` : "";
-  }
 </script>
 
 <div class="wbs-graph-view">
   <!-- ヘッダー -->
-  <header class="graph-header">
-    <div class="header-title">
-      <h2>WBS グラフ</h2>
-      <span class="task-count">
-        {$overallProgress.completed} / {$overallProgress.total} タスク完了
-      </span>
-    </div>
-
-    <div class="header-progress">
-      <div class="progress-bar-large">
-        <div
-          class="progress-fill"
-          style:--progress="{$overallProgress.percentage}%"
-        ></div>
-      </div>
-      <span class="progress-percentage">
-        <span class="progress-number">{$overallProgress.percentage}</span><span
-          class="progress-symbol">%</span
-        >
-      </span>
-    </div>
-
-    <div class="header-actions">
-      <button
-        class="action-btn"
-        on:click={() => expandedNodes.expandAll()}
-        title="すべて展開"
-      >
-        ↕ 全展開
-      </button>
-      <button
-        class="action-btn"
-        on:click={() => expandedNodes.collapseAll()}
-        title="すべて折りたたむ"
-      >
-        ⇕ 全折
-      </button>
-    </div>
-  </header>
+  <WBSHeader />
 
   <!-- グラフキャンバス -->
   <div
@@ -251,46 +192,8 @@
 
         <!-- ノード -->
         <div class="nodes-layer">
-          {#each positionedNodes as { node, x, y }}
-            <div
-              class="graph-node {getPhaseClass(node.phaseName)} {getStatusClass(
-                node
-              )}"
-              style:left="{x}px"
-              style:top="{y}px"
-              style:width="{NODE_WIDTH}px"
-              style:height="{NODE_HEIGHT}px"
-              on:click={() => {
-                if (node.children.length > 0) {
-                  expandedNodes.toggle(node.id);
-                }
-              }}
-              on:keydown={(e) => {
-                if (e.key === "Enter" && node.children.length > 0) {
-                  expandedNodes.toggle(node.id);
-                }
-              }}
-              role="button"
-              tabindex="0"
-            >
-              <div class="phase-bar"></div>
-              <div class="node-content">
-                <div class="node-title">{node.label}</div>
-                <div class="node-meta">
-                  {#if node.type === "phase"}
-                    <span class="phase-badge">{node.label}</span>
-                  {:else if node.task}
-                    <span class="status-badge">{node.task.status}</span>
-                  {/if}
-                  {#if node.children.length > 0}
-                    <span class="children-count">
-                      {$expandedNodes.has(node.id) ? "▼" : "▶"}
-                      {node.children.length}
-                    </span>
-                  {/if}
-                </div>
-              </div>
-            </div>
+          {#each positionedNodes as { node, x, y } (node.id)}
+            <WBSGraphNode {node} {x} {y} />
           {/each}
         </div>
       </div>
@@ -310,109 +213,6 @@
     flex-direction: column;
     height: 100%;
     background: var(--mv-color-surface-node);
-  }
-
-  /* ヘッダー */
-  .graph-header {
-    display: flex;
-    flex-direction: column;
-    gap: var(--mv-spacing-sm);
-    padding: var(--mv-spacing-md);
-    border-bottom: var(--mv-border-width-thin) solid
-      var(--mv-color-border-subtle);
-    background: var(--mv-color-surface-hover);
-    flex-shrink: 0;
-  }
-
-  .header-title {
-    display: flex;
-    align-items: baseline;
-    gap: var(--mv-spacing-sm);
-  }
-
-  .header-title h2 {
-    font-size: var(--mv-font-size-lg);
-    font-weight: var(--mv-font-weight-semibold);
-    color: var(--mv-color-text-primary);
-    margin: 0;
-  }
-
-  .task-count {
-    font-size: var(--mv-font-size-sm);
-    color: var(--mv-color-text-muted);
-  }
-
-  .header-progress {
-    display: flex;
-    align-items: center;
-    gap: var(--mv-spacing-sm);
-  }
-
-  .progress-bar-large {
-    flex: 1;
-    height: var(--mv-progress-bar-height-md);
-    background: var(--mv-progress-bar-bg);
-    border-radius: var(--mv-radius-sm);
-    overflow: hidden;
-    box-shadow: var(--mv-shadow-progress-bar);
-    border: var(--mv-border-panel);
-  }
-
-  .progress-fill {
-    height: 100%;
-    width: var(--progress, 0%);
-    background: var(--mv-progress-bar-fill);
-    border-radius: var(--mv-radius-sm);
-    transition: width var(--mv-duration-slow);
-    box-shadow: var(--mv-shadow-glow-sm);
-  }
-
-  .progress-percentage {
-    display: flex;
-    align-items: baseline;
-    font-family: var(--mv-font-mono);
-    color: var(--mv-progress-text-color);
-    min-width: var(--mv-progress-text-width-md);
-    justify-content: flex-end;
-    text-shadow: var(--mv-text-shadow-glow);
-  }
-
-  .progress-number {
-    font-family: var(--mv-font-display);
-    font-size: var(--mv-font-size-xl);
-    font-weight: var(--mv-font-weight-bold);
-    letter-spacing: var(--mv-letter-spacing-tight);
-  }
-
-  .progress-symbol {
-    font-size: var(--mv-font-size-sm);
-    font-weight: var(--mv-font-weight-semibold);
-    margin-left: var(--mv-border-width-thin);
-    opacity: 0.85;
-  }
-
-  .header-actions {
-    display: flex;
-    gap: var(--mv-spacing-xs);
-  }
-
-  .action-btn {
-    padding: var(--mv-spacing-xxs) var(--mv-spacing-sm);
-    font-size: var(--mv-font-size-xs);
-    font-weight: var(--mv-font-weight-medium);
-    color: var(--mv-color-text-secondary);
-    background: var(--mv-color-surface-primary);
-    border: var(--mv-border-width-thin) solid var(--mv-color-border-default);
-    border-radius: var(--mv-radius-sm);
-    cursor: pointer;
-    transition:
-      background-color var(--mv-transition-hover),
-      color var(--mv-transition-hover);
-  }
-
-  .action-btn:hover {
-    background: var(--mv-color-surface-hover);
-    color: var(--mv-color-text-primary);
   }
 
   /* グラフコンテナ */
@@ -470,6 +270,10 @@
     fill: none;
     stroke: var(--mv-color-border-default);
     stroke-width: 2;
+    filter: drop-shadow(
+      0 0 2px var(--mv-color-border-subtle)
+    ); /* subtle glow */
+    transition: stroke var(--mv-transition-hover);
   }
 
   /* ノードレイヤー */
@@ -477,126 +281,6 @@
     position: absolute;
     top: 0;
     left: 0;
-  }
-
-  /* グラフノード */
-  .graph-node {
-    position: absolute;
-    background: var(--mv-color-surface-node);
-    border: var(--mv-border-width-default) solid var(--mv-color-border-default);
-    border-radius: var(--mv-radius-md);
-    cursor: pointer;
-    display: flex;
-    overflow: hidden;
-    transition:
-      border-color var(--mv-transition-hover),
-      box-shadow var(--mv-transition-hover),
-      transform var(--mv-transition-hover);
-    box-shadow: var(--mv-shadow-node-glow); /* 常時微発光 */
-  }
-
-  .graph-node:hover {
-    border-color: var(--mv-color-border-focus);
-    transform: translateY(-2px);
-    box-shadow: var(--mv-shadow-card);
-  }
-
-  .graph-node:focus {
-    outline: none;
-    border-color: var(--mv-color-border-focus);
-    box-shadow: var(--mv-shadow-focus);
-  }
-
-  /* フェーズバー */
-  .phase-bar {
-    width: var(--mv-spacing-xxs);
-    flex-shrink: 0;
-  }
-
-  .phase-concept .phase-bar {
-    background: var(--mv-primitive-frost-3);
-  }
-
-  .phase-design .phase-bar {
-    background: var(--mv-primitive-aurora-purple);
-  }
-
-  .phase-impl .phase-bar {
-    background: var(--mv-primitive-aurora-green);
-  }
-
-  .phase-verify .phase-bar {
-    background: var(--mv-primitive-aurora-yellow);
-  }
-
-  /* ノードコンテンツ */
-  .node-content {
-    flex: 1;
-    padding: var(--mv-spacing-xs) var(--mv-spacing-sm);
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    gap: var(--mv-spacing-xxs);
-  }
-
-  .node-title {
-    font-size: var(--mv-font-size-sm);
-    font-weight: var(--mv-font-weight-semibold);
-    color: var(--mv-color-text-primary);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .node-meta {
-    display: flex;
-    align-items: center;
-    gap: var(--mv-spacing-xs);
-  }
-
-  .phase-badge,
-  .status-badge {
-    font-size: var(--mv-font-size-xs);
-    padding: 0 var(--mv-spacing-xxs);
-    border-radius: var(--mv-radius-sm);
-    text-transform: uppercase;
-    letter-spacing: var(--mv-letter-spacing-wide);
-  }
-
-  .phase-badge {
-    background: var(--mv-color-surface-secondary);
-    color: var(--mv-color-text-secondary);
-  }
-
-  .status-badge {
-    font-weight: var(--mv-font-weight-medium);
-  }
-
-  /* ステータス別スタイル */
-  .status-pending .status-badge {
-    background: var(--mv-color-status-pending-bg);
-    color: var(--mv-color-status-pending-text);
-  }
-
-  .status-running .status-badge {
-    background: var(--mv-color-status-running-bg);
-    color: var(--mv-color-status-running-text);
-  }
-
-  .status-succeeded .status-badge {
-    background: var(--mv-color-status-succeeded-bg);
-    color: var(--mv-color-status-succeeded-text);
-  }
-
-  .status-failed .status-badge {
-    background: var(--mv-color-status-failed-bg);
-    color: var(--mv-color-status-failed-text);
-  }
-
-  .children-count {
-    font-size: var(--mv-font-size-xs);
-    color: var(--mv-color-text-muted);
-    font-family: var(--mv-font-mono);
   }
 
   /* 空状態 */
