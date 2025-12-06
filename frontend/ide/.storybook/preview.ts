@@ -12,8 +12,9 @@ const preview: Preview = {
       }
     },
     backgrounds: {
-      default: 'dark',
+      default: 'multiverse-app',
       values: [
+        { name: 'multiverse-app', value: '#16181e' }, // --mv-primitive-deep-0
         { name: 'dark', value: '#1a1a1a' },
         { name: 'light', value: '#ffffff' }
       ]

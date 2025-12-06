@@ -37,12 +37,12 @@
   --mv-primitive-frost-2: #81a1c1;
   --mv-primitive-frost-3: #5e81ac;
 
-  /* Aurora（ステータス色） */
-  --mv-primitive-aurora-red: #bf616a;
-  --mv-primitive-aurora-orange: #d08770;
-  --mv-primitive-aurora-yellow: #ebcb8b;
-  --mv-primitive-aurora-green: #a3be8c;
-  --mv-primitive-aurora-purple: #b48ead;
+  /* Aurora（ステータス色 - より明るく鮮やかに調整） */
+  --mv-primitive-aurora-red: #da7e87;    /* 元: #bf616a */
+  --mv-primitive-aurora-orange: #e09880; /* 元: #d08770 */
+  --mv-primitive-aurora-yellow: #f5deaa; /* 元: #ebcb8b */
+  --mv-primitive-aurora-green: #b8dea6;  /* 元: #a3be8c */
+  --mv-primitive-aurora-purple: #cc9ec2; /* 元: #b48ead */
 
   /* Nord Deep 拡張（標準より深い背景） */
   --mv-primitive-deep-0: #16181e;
@@ -66,14 +66,14 @@
   --mv-primitive-neutral-600: #a5afbf;
 
   /* ========================================
-     セマンティックカラー: サーフェス（背景）
+     セマンティックカラー: サーフェス（全体的に明るくシフト）
      ======================================== */
-  --mv-color-surface-app: var(--mv-primitive-deep-0);
-  --mv-color-surface-primary: var(--mv-primitive-deep-1);
-  --mv-color-surface-secondary: var(--mv-primitive-deep-2);
-  --mv-color-surface-hover: var(--mv-primitive-deep-4);
-  --mv-color-surface-selected: var(--mv-primitive-deep-5);
-  --mv-color-surface-node: var(--mv-primitive-deep-3);
+  --mv-color-surface-app: var(--mv-primitive-deep-1);       /* 元 deep[0] */
+  --mv-color-surface-primary: var(--mv-primitive-deep-2);   /* 元 deep[1] */
+  --mv-color-surface-secondary: var(--mv-primitive-deep-3); /* 元 deep[2] */
+  --mv-color-surface-hover: var(--mv-primitive-deep-5);     /* 元 deep[4] */
+  --mv-color-surface-selected: var(--mv-primitive-polar-night-2); /* より明るく */
+  --mv-color-surface-node: var(--mv-primitive-deep-4);      /* 元 deep[3] */
   --mv-color-surface-overlay: rgba(0, 0, 0, 0.6);
 
   /* ========================================
@@ -101,6 +101,7 @@
   --mv-color-glow-running: rgba(143, 191, 159, 0.35);
   --mv-color-shadow-elevated: rgba(0, 0, 0, 0.3);
   --mv-color-shadow-deep: rgba(0, 0, 0, 0.4);
+  --mv-color-glow-ambient: rgba(136, 192, 208, 0.1); /* UIパーツの常時発光用 */
 
   /* ========================================
      セマンティックカラー: インタラクティブ
@@ -285,9 +286,11 @@
      ボックスシャドウ
      ======================================== */
   --mv-shadow-focus: 0 0 0 var(--mv-focus-ring-width) var(--mv-color-glow-focus);
-  --mv-shadow-selected: 0 0 0 var(--mv-border-width-thick) var(--mv-color-glow-selected);
+  --mv-shadow-selected: 0 0 0 var(--mv-border-width-thick)
+    var(--mv-color-glow-selected);
   --mv-shadow-card: 0 4px 12px var(--mv-color-shadow-elevated);
-  --mv-shadow-tab-active-inset: 0 calc(-1 * var(--mv-border-width-default)) 0 0 var(--mv-primitive-aurora-yellow) inset;
+  --mv-shadow-tab-active-inset: 0 calc(-1 * var(--mv-border-width-default)) 0 0
+    var(--mv-primitive-aurora-yellow) inset;
 
   /* ========================================
      プログレスバー
@@ -299,6 +302,12 @@
   --mv-progress-text-width-sm: 32px;
   --mv-progress-text-width-md: 48px;
   --mv-progress-text-width-lg: 80px;
+
+  /* プログレスバー カラー（明るく目立つ色、発光表現） */
+  --mv-progress-bar-bg: rgba(136, 192, 208, 0.25);
+  --mv-progress-bar-fill: #b5e8ff; /* 高輝度アイスブルー */
+  --mv-progress-bar-fill-glow: rgba(136, 192, 208, 0.8); /* 強力なグロー */
+  --mv-progress-text-color: #b5e8ff;
 
   /* ========================================
      WBS ツリー
@@ -317,8 +326,11 @@
   /* ========================================
      タイポグラフィ
      ======================================== */
-  --mv-font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  --mv-font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  --mv-font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
+  --mv-font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
+    monospace;
+  --mv-font-display: "Orbitron", var(--mv-font-sans);  /* FF風の未来的フォント */
 
   --mv-font-size-xs: 10px;
   --mv-font-size-sm: 12px;
@@ -374,7 +386,8 @@
    控えめなグローが拡大するスタイル
    ======================================== */
 @keyframes mv-pulse {
-  0%, 100% {
+  0%,
+  100% {
     box-shadow: 0 0 4px 0 var(--mv-color-status-running-glow);
   }
   50% {

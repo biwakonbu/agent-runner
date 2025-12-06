@@ -178,13 +178,15 @@
     height: var(--mv-floating-window-height);
     background: linear-gradient(
       180deg,
-      var(--mv-color-surface-overlay) 0%,
+      rgba(46, 52, 64, 0.85) 0%,
       var(--mv-color-surface-primary) 100%
     );
     backdrop-filter: blur(var(--mv-scrollbar-radius));
     border-radius: var(--mv-radius-sm);
-    box-shadow: 0 var(--mv-spacing-xxs) var(--mv-spacing-sm)
-      var(--mv-color-shadow-deep);
+    border: 1px solid var(--mv-color-glow-ambient);
+    box-shadow:
+      0 0 15px var(--mv-color-glow-ambient),
+      0 var(--mv-spacing-xxs) var(--mv-spacing-sm) var(--mv-color-shadow-deep);
     display: flex;
     flex-direction: column;
     z-index: 1000;
@@ -278,7 +280,10 @@
     background: var(--mv-color-surface-selected);
     color: var(--mv-primitive-aurora-yellow);
     font-weight: bold;
-    box-shadow: var(--mv-shadow-tab-active-inset);
+    background: var(--mv-color-surface-selected);
+    color: var(--mv-primitive-aurora-yellow);
+    font-weight: bold;
+    box-shadow: 0 0 8px rgba(235, 203, 139, 0.4); /* 黄色いグロー */
   }
 
   .content {

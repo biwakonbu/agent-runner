@@ -5,7 +5,7 @@
   import { GridCanvas } from "./lib/grid";
   import { Toolbar } from "./lib/toolbar";
   import { DetailPanel } from "./lib/panel";
-  import { WBSView } from "./lib/wbs";
+  import { WBSListView, WBSGraphView } from "./lib/wbs";
   import { Button } from "./design-system";
   import {
     tasks,
@@ -131,10 +131,10 @@
     <!-- メインコンテンツ -->
     <div class="main-content">
       <!-- Graph/WBS ビュー切り替え -->
-      {#if $viewMode === 'graph'}
-        <GridCanvas />
+      {#if $viewMode === "graph"}
+        <WBSGraphView />
       {:else}
-        <WBSView />
+        <WBSListView />
       {/if}
 
       <!-- 詳細パネル -->

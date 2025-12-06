@@ -1,6 +1,6 @@
 <script lang="ts">
-  import { createEventDispatcher } from 'svelte';
-  import { Button } from '../../design-system';
+  import { createEventDispatcher } from "svelte";
+  import { Button } from "../../design-system";
   import {
     viewport,
     zoomPercent,
@@ -8,22 +8,26 @@
     poolSummaries,
     viewMode,
     overallProgress,
-  } from '../../stores';
-  import type { TaskStatus } from '../../types';
+  } from "../../stores";
+  import type { TaskStatus } from "../../types";
 
   const dispatch = createEventDispatcher<{
     createTask: void;
   }>();
 
   // ステータスサマリの表示設定（フォールバック用）
-  const statusDisplay: { key: TaskStatus; label: string; showCount: boolean }[] = [
-    { key: 'RUNNING', label: '実行中', showCount: true },
-    { key: 'PENDING', label: '待機', showCount: true },
-    { key: 'FAILED', label: '失敗', showCount: true },
+  const statusDisplay: {
+    key: TaskStatus;
+    label: string;
+    showCount: boolean;
+  }[] = [
+    { key: "RUNNING", label: "実行中", showCount: true },
+    { key: "PENDING", label: "待機", showCount: true },
+    { key: "FAILED", label: "失敗", showCount: true },
   ];
 
   function handleCreateTask() {
-    dispatch('createTask');
+    dispatch("createTask");
   }
 
   function toggleViewMode() {
@@ -32,7 +36,7 @@
 
   // Pool別サマリがある場合はそれを表示、なければステータス別サマリを表示
   $: hasPoolSummaries = $poolSummaries.length > 0;
-  $: isGraphMode = $viewMode === 'graph';
+  $: isGraphMode = $viewMode === "graph";
 </script>
 
 <header class="toolbar">
@@ -90,7 +94,10 @@
     <!-- 進捗率バー -->
     <div class="progress-section">
       <div class="progress-bar-mini">
-        <div class="progress-fill" style:--progress="{$overallProgress.percentage}%"></div>
+        <div
+          class="progress-fill"
+          style:--progress="{$overallProgress.percentage}%"
+        ></div>
       </div>
       <span class="progress-text">{$overallProgress.percentage}%</span>
     </div>
@@ -157,7 +164,8 @@
     height: var(--mv-layout-toolbar-height);
     padding: 0 var(--mv-spacing-md);
     background: var(--mv-color-surface-primary);
-    border-bottom: var(--mv-border-width-thin) solid var(--mv-color-border-subtle);
+    border-bottom: var(--mv-border-width-thin) solid
+      var(--mv-color-border-subtle);
     flex-shrink: 0;
   }
 
@@ -239,9 +247,10 @@
     align-items: center;
     gap: var(--mv-spacing-xxs);
     background: var(--mv-color-surface-secondary);
-    border: var(--mv-border-width-thin) solid var(--mv-color-border-default);
+    border: var(--mv-border-width-thin) solid var(--mv-color-glow-ambient); /* ボーダーをグロー色に */
     border-radius: var(--mv-radius-sm);
     padding: var(--mv-spacing-xxs);
+    box-shadow: 0 0 8px var(--mv-color-glow-ambient); /* 常時微発光 */
   }
 
   .zoom-value {
@@ -272,9 +281,10 @@
     gap: var(--mv-spacing-xxs);
     padding: var(--mv-spacing-xxs) var(--mv-spacing-sm);
     background: var(--mv-color-surface-secondary);
-    border: var(--mv-border-width-thin) solid var(--mv-color-border-default);
+    border: var(--mv-border-width-thin) solid var(--mv-color-glow-ambient); /* ボーダーをグロー色に */
     border-radius: var(--mv-radius-sm);
     font-size: var(--mv-font-size-xs);
+    box-shadow: 0 0 8px var(--mv-color-glow-ambient); /* 常時微発光 */
   }
 
   .pool-name {
