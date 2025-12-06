@@ -1,426 +1,495 @@
-# PRD: multiverse IDE v0.1（UI 実装開始版）
+# PRD v2.0: multiverse - チャット駆動AI開発支援プラットフォーム
 
-## 0. 本 PRD の位置づけ
+## 1. プロダクトビジョン
 
-- 本 PRD は、`multiverse` プロジェクトにおける **ローカル IDE（デスクトップ UI）部分の v0.1** を定義する。
-- 既存の AgentRunner コア仕様・設計と、multiverse Orchestrator / IDE の設計ドラフトを前提としつつ、
-  **UI 実装を具体的に開始できるレベルまで要件・技術スタック・ディレクトリ構成を固める**ことを目的とする。
-- 前提としているドキュメント（事実ベース）:
+### 1.1 ビジョンステートメント
 
-  - AgentRunner コア仕様・設計一式
-  - multiverse / Task Orchestrator 統合設計 v0.2
-  - multiverse / IDE MVP 設計ドラフト v0.3
+**multiverse** は、チャットインターフェースを通じて開発者の意図を理解し、
+Meta-agentが自律的にタスクを分解・実行・評価する AI 開発支援プラットフォームです。
 
-以降、
+**コアコンセプト:**
+- チャットウィンドウが全ての入力経路（AIとの対話）
+- Meta-agentによる徹底的なタスク分解
+  - 概念設計 → 実装設計 → 実装計画 → タスクマネジメント → アサイン
+- 2D俯瞰UIでタスクグラフを視覚化（有向グラフ）
+- WBSはリリースマイルストーンとして別枠管理
+- 自律実行（計画→実行まで全自動、一時停止機能あり）
 
-- 「既存仕様に基づく前提」は【既存】
-- 本 PRD で新たに定める内容・変更提案は【提案】
-  と明示する。
+### 1.2 解決する課題
 
----
+| 現状の課題 | multiverse v2.0 での解決 |
+|-----------|-------------------------|
+| タスク作成が手動・煩雑 | チャットから自然言語でタスク生成 |
+| タスク間依存関係の管理が困難 | 有向グラフで依存関係を可視化 |
+| 達成判定が曖昧 | 細分化されたタスクで個別・シンプルな達成判定 |
+| 人間の介入が頻繁に必要 | 自律実行ループで人間待ち不要 |
+| 問題・検討材料の散逸 | バックログで一元管理 |
 
-## 1. 背景 / 課題
+### 1.3 ターゲットユーザー
 
-### 1.1 背景【既存】
-
-- AgentRunner は、CLI から Task YAML を受け取り、Meta-agent（LLM）＋ Worker（CLI / コンテナ）をオーケストレーションする実行基盤として設計されている。
-- 現状の主な利用想定は「CLI + Task YAML」であり、
-
-  - タスク開始、状態確認、失敗時リトライ、ログ確認などを人間が CLI / ファイルで行う前提になっている。
-
-- Web UI / IDE に関しては「将来の拡張」として設計レベルでは触れられているが、
-  具体的な UI 実装・プロセス分離・ストレージ構造はまだ実装されていない。
-
-### 1.2 課題【既存】
-
-- YAML / CLI ベースでは、以下の点で利用性に課題がある:
-
-  - タスクの一覧性が低く、ステータス管理が煩雑
-  - 実行履歴や失敗リトライを「人間がファイルを開いて読む」前提
-  - 複数 Worker / 複数タスクの並列実行状況を俯瞰しにくい
-
-- IDE / Orchestrator の設計案はあるが、実装に必要な
-
-  - 技術スタックの確定
-  - リポジトリ / ディレクトリ構成の更新方針
-  - MVP としての機能スコープ
-    が明文化されていないため、エージェントに「どこまで作れば良いか」が渡しづらい。
+- ソフトウェア開発者（個人・チーム）
+- AIアシスタントと協調して開発を進めたいエンジニア
+- 複数の並行タスクを俯瞰的に管理したい開発リーダー
 
 ---
 
-## 2. ゴール（この PRD で達成したいこと）【提案】
+## 2. 機能要件（フェーズ別）
 
-1. **ローカル IDE（multiverse IDE）から、AgentRunner ベースのタスクを GUI で起動・監視できる状態にする。**
-2. **ユーザー（開発者）が YAML を直接触らなくても、UI からタスクを作成・実行・状態確認できる。**
-3. **IDE / Orchestrator / Worker / Core のプロセス分離・責務分離方針を維持しつつ、
-   UI 実装に必要な技術スタックとディレクトリ構成の「現時点の答え」を固定する。**
-4. **今後の自動化（エージェントによる開発・テスト）にとって、
-   タスク・ワークスペース周りのメタデータが一貫した構造で管理されるようにする。**
+### Phase 1: チャット → タスク生成（MVP）【優先度: 最高】
 
----
+#### FR-P1-001: チャット入力UI
 
-## 3. スコープ / 非スコープ【提案】
+- 既存 FloatingChatWindow を拡張
+- テキスト入力・送信
+- メッセージ履歴表示（user/assistant/system）
+- Wails IPC 経由でバックエンドと通信
+- タスク生成結果のインライン表示
 
-### 3.1 スコープ（v0.1）
+#### FR-P1-002: ChatHandler（バックエンド新規）
 
-- デスクトップ IDE アプリケーション（multiverse IDE）
+```go
+// internal/chat/handler.go
+type ChatHandler struct {
+    Meta          MetaClient
+    TaskStore     *orchestrator.TaskStore
+    SessionStore  *ChatSessionStore
+}
 
-  - Workspace（ローカルプロジェクト）選択・登録
-  - Task の作成・閲覧・ステータス表示
-  - Task 実行（`Run` ボタン） → Orchestrator 経由で Core / Worker を起動
-  - TaskAttempt（実行履歴）の一覧・結果概要の表示
-  - WorkerPool の基本設定の閲覧（編集は v0.1 では任意）
-
-- ストレージとプロセス構成
-
-  - `$HOME/.multiverse` 以下に Workspace & Task メタデータを管理（既存設計の具現化）
-  - Orchestrator ↔ Worker 間のファイルベース IPC（JSON）を前提とした構造の確定
-
-- UI 実装のための技術スタック / ディレクトリ構成の更新
-
-  - Go + Wails + Svelte + TypeScript を前提とした IDE 実装
-  - 既存 AgentRunner コアのコードレイアウトとの共存方針
-
-### 3.2 非スコープ（v0.1 でやらない）
-
-- Meta-agent の高度なマルチ meta 構成（子 meta、複数 LLM）実装
-- 既存 Core の FSM ロジックや YAML プロトコルの大幅な変更
-- タスクの親子構造（ツリー表示）の UI（設計は踏まえるが実装は次フェーズ）
-- Web ブラウザ版 IDE（ローカルデスクトップ専用想定）
-- タスクノート（.agent-runner/task-xxx.md）のリッチビューア統合（将来拡張）
-
----
-
-## 4. ターゲットユーザー / ユースケース【提案】
-
-### 4.1 ターゲットユーザー
-
-- ローカル環境でエージェント開発・検証を行うソフトウェアエンジニア
-- 自動コーディング / 自動テストなどのタスクを複数並行で動かしたい開発者
-- 将来的には CI / チーム開発でも利用されうるが、v0.1 は **ローカル 1 人利用** を主対象とする。
-
-### 4.2 主要ユースケース（MVP）
-
-1. **ローカルプロジェクトを IDE に登録し、タスクを 1 つ作って実行する**
-
-   - プロジェクトディレクトリを選択
-   - Task を作成（タイトル、種別、実行対象などを設定）
-   - Run ボタンで実行
-   - 実行状態（PENDING / RUNNING / SUCCEEDED / FAILED）を UI で確認
-
-2. **失敗したタスクの実行履歴を確認し、再実行する**
-
-   - Task 詳細画面から Attempt の履歴を一覧表示
-   - 失敗した Attempt のエラー概要を確認
-   - 再実行ボタンで新しい Attempt を起動
-
-3. **複数タスクの並行実行状況をプール単位で把握する**
-
-   - WorkerPool ごとに「Running / Queue 中」のタスク数を表示
-   - タスクが溢れていないか、詰まっていないかを俯瞰する
-
----
-
-## 5. 機能要件（Functional Requirements）
-
-番号付きで定義する。テキストは UI 実装エージェント向けにやや具体的に記述。
-
-### 5.1 Workspace 管理
-
-- **FR-IDE-001**【既存設計の具現化】
-
-  - IDE は「プロジェクトルートの絶対パス」から `workspace-id = sha1(projectRoot)[:12]` を計算し、
-    `$HOME/.multiverse/workspaces/<workspace-id>/` をワークスペースディレクトリとして使用する。
-
-- **FR-IDE-002**【提案】
-
-  - IDE は初回オープン時にユーザーに `projectRoot` を選択させる UI を提供する。
-  - 既に同じ `projectRoot` に対応する `workspace-id` が存在する場合は、その Workspace を再利用する。
-
-- **FR-IDE-003**【既存＋提案】
-
-  - `workspace.json` は以下の情報を必須として保持する（既存案の具現化）。
-
-    - `version`
-    - `projectRoot`
-    - `displayName`
-    - `createdAt`
-    - `lastOpenedAt`
-      （フォーマットは IDE MVP ドキュメントに準拠）
-
-### 5.2 Task モデル / 一覧・詳細
-
-- **FR-IDE-010**【既存＋提案】
-
-  - Task は 1 Task 1 ファイル（JSONL）で `tasks/<task-id>.jsonl` に永続化される。
-  - ファイル内の **最後の行が最新状態** として扱われる。
-
-- **FR-IDE-011**【提案】
-
-  - IDE は `Task` の最新スナップショットを読み込み、以下の情報を UI に表示する。
-
-    - ID、Title、Status、PoolID、CreatedAt、UpdatedAt、StartedAt、DoneAt
-
-  - TaskStatus は `PENDING / READY / RUNNING / SUCCEEDED / FAILED / CANCELED / BLOCKED` を扱う（既存案踏襲）。
-
-- **FR-IDE-012**【提案】
-
-  - Task 作成ダイアログでは最低限以下を入力できること:
-
-    - Title（必須）
-    - Kind（"codegen" / "test" 等のプリセット選択）
-    - PoolID（`worker-pools.json` の ID から選択）
-
-  - 作成時に
-
-    - `tasks/<task-id>.jsonl` の最初のレコード
-    - `instructions/tasks/<task-id>.md`（空テンプレート）
-      を生成する。
-
-### 5.3 Task 実行 / Attempt
-
-- **FR-IDE-020**【既存＋提案】
-
-  - 「Run」ボタン押下時、IDE は Orchestrator に「Task を実行キューに投入する」リクエストを行う。
-  - Orchestrator は `ipc/queue/<pool-id>/<job-id>.json` にジョブを追加し、TaskStatus を `READY` に更新する。
-
-- **FR-IDE-021**【既存＋提案】
-
-  - Orchestrator により TaskAttempt が生成され、`attempts/<attempt-id>.json` に保存される。
-  - IDE は Task 詳細画面から、指定 TaskID に紐づく Attempt 一覧を取得し表示する。
-
-- **FR-IDE-022**【提案】
-
-  - Attempt 詳細では、最低限以下を表示する:
-
-    - AttemptID
-    - Status（STARTING / RUNNING / SUCCEEDED / FAILED / TIMEOUT / CANCELED）
-    - StartedAt / FinishedAt
-    - ErrorSummary（あれば）
-
-### 5.4 ステータス更新 / ポーリング
-
-- **FR-IDE-030**【提案】
-
-  - IDE は 1〜2 秒間隔で Workspace の Task 状態を再読込し、一覧画面の表示を更新する。
-  - 実装は単純なポーリングでよく、WebSocket 等は v0.1 では不要。
-
-- **FR-IDE-031**【提案】
-
-  - Task 一覧において、現在 `RUNNING` or `READY` の Task に対し、Pool ごとのカウントを表示できるようにする
-
-    - UI 上部 or サイドバーに Pool 単位のサマリ
-    - 例: `codegen: 2 running / 3 queued`
-
----
-
-## 6. 技術要件 / 技術スタック
-
-### 6.1 プロセス構成【既存＋提案】
-
-【既存】
-
-- プロセスは IDE(UI) / Orchestrator / Worker / Core（AgentRunner）で **必ず分離** する方針。
-
-【提案 / 明示】
-
-- v0.1 でのプロセスは以下とする:
-
-  - `multiverse-ide`
-
-    - Wails + Go バックエンド
-    - Svelte + TypeScript フロントエンド
-
-  - `multiverse-orchestrator`
-
-    - Go 製 CLI / デーモンプロセス
-    - ファイルベース IPC で Worker と連携
-
-  - Worker プロセス（複数種）
-
-    - 例: `multiverse-worker-codegen`, `multiverse-worker-test`
-
-  - AgentRunner Core
-
-    - 既存 `agent-runner` CLI 相当
-    - Orchestrator から起動される位置づけ
-
-※ Core のバイナリ名や配置は後述ディレクトリ構成に従い整理する。
-
-### 6.2 新技術スタック【提案】
-
-- 言語 / ランタイム
-
-  - Backend: Go（既存 AgentRunner と同一バージョン系を使用）
-  - Desktop Shell: Wails（Go ベースのデスクトップアプリフレームワーク）
-  - Frontend: Svelte + TypeScript
-
-- ビルド / 配布
-
-  - Wails 標準のビルドチェーンを利用し、単一バイナリ配布を前提とする（Mac を第一ターゲット）
-
-- ストレージ
-
-  - メタデータ: JSON / JSONL / Markdown（既存設計と同じ）
-  - 配置: `$HOME/.multiverse/workspaces/...`（既存案踏襲）
-
-### 6.3 ディレクトリ構成（リポジトリ）【提案】
-
-既存 AgentRunner の Go コード構成（`cmd/agent-runner`, `internal/core`, `pkg/config` 等）
-と、multiverse IDE / Orchestrator の設計を統合するため、リポジトリのトップレベルを次のように整理する案とする。
-
-```text
-multiverse/
-  cmd/
-    agent-runner/           # 既存 Core CLI（名称は当面維持）
-    multiverse-orchestrator/
-    multiverse-ide/         # Wails エントリポイント
-
-  internal/
-    core/                   # AgentRunner コア（既存）
-    meta/                   # Meta-agent 通信（既存）
-    worker/                 # Worker 実行・Sandbox（既存）
-    note/                   # Task Note 生成（既存）
-
-    orchestrator/           # Orchestrator ドメインロジック（新規）
-      scheduler.go
-      task_store.go
-      ipc/
-        filesystem_queue.go
-
-    ide/                    # IDE バックエンドロジック（新規）
-      workspace_store.go
-      task_service.go
-
-  frontend/
-    ide/                    # Svelte + TS フロントエンド（新規）
-      src/
-        styles/
-        ui/
-        layout/
-        features/
-        stores/
-        App.svelte
-      package.json
-      vite.config.ts 等
-
-  docs/
-    COMPLETE_DOCUMENTATION.md
-    multiverse-architecture-v0.2.md
-    multiverse-ide-mvp-v0.3.md
-    PRD.md                  # 本ドキュメント
+func (h *ChatHandler) HandleMessage(ctx context.Context, sessionID, message string) (*ChatResponse, error)
 ```
 
-- 【事実】既存 AgentRunner の `internal/*` 構成は原則変更しない。
-- 【提案】multiverse 関連コードを `cmd/multiverse-*` ＋ `internal/orchestrator`, `internal/ide`, `frontend/ide` として追加する。
-- 【提案】IDE のフロントエンドは `frontend/ide` に単独で置き、Wails の build ステップがここを参照する。
+処理フロー:
+1. ユーザーメッセージを ChatSession に保存
+2. Meta-agent の `decompose` を呼び出し
+3. 生成されたタスクを TaskStore に永続化
+4. フロントエンドに結果を返却
+
+#### FR-P1-003: Meta-agent decompose プロトコル
+
+リクエスト:
+```yaml
+type: decompose
+version: 1
+payload:
+  user_input: "認証機能を実装してほしい"
+  context:
+    workspace_path: "/path/to/project"
+    existing_tasks: [...]
+    conversation_history: [...]
+```
+
+レスポンス:
+```yaml
+type: decompose
+version: 1
+payload:
+  understanding: "認証機能の実装を要求..."
+  phases:
+    - name: "概念設計"
+      milestone: "M1-Auth-Design"
+      tasks:
+        - id: "task-001"
+          title: "認証フロー設計"
+          description: "..."
+          acceptance_criteria: [...]
+          dependencies: []
+          wbs_level: 1
+    - name: "実装設計"
+      tasks: [...]
+    - name: "実装"
+      tasks: [...]
+  potential_conflicts:
+    - file: "src/auth/login.ts"
+      tasks: ["task-004"]
+      warning: "既存ファイルを変更"
+```
+
+#### FR-P1-004: Task 構造体拡張
+
+```go
+type Task struct {
+    // 既存
+    ID        string     `json:"id"`
+    Title     string     `json:"title"`
+    Status    TaskStatus `json:"status"`
+    PoolID    string     `json:"poolId"`
+    CreatedAt time.Time  `json:"createdAt"`
+    UpdatedAt time.Time  `json:"updatedAt"`
+    StartedAt *time.Time `json:"startedAt,omitempty"`
+    DoneAt    *time.Time `json:"doneAt,omitempty"`
+
+    // 新規
+    Description        string   `json:"description,omitempty"`
+    Dependencies       []string `json:"dependencies,omitempty"`
+    ParentID           *string  `json:"parentId,omitempty"`
+    WBSLevel           int      `json:"wbsLevel,omitempty"`
+    PhaseName          string   `json:"phaseName,omitempty"`
+    SourceChatID       *string  `json:"sourceChatId,omitempty"`
+    AcceptanceCriteria []string `json:"acceptanceCriteria,omitempty"`
+}
+```
+
+#### FR-P1-005: ノード表示（GridCanvas拡張）
+
+- 新規タスク生成時のアニメーション
+- 依存関係インジケーター（Phase 2 準備）
+- フェーズ（概念設計/実装設計/実装）の色分け
 
 ---
 
-## 7. データモデル / 永続化方針（要約）
+### Phase 2: 依存関係グラフ・WBS表示【優先度: 高】
 
-### 7.1 Workspace
+#### FR-P2-001: TaskGraphManager
 
-- `workspace-id = sha1(projectRoot)[:12]`【既存/確定】
-- ディレクトリ:
+```go
+// internal/orchestrator/task_graph.go
+type TaskGraphManager struct {
+    TaskStore *TaskStore
+}
 
-  - `$HOME/.multiverse/workspaces/<workspace-id>/workspace.json`
-  - `config/worker-pools.json`
-  - `tasks/*.jsonl`
-  - `attempts/*.json`
-  - `ipc/queue/*`, `ipc/results/*`
-  - `logs/*`
+type TaskGraph struct {
+    Nodes map[string]*GraphNode
+    Edges []TaskEdge
+}
 
-### 7.2 Task / Attempt
+func (m *TaskGraphManager) BuildGraph() (*TaskGraph, error)
+func (m *TaskGraphManager) GetExecutionOrder() ([]string, error)
+func (m *TaskGraphManager) GetBlockedTasks() ([]string, error)
+```
 
-- Task
+#### FR-P2-002: ConnectionLine（依存矢印）
 
-  - 1 Task 1 ファイル JSONL
-  - 状態遷移は `PENDING → READY → RUNNING → SUCCEEDED / FAILED` を基本とする。【既存】
+```svelte
+<!-- frontend/ide/src/lib/grid/ConnectionLine.svelte -->
+<svg class="connection-line">
+  <path d={calculatePath(fromNode, toNode)} class={status} />
+  <marker id="arrowhead" ... />
+</svg>
+```
 
-- Attempt
+視覚表現:
+- 完了した依存: 緑色の実線
+- 未完了の依存: オレンジの破線
+- ブロック状態: 赤色の太線
 
-  - 1 Attempt 1 ファイル JSON
-  - Task の再実行ごとに新しい Attempt が生成される。【既存】
+#### FR-P2-003: WBS表示モード
 
-### 7.3 Orchestrator ↔ Worker IPC
+- ツールバーに WBS/Graph 切り替えボタン
+- WBS ビュー: マイルストーン別のツリー表示
+- 折りたたみ/展開機能
+- 進捗率表示（完了タスク / 全タスク）
 
-- `ipc/queue/<pool-id>/<job-id>.json`（Orchestrator → Worker）
-- `ipc/results/<job-id>.json`（Worker → Orchestrator）
-- メッセージ本体は JSON 固定【既存】
+#### FR-P2-004: 依存に基づくスケジューリング
 
-IDE は IPC ファイルそのものは直接扱わず、
-Orchestrator の状態反映として Task / Attempt のファイルを読むのみとする【提案】。
-
----
-
-## 8. 現状とのギャップと修正方針【提案】
-
-| 項目            | 現状（ドキュメントベース）                                                | ありたい姿（本 PRD 後）                                                     | 修正方針                                                                  |
-| --------------- | ------------------------------------------------------------------------- | --------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
-| UI プロセス     | 「Web UI / IDE は将来拡張」としてのみ記載                                 | `multiverse-ide` として Wails + Svelte の具体実装開始                       | 本 PRD で技術スタックとディレクトリ構成を固定し、エージェントタスク化     |
-| ストレージ配置  | AgentRunner 側は `.agent-runner/task-*.md` をリポジトリ直下に作成【既存】 | IDE / Orchestrator は `$HOME/.multiverse/workspaces/...` にメタデータを集約 | Core の Task Note 仕様は維持しつつ、IDE 側のメタは `~/.multiverse` に限定 |
-| Orchestrator    | 統合設計 v0.2 / IDE MVP v0.3 に概念レベルで記述                           | `multiverse-orchestrator` CLI として実装、IPC ディレクトリ構造を実際に作成  | `internal/orchestrator` を新設し、既存 Core とは明確に分離                |
-| WorkerPool 管理 | ドキュメント上の JSON 設計のみ                                            | IDE から参照・編集できる UI コンポーネントに昇格                            | v0.1 では閲覧のみ最低限実装し、編集は v0.1.1 以降で拡張                   |
-
----
-
-## 9. マイルストーン / フェーズ分割【提案】
-
-### M0: 基盤整備（バックエンドのみ）
-
-- `~/.multiverse/workspaces/...` ディレクトリ構造の自動生成
-- `workspace.json` / `tasks/*.jsonl` / `attempts/*.json` の read/write ライブラリ（Go）
-- Orchestrator のダミー実装（queue / results の単純な状態遷移）
-
-### M1: IDE v0.1（この PRD の範囲）
-
-- Wails プロジェクト立ち上げ (`cmd/multiverse-ide` + `frontend/ide`)
-- Workspace 選択画面
-- Task 一覧 / 詳細画面
-- Task 作成ダイアログ
-- Run ボタン → Orchestrator 呼び出し（簡易）
-- ポーリングによる Task 状態更新
-- Attempt 一覧・概要表示
-
-### M1.1: Core 統合
-
-- `multiverse-orchestrator` から AgentRunner Core を呼び出し
-- 実際に Worker / Meta を使ったタスクが走るところまで
+```go
+func (s *Scheduler) ScheduleReadyTasks() error {
+    for _, task := range s.GetPendingTasks() {
+        if s.allDependenciesSatisfied(task) {
+            s.ScheduleTask(task.ID)
+        }
+    }
+}
+```
 
 ---
 
-## 10. 受け入れ条件（Acceptance Criteria）【提案】
+### Phase 3: 自律実行ループ【優先度: 中】
 
-M1 完了の判断基準として、少なくとも以下を満たすこと。
+#### FR-P3-001: ExecutionOrchestrator
 
-1. **単一 Workspace / 単一プロジェクトでの操作**
+```go
+type ExecutionOrchestrator struct {
+    Scheduler    *Scheduler
+    GraphManager *TaskGraphManager
+    State        ExecutionState  // IDLE | RUNNING | PAUSED | STOPPED
+    PauseSignal  chan struct{}
+    ResumeSignal chan struct{}
+}
 
-   - 任意のローカルディレクトリを Workspace として登録できる
-   - Workspace 一覧に登録済みプロジェクトが表示される
+func (e *ExecutionOrchestrator) Start(ctx context.Context) error
+func (e *ExecutionOrchestrator) Pause()
+func (e *ExecutionOrchestrator) Resume()
+```
 
-2. **Task 管理**
+#### FR-P3-002: リアルタイム進捗表示
 
-   - UI から Task を新規作成できる
-   - Task 一覧で Status / PoolID / 日付が表示される
-   - Task 詳細から、関連する Attempt の一覧が表示される
+```go
+// バックエンド
+runtime.EventsEmit(ctx, "task:stateChange", TaskStateChangeEvent{...})
+```
 
-3. **Task 実行**
+```typescript
+// フロントエンド
+runtime.EventsOn('task:stateChange', (event) => {
+    tasks.updateTask(event.taskId, { status: event.newStatus });
+});
+```
 
-   - Run ボタン押下で Orchestrator が起動し、少なくともダミー Worker による SUCCEEDED / FAILED が返る
-   - Task の Status が RUNNING → SUCCEEDED / FAILED に UI 上で正しく反映される
+#### FR-P3-003: 一時停止・再開機能
 
-4. **永続化**
+- ツールバーに一時停止/再開ボタン
+- 一時停止時は実行中タスクを中断せず、新規タスク開始のみ停止
 
-   - IDE を終了・再起動しても、Workspace / Task / Attempt の情報が保持されている
-   - `~/.multiverse/workspaces/<workspace-id>/` 以下のファイル群が正しく更新されている
+#### FR-P3-004: 自動リトライ/人間判断
 
-5. **安定性**
+```go
+type RetryPolicy struct {
+    MaxAttempts     int
+    BackoffDuration time.Duration
+    RequireHuman    bool
+}
 
-   - 想定外の Worker 終了（results が出ないケース）では Task が FAILED と判定される
-   - IDE プロセスが異常終了しても、再起動後に Task 状態が破綻しない（少なくとも読み直しが可能）
+func (e *ExecutionOrchestrator) HandleFailure(task *Task, err error) {
+    if attempt < policy.MaxAttempts {
+        // 自動リトライ
+    } else if policy.RequireHuman {
+        // バックログに追加
+    } else {
+        // FAILED としてマーク
+    }
+}
+```
+
+#### FR-P3-005: バックログ管理
+
+```go
+type BacklogItem struct {
+    ID          string      `json:"id"`
+    TaskID      string      `json:"taskId"`
+    Type        BacklogType `json:"type"`  // FAILURE | QUESTION | BLOCKER
+    Description string      `json:"description"`
+    Priority    int         `json:"priority"`
+    CreatedAt   time.Time   `json:"createdAt"`
+    ResolvedAt  *time.Time  `json:"resolvedAt,omitempty"`
+}
+```
 
 ---
 
-以上を本 PRD v0.1 とし、
-この内容をもとに「multiverse IDE UI 実装タスク」をエージェントに渡せる状態とする。
+## 3. データモデル
+
+### Task（拡張）
+
+| フィールド | 型 | 説明 |
+|-----------|-----|------|
+| dependencies | []string | 依存タスクIDリスト |
+| parentId | *string | 親タスクID（WBS階層用） |
+| wbsLevel | int | WBS階層レベル（1=概念設計, 2=実装設計, 3=実装） |
+| phaseName | string | フェーズ名 |
+| sourceChatId | *string | 生成元チャットセッションID |
+| acceptanceCriteria | []string | 達成条件リスト |
+
+### ChatSession
+
+| フィールド | 型 | 説明 |
+|-----------|-----|------|
+| id | string | セッションID |
+| workspaceId | string | ワークスペースID |
+| messages | []ChatMessage | メッセージ一覧 |
+| createdAt | time.Time | 作成日時 |
+| updatedAt | time.Time | 更新日時 |
+
+### ChatMessage
+
+| フィールド | 型 | 説明 |
+|-----------|-----|------|
+| id | string | メッセージID |
+| role | string | user / assistant / system |
+| content | string | メッセージ本文 |
+| timestamp | time.Time | タイムスタンプ |
+| generatedTasks | []string | このメッセージで生成されたタスクID |
+
+### BacklogItem
+
+| フィールド | 型 | 説明 |
+|-----------|-----|------|
+| id | string | バックログID |
+| taskId | string | 関連タスクID |
+| type | BacklogType | FAILURE / QUESTION / BLOCKER |
+| title | string | タイトル |
+| description | string | 説明 |
+| priority | int | 優先度 |
+| createdAt | time.Time | 作成日時 |
+| resolvedAt | *time.Time | 解決日時 |
+| resolution | string | 解決方法 |
+
+---
+
+## 4. アーキテクチャ
+
+### 4層構造（維持 + 拡張）
+
+```
+┌─────────────────────────────────────────────────────┐
+│  multiverse-ide (Desktop UI)                        │
+│  - ChatWindow → タスク生成                           │
+│  - GridCanvas → 依存グラフ表示                       │
+│  - WBSView → マイルストーン表示                      │
+│  - BacklogPanel → バックログ管理                     │
+└──────────────┬──────────────────────────────────────┘
+               │ Wails IPC + Events
+┌──────────────▼──────────────────────────────────────┐
+│  Orchestrator Layer                                 │
+│  - ChatHandler (NEW)                                │
+│  - TaskGraphManager (NEW)                           │
+│  - ExecutionOrchestrator (NEW)                      │
+│  - BacklogStore (NEW)                               │
+│  - TaskStore / Scheduler                            │
+└──────────────┬──────────────────────────────────────┘
+               │
+┌──────────────▼──────────────────────────────────────┐
+│  AgentRunner Core + Meta-agent                      │
+│  - FSM（既存維持）                                   │
+│  - decompose プロトコル (NEW)                        │
+└──────────────┬──────────────────────────────────────┘
+               │
+┌──────────────▼──────────────────────────────────────┘
+│  Worker (Docker Sandbox)                            │
+└─────────────────────────────────────────────────────┘
+```
+
+### 新規コンポーネント
+
+| コンポーネント | 場所 | 責務 |
+|--------------|------|------|
+| ChatHandler | internal/chat/handler.go | チャット入力のMeta-agent転送、タスク生成 |
+| TaskGraphManager | internal/orchestrator/task_graph.go | 依存関係グラフの構築・管理 |
+| ExecutionOrchestrator | internal/orchestrator/executor.go | 自律実行ループ、一時停止/再開 |
+| BacklogStore | internal/orchestrator/backlog.go | 問題・検討材料の永続化 |
+| ChatSessionStore | internal/chat/session_store.go | チャット履歴の永続化 |
+
+---
+
+## 5. マイルストーン
+
+### M1: チャット→タスク生成（2週間）
+
+**Week 1:**
+- Task 構造体拡張
+- Meta-agent decompose プロトコル
+- ChatHandler 実装
+- ChatSession 永続化
+
+**Week 2:**
+- FloatingChatWindow バックエンド連携
+- タスク生成結果のUI表示
+- E2Eテスト
+
+### M2: 依存グラフ・WBS表示（2週間）
+
+**Week 3:**
+- TaskGraphManager
+- Scheduler 依存チェック拡張
+- ConnectionLine コンポーネント
+
+**Week 4:**
+- WBS ツリービュー
+- マイルストーン表示
+- 進捗率計算
+
+### M3: 自律実行ループ（2週間）
+
+**Week 5:**
+- ExecutionOrchestrator
+- 一時停止/再開
+- Wails Events リアルタイム通知
+
+**Week 6:**
+- 自動リトライ
+- BacklogStore
+- バックログUI
+
+---
+
+## 6. 受け入れ条件
+
+### Phase 1 完了条件
+
+| ID | 条件 |
+|----|------|
+| AC-P1-01 | チャットからテキストを送信できる |
+| AC-P1-02 | Meta-agent がタスク分解を行い、複数タスクが生成される |
+| AC-P1-03 | 生成タスクが tasks/*.jsonl に永続化される |
+| AC-P1-04 | タスクに依存関係情報が含まれる |
+| AC-P1-05 | GridCanvas にノードとして表示される |
+
+### Phase 2 完了条件
+
+| ID | 条件 |
+|----|------|
+| AC-P2-01 | タスク間依存が矢印で表示される |
+| AC-P2-02 | 依存タスク未完了時に BLOCKED 状態になる |
+| AC-P2-03 | WBS ビューでツリー表示できる |
+| AC-P2-04 | マイルストーン別の進捗率が表示される |
+
+### Phase 3 完了条件
+
+| ID | 条件 |
+|----|------|
+| AC-P3-01 | 自動実行で依存順にタスクが実行される |
+| AC-P3-02 | 一時停止で新規タスク開始が停止する |
+| AC-P3-03 | 再開で実行が継続する |
+| AC-P3-04 | 失敗時に自動リトライまたはバックログ追加 |
+
+---
+
+## 7. 技術的リスクと対策
+
+| リスク | 影響度 | 対策 |
+|--------|--------|------|
+| Meta-agent のタスク分解精度が低い | 高 | プロンプトエンジニアリング、人間レビュー機能 |
+| 依存関係の循環参照 | 中 | グラフ構築時にサイクル検出 |
+| 大量タスク時のUI性能劣化 | 中 | 仮想化描画（可視領域のみレンダリング） |
+| ファイルコンフリクト検出漏れ | 高 | Meta-agent に明示的なコンフリクト分析を依頼 |
+| 自律実行中のエラー連鎖 | 高 | 失敗回数閾値でループ停止、人間判断モード |
+
+---
+
+## 8. 既存設計との差分
+
+### 削除
+
+- タスク作成ダイアログ（FR-IDE-012）→ チャットに置換
+
+### 維持
+
+- 4層アーキテクチャ
+- $HOME/.multiverse/workspaces/ 構造
+- JSONL/JSON 永続化形式
+- FSM 状態遷移
+- Task/Attempt のステータス定義
+
+### 変更
+
+- Task 構造体: 依存関係、WBS、生成元情報追加
+- Meta-agent プロトコル: decompose 追加
+- Scheduler: 依存チェック追加
+
+---
+
+## 9. 技術スタック
+
+### バックエンド（維持）
+
+| カテゴリ | 技術 | バージョン |
+|---------|------|-----------|
+| 言語 | Go | 1.23+ |
+| デスクトップ | Wails | v2 |
+| コンテナ | Docker | - |
+| LLM | OpenAI API | - |
+
+### フロントエンド（維持）
+
+| カテゴリ | 技術 | バージョン |
+|---------|------|-----------|
+| フレームワーク | Svelte | 4 |
+| 型安全 | TypeScript | 5 |
+| ビルド | Vite | 5 |
+| パッケージ管理 | pnpm | - |
+
+### 新規追加
+
+| カテゴリ | 技術 | 用途 |
+|---------|------|------|
+| グラフ描画 | SVG | 依存関係の矢印描画 |
+| リアルタイム通信 | Wails Events | 状態変更通知 |

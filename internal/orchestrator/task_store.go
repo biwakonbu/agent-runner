@@ -24,6 +24,7 @@ const (
 
 // Task represents a unit of work.
 type Task struct {
+	// 基本フィールド
 	ID        string     `json:"id"`
 	Title     string     `json:"title"`
 	Status    TaskStatus `json:"status"`
@@ -32,6 +33,15 @@ type Task struct {
 	UpdatedAt time.Time  `json:"updatedAt"`
 	StartedAt *time.Time `json:"startedAt,omitempty"`
 	DoneAt    *time.Time `json:"doneAt,omitempty"`
+
+	// v2.0 拡張フィールド: タスク分解・依存関係
+	Description        string   `json:"description,omitempty"`        // タスクの詳細説明
+	Dependencies       []string `json:"dependencies,omitempty"`       // 依存タスクIDリスト
+	ParentID           *string  `json:"parentId,omitempty"`           // 親タスクID（WBS階層用）
+	WBSLevel           int      `json:"wbsLevel,omitempty"`           // WBS階層レベル（1=概念設計, 2=実装設計, 3=実装）
+	PhaseName          string   `json:"phaseName,omitempty"`          // フェーズ名
+	SourceChatID       *string  `json:"sourceChatId,omitempty"`       // 生成元チャットセッションID
+	AcceptanceCriteria []string `json:"acceptanceCriteria,omitempty"` // 達成条件リスト
 }
 
 // AttemptStatus represents the status of an attempt.
@@ -288,4 +298,64 @@ func (s *TaskStore) GetAvailablePools() []Pool {
 	// TODO: worker-pools.json から読み込む実装を追加
 	// 現時点ではデフォルト Pool を返す
 	return DefaultPools
+}
+
+// ListAllTasks は全タスクの最新状態を返す
+func (s *TaskStore) ListAllTasks() ([]Task, error) {
+	dir := s.GetTaskDir()
+	entries, err := os.ReadDir(dir)
+	if os.IsNotExist(err) {
+		return []Task{}, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to read tasks directory: %w", err)
+	}
+
+	var tasks []Task
+	for _, entry := range entries {
+		if entry.IsDir() || filepath.Ext(entry.Name()) != ".jsonl" {
+			continue
+		}
+
+		id := entry.Name()[:len(entry.Name())-6]
+		task, err := s.LoadTask(id)
+		if err != nil {
+			continue
+		}
+		tasks = append(tasks, *task)
+	}
+
+	return tasks, nil
+}
+
+// ListTasksByStatus は指定ステータスのタスク一覧を返す
+func (s *TaskStore) ListTasksByStatus(status TaskStatus) ([]Task, error) {
+	allTasks, err := s.ListAllTasks()
+	if err != nil {
+		return nil, err
+	}
+
+	var filtered []Task
+	for _, task := range allTasks {
+		if task.Status == status {
+			filtered = append(filtered, task)
+		}
+	}
+	return filtered, nil
+}
+
+// ListTasksBySourceChat は指定チャットセッションから生成されたタスク一覧を返す
+func (s *TaskStore) ListTasksBySourceChat(chatID string) ([]Task, error) {
+	allTasks, err := s.ListAllTasks()
+	if err != nil {
+		return nil, err
+	}
+
+	var filtered []Task
+	for _, task := range allTasks {
+		if task.SourceChatID != nil && *task.SourceChatID == chatID {
+			filtered = append(filtered, task)
+		}
+	}
+	return filtered, nil
 }

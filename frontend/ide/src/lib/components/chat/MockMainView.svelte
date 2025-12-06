@@ -1,16 +1,9 @@
 <script lang="ts">
   import FloatingChatWindow from "./FloatingChatWindow.svelte";
-
-  export let chatMessages: Array<{
-    id: string;
-    role: "user" | "assistant" | "system";
-    content: string;
-    timestamp: string;
-  }> = [];
 </script>
 
 <div class="main-view">
-  <FloatingChatWindow messages={chatMessages} />
+  <FloatingChatWindow />
 </div>
 
 <style>

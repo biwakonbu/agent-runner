@@ -124,6 +124,65 @@ export const gridBounds = derived(taskNodes, ($nodes) => {
   };
 });
 
+// 依存関係エッジの型
+export interface TaskEdge {
+  from: string; // 依存元タスクID
+  to: string;   // 依存先タスクID
+  satisfied: boolean; // 依存が満たされているか
+}
+
+// 依存関係エッジのリスト
+export const taskEdges = derived(tasks, ($tasks): TaskEdge[] => {
+  const edges: TaskEdge[] = [];
+  const taskMap = new Map($tasks.map((t) => [t.id, t]));
+  const completedStatuses = new Set(['SUCCEEDED', 'CANCELED']);
+
+  for (const task of $tasks) {
+    if (!task.dependencies || task.dependencies.length === 0) continue;
+
+    for (const depId of task.dependencies) {
+      const depTask = taskMap.get(depId);
+      const satisfied = depTask
+        ? completedStatuses.has(depTask.status)
+        : false;
+
+      edges.push({
+        from: depId,
+        to: task.id,
+        satisfied,
+      });
+    }
+  }
+
+  return edges;
+});
+
+// ブロックされているタスク（未完了の依存がある）
+export const blockedTasks = derived(
+  [tasks, taskEdges],
+  ([$tasks, $edges]) => {
+    const blockedIds = new Set<string>();
+    const unsatisfiedEdges = $edges.filter((e) => !e.satisfied);
+
+    for (const edge of unsatisfiedEdges) {
+      blockedIds.add(edge.to);
+    }
+
+    return $tasks.filter((t) => blockedIds.has(t.id));
+  }
+);
+
+// 実行可能タスク（PENDINGで、全依存が満たされている）
+export const readyTasks = derived(
+  [tasks, blockedTasks],
+  ([$tasks, $blockedTasks]) => {
+    const blockedIds = new Set($blockedTasks.map((t) => t.id));
+    return $tasks.filter(
+      (t) => t.status === 'PENDING' && !blockedIds.has(t.id)
+    );
+  }
+);
+
 // Pool別サマリストア
 function createPoolSummariesStore() {
   const { subscribe, set } = writable<PoolSummary[]>([]);

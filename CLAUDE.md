@@ -4,12 +4,23 @@
 
 ## プロジェクト概要
 
-**multiverse** は、開発タスクを自動実行する統合プラットフォームです。以下の4層で構成されています:
+**multiverse** は、チャットインターフェースを通じて開発者の意図を理解し、Meta-agentが自律的にタスクを分解・実行・評価する AI 開発支援プラットフォームです。
 
-- **multiverse IDE**: デスクトップ UI（Wails + Svelte）でタスクを GUI 管理
-- **Orchestrator**: タスクのスケジューリング・永続化・IPC キュー管理
+### コアコンセプト（v2.0）
+
+- **チャット駆動**: チャットウィンドウが全ての入力経路（AIとの対話）
+- **自律タスク分解**: Meta-agentが概念設計→実装設計→実装計画→タスクに分解
+- **依存グラフ視覚化**: 2D俯瞰UIでタスクの依存関係を有向グラフで表示
+- **WBS管理**: リリースマイルストーンを別枠で管理
+- **自律実行**: 計画→実行まで全自動（一時停止機能あり）
+- **バックログ管理**: 問題・検討材料を一元管理
+
+### 4層構造
+
+- **multiverse IDE**: デスクトップ UI（Wails + Svelte）でチャット・タスクグラフ・WBS を管理
+- **Orchestrator**: ChatHandler、TaskGraphManager、ExecutionOrchestrator、タスク永続化
 - **AgentRunner Core**: Meta-agent（LLM）による計画・評価と FSM ベースの状態管理
-- **Worker Agents**: Docker サンドボックス内で実際の開発作業（コーディング、テスト）を実行
+- **Worker Agents**: Docker サンドボックス内で実際の開発作業を実行
 
 詳細な要件は [PRD.md](PRD.md) を参照してください。
 
@@ -42,11 +53,18 @@ multiverse/
 │   │   ├── worker.go
 │   │   └── note.go
 │   │
-│   ├── orchestrator/              # Orchestrator ドメインロジック（新規）
+│   ├── orchestrator/              # Orchestrator ドメインロジック
 │   │   ├── task_store.go          # Task/Attempt の JSONL/JSON 永続化
 │   │   ├── scheduler.go           # タスクスケジューリング
+│   │   ├── task_graph.go          # TaskGraphManager（依存グラフ管理）★NEW
+│   │   ├── executor.go            # ExecutionOrchestrator（自律実行）★NEW
+│   │   ├── backlog.go             # BacklogStore（問題管理）★NEW
 │   │   └── ipc/
 │   │       └── filesystem_queue.go # ファイルベース IPC キュー
+│   │
+│   ├── chat/                      # チャット処理 ★NEW
+│   │   ├── handler.go             # ChatHandler（チャット→タスク分解）
+│   │   └── session_store.go       # ChatSession 永続化
 │   │
 │   ├── ide/                       # IDE バックエンドロジック
 │   │   └── workspace_store.go     # Workspace メタデータ管理
@@ -180,32 +198,36 @@ docker build -t agent-runner-codex:latest sandbox/
 
 ## アーキテクチャ
 
-### 4層構造
+### 4層構造（v2.0）
 
 ```
-┌─────────────────────────────────────┐
-│  multiverse-ide (Desktop UI)       │
-│  - Wails + Go Backend              │
-│  - Svelte + TS Frontend            │
-└──────────────┬──────────────────────┘
-               │ Wails IPC
-┌──────────────▼──────────────────────┐
-│  Orchestrator Layer                 │
-│  - WorkspaceStore                   │
-│  - TaskStore (JSONL)                │
-│  - Scheduler + IPC Queue            │
-└──────────────┬──────────────────────┘
+┌─────────────────────────────────────────────────────┐
+│  multiverse-ide (Desktop UI)                        │
+│  - ChatWindow → タスク生成（チャット駆動）            │
+│  - GridCanvas → 依存グラフ表示（有向グラフ）          │
+│  - WBSView → マイルストーン表示                      │
+│  - BacklogPanel → バックログ管理                     │
+└──────────────┬──────────────────────────────────────┘
+               │ Wails IPC + Events
+┌──────────────▼──────────────────────────────────────┐
+│  Orchestrator Layer                                 │
+│  - ChatHandler (NEW: チャット→タスク分解)            │
+│  - TaskGraphManager (NEW: 依存グラフ管理)            │
+│  - ExecutionOrchestrator (NEW: 自律実行ループ)       │
+│  - BacklogStore (NEW: 問題・検討材料管理)            │
+│  - TaskStore / Scheduler                            │
+└──────────────┬──────────────────────────────────────┘
                │ 呼び出し
-┌──────────────▼──────────────────────┐
-│  AgentRunner Core (CLI)             │
-│  - FSM オーケストレーション          │
-│  - Meta-agent 通信                  │
-└──────────────┬──────────────────────┘
+┌──────────────▼──────────────────────────────────────┐
+│  AgentRunner Core + Meta-agent                      │
+│  - FSM オーケストレーション（既存維持）               │
+│  - decompose プロトコル (NEW: タスク分解)            │
+└──────────────┬──────────────────────────────────────┘
                │ Docker Exec
-┌──────────────▼──────────────────────┘
-│  Worker (Docker Sandbox)            │
-│  - Codex CLI 等                     │
-└─────────────────────────────────────┘
+┌──────────────▼──────────────────────────────────────┘
+│  Worker (Docker Sandbox)                            │
+│  - Codex CLI 等                                     │
+└─────────────────────────────────────────────────────┘
 ```
 
 ### AgentRunner Core の状態機械（FSM）
@@ -268,10 +290,73 @@ PENDING → READY → RUNNING → SUCCEEDED / FAILED / CANCELED / BLOCKED
 
 `tasks/<task-id>.jsonl` - 1 行 = 1 JSON オブジェクト、最後の行が最新状態
 
+**Task 構造体（v2.0 拡張）:**
+
+```go
+type Task struct {
+    // 基本フィールド
+    ID        string     `json:"id"`
+    Title     string     `json:"title"`
+    Status    TaskStatus `json:"status"`
+    PoolID    string     `json:"poolId"`
+    CreatedAt time.Time  `json:"createdAt"`
+    UpdatedAt time.Time  `json:"updatedAt"`
+    StartedAt *time.Time `json:"startedAt,omitempty"`
+    DoneAt    *time.Time `json:"doneAt,omitempty"`
+
+    // v2.0 拡張フィールド
+    Description        string   `json:"description,omitempty"`
+    Dependencies       []string `json:"dependencies,omitempty"`
+    ParentID           *string  `json:"parentId,omitempty"`
+    WBSLevel           int      `json:"wbsLevel,omitempty"`
+    PhaseName          string   `json:"phaseName,omitempty"`
+    SourceChatID       *string  `json:"sourceChatId,omitempty"`
+    AcceptanceCriteria []string `json:"acceptanceCriteria,omitempty"`
+}
+```
+
 ```jsonl
-{"id":"task-1","title":"Feature A","status":"PENDING","poolId":"codegen","createdAt":"...","updatedAt":"..."}
-{"id":"task-1","title":"Feature A","status":"RUNNING","poolId":"codegen","createdAt":"...","updatedAt":"...","startedAt":"..."}
-{"id":"task-1","title":"Feature A","status":"SUCCEEDED","poolId":"codegen","createdAt":"...","updatedAt":"...","startedAt":"...","doneAt":"..."}
+{"id":"task-1","title":"Feature A","status":"PENDING","poolId":"codegen","dependencies":["task-0"],"phaseName":"実装","wbsLevel":3,"createdAt":"...","updatedAt":"..."}
+```
+
+### ChatSession
+
+`chat/<session-id>.jsonl` - チャット履歴
+
+```go
+type ChatSession struct {
+    ID          string        `json:"id"`
+    WorkspaceID string        `json:"workspaceId"`
+    Messages    []ChatMessage `json:"messages"`
+    CreatedAt   time.Time     `json:"createdAt"`
+    UpdatedAt   time.Time     `json:"updatedAt"`
+}
+
+type ChatMessage struct {
+    ID             string    `json:"id"`
+    Role           string    `json:"role"`  // user | assistant | system
+    Content        string    `json:"content"`
+    Timestamp      time.Time `json:"timestamp"`
+    GeneratedTasks []string  `json:"generatedTasks,omitempty"`
+}
+```
+
+### BacklogItem
+
+`backlog/<item-id>.json` - 問題・検討材料
+
+```go
+type BacklogItem struct {
+    ID          string       `json:"id"`
+    TaskID      string       `json:"taskId"`
+    Type        BacklogType  `json:"type"`  // FAILURE | QUESTION | BLOCKER
+    Title       string       `json:"title"`
+    Description string       `json:"description"`
+    Priority    int          `json:"priority"`
+    CreatedAt   time.Time    `json:"createdAt"`
+    ResolvedAt  *time.Time   `json:"resolvedAt,omitempty"`
+    Resolution  string       `json:"resolution,omitempty"`
+}
 ```
 
 ### Attempt（JSON 形式）
@@ -327,8 +412,17 @@ PENDING → READY → RUNNING → SUCCEEDED / FAILED / CANCELED / BLOCKED
 
 - **task_store.go**: Task/Attempt の永続化（JSONL/JSON）
 - **scheduler.go**: タスクスケジューリング
+- **task_graph.go**: TaskGraphManager（依存グラフ管理、トポロジカルソート）
+- **executor.go**: ExecutionOrchestrator（自律実行ループ、一時停止/再開）
+- **backlog.go**: BacklogStore（問題・検討材料管理）
 - **ipc/filesystem_queue.go**: ファイルベース IPC キュー
 - **詳細**: [internal/orchestrator/CLAUDE.md](internal/orchestrator/CLAUDE.md)
+
+### `/internal/chat` - チャット処理（NEW）
+
+- **handler.go**: ChatHandler（チャット→Meta-agent→タスク分解）
+- **session_store.go**: ChatSession 永続化（JSONL）
+- **詳細**: [internal/chat/CLAUDE.md](internal/chat/CLAUDE.md)
 
 ### `/internal/ide` - IDE バックエンドロジック
 
@@ -450,7 +544,8 @@ export CODEX_API_KEY="..."
 | 層 | パッケージ | 責務 | 詳細 |
 |----|-----------|------|------|
 | **IDE** | ide | Workspace メタデータ管理 | [CLAUDE.md](internal/ide/CLAUDE.md) |
-| **IDE** | orchestrator | Task/Attempt 永続化・スケジューラ | [CLAUDE.md](internal/orchestrator/CLAUDE.md) |
+| **IDE** | orchestrator | Task永続化・依存グラフ・自律実行 | [CLAUDE.md](internal/orchestrator/CLAUDE.md) |
+| **IDE** | chat | ChatHandler・セッション管理 | [CLAUDE.md](internal/chat/CLAUDE.md) |
 | **Core** | core | FSM・TaskContext・状態遷移 | [CLAUDE.md](internal/core/CLAUDE.md) |
 | **Core** | meta | LLM 通信・YAML プロトコル | [CLAUDE.md](internal/meta/CLAUDE.md) |
 | **Core** | worker | CLI 実行・Docker サンドボックス | [CLAUDE.md](internal/worker/CLAUDE.md) |
@@ -483,7 +578,8 @@ export CODEX_API_KEY="..."
 
 ### プロジェクト定義
 
-- **[PRD.md](PRD.md)** - multiverse IDE v0.1 要件書
+- **[PRD.md](PRD.md)** - multiverse v2.0 要件書（チャット駆動AI開発支援プラットフォーム）
+- **[TODO.md](TODO.md)** - 実装タスクリスト（Phase 1〜3）
 
 ### AI 開発者向け（メモリ・操作ガイド）
 

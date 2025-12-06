@@ -20,8 +20,20 @@ export const TaskStatusSchema = z.enum([
 
 export type TaskStatus = z.infer<typeof TaskStatusSchema>;
 
+// PhaseName スキーマ（タスク分解フェーズ）
+export const PhaseNameSchema = z.enum([
+  '概念設計',
+  '実装設計',
+  '実装',
+  '検証',
+  '',
+]);
+
+export type PhaseName = z.infer<typeof PhaseNameSchema>;
+
 // Task スキーマ
 export const TaskSchema = z.object({
+  // 基本フィールド
   id: z.string(),
   title: z.string(),
   status: TaskStatusSchema,
@@ -30,6 +42,15 @@ export const TaskSchema = z.object({
   updatedAt: z.string().datetime({ offset: true }).or(z.string()),
   startedAt: z.string().datetime({ offset: true }).or(z.string()).optional(),
   doneAt: z.string().datetime({ offset: true }).or(z.string()).optional(),
+
+  // v2.0 拡張フィールド
+  description: z.string().optional(),
+  dependencies: z.array(z.string()).optional(),
+  parentId: z.string().optional().nullable(),
+  wbsLevel: z.number().int().nonnegative().optional(),
+  phaseName: PhaseNameSchema.optional(),
+  sourceChatId: z.string().optional().nullable(),
+  acceptanceCriteria: z.array(z.string()).optional(),
 });
 
 export type Task = z.infer<typeof TaskSchema>;

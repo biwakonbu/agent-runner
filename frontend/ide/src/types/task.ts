@@ -7,6 +7,7 @@
 
 export {
   type TaskStatus,
+  type PhaseName,
   type Task,
   type TaskNode,
   statusToCssClass,

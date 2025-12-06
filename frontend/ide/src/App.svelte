@@ -11,7 +11,6 @@
     selectedTask,
     selectedTaskId,
     poolSummaries,
-    chatStore,
   } from "./stores";
   import { Logger } from "./services/logger";
   import type { Task, PoolSummary } from "./types";
@@ -30,7 +29,6 @@
   let chatPosition = { x: 0, y: 0 };
 
   onMount(() => {
-    chatStore.init();
     // Calculate initial position (Bottom-Right)
     // 600px width, 350px height, 20px padding
     const width = 600;
@@ -166,9 +164,7 @@
     <!-- チャットウィンドウ -->
     {#if isChatVisible}
       <FloatingChatWindow
-        messages={$chatStore}
         initialPosition={chatPosition}
-        on:send={(e) => chatStore.sendMessage(e.detail)}
         on:close={() => (isChatVisible = false)}
       />
     {/if}

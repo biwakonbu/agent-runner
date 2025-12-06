@@ -457,6 +457,186 @@ Evaluate whether all acceptance criteria are satisfied.`,
 	return &assessment, nil
 }
 
+// Decompose はユーザー入力からタスクを分解する（v2.0 チャット駆動）
+func (c *Client) Decompose(ctx context.Context, req *DecomposeRequest) (*DecomposeResponse, error) {
+	logger := logging.WithTraceID(c.logger, ctx)
+
+	if c.kind == "mock" {
+		logger.Debug("using mock decompose response")
+		return &DecomposeResponse{
+			Understanding: "Mock: ユーザーの要求を理解しました",
+			Phases: []DecomposedPhase{
+				{
+					Name:      "概念設計",
+					Milestone: "M1-Mock-Design",
+					Tasks: []DecomposedTask{
+						{
+							ID:                 "temp-001",
+							Title:              "Mock概念設計タスク",
+							Description:        "モック用の概念設計タスクです",
+							AcceptanceCriteria: []string{"設計ドキュメントが作成されている"},
+							Dependencies:       []string{},
+							WBSLevel:           1,
+							EstimatedEffort:    "small",
+						},
+					},
+				},
+				{
+					Name:      "実装",
+					Milestone: "M2-Mock-Impl",
+					Tasks: []DecomposedTask{
+						{
+							ID:                 "temp-002",
+							Title:              "Mock実装タスク",
+							Description:        "モック用の実装タスクです",
+							AcceptanceCriteria: []string{"機能が実装されている", "テストが通過している"},
+							Dependencies:       []string{"temp-001"},
+							WBSLevel:           3,
+							EstimatedEffort:    "medium",
+						},
+					},
+				},
+			},
+			PotentialConflicts: []PotentialConflict{},
+		}, nil
+	}
+
+	systemPrompt := decomposeSystemPrompt
+	userPrompt := buildDecomposeUserPrompt(req)
+
+	logger.Info("calling LLM for decompose",
+		slog.String("user_input_length", fmt.Sprintf("%d", len(req.UserInput))),
+		slog.Int("existing_tasks", len(req.Context.ExistingTasks)),
+	)
+
+	resp, err := c.callLLM(ctx, systemPrompt, userPrompt)
+	if err != nil {
+		return nil, fmt.Errorf("LLM call failed: %w", err)
+	}
+
+	// YAML を抽出してパース
+	resp = extractYAML(resp)
+
+	var msg MetaMessage
+	if err := yaml.Unmarshal([]byte(resp), &msg); err != nil {
+		return nil, fmt.Errorf("failed to parse YAML: %w\nResponse: %s", err, resp)
+	}
+
+	payloadBytes, err := yaml.Marshal(msg.Payload)
+	if err != nil {
+		return nil, err
+	}
+
+	var decompose DecomposeResponse
+	if err := yaml.Unmarshal(payloadBytes, &decompose); err != nil {
+		return nil, fmt.Errorf("failed to parse decompose response: %w", err)
+	}
+
+	logger.Info("decompose completed",
+		slog.Int("phases", len(decompose.Phases)),
+		slog.Int("potential_conflicts", len(decompose.PotentialConflicts)),
+	)
+
+	return &decompose, nil
+}
+
+// decomposeSystemPrompt はタスク分解用のシステムプロンプト
+const decomposeSystemPrompt = `You are a Meta-agent that decomposes user requests into structured development tasks.
+
+Your goal is to:
+1. Understand the user's intent from their message
+2. Break down the request into phases: 概念設計 (Conceptual Design) → 実装設計 (Implementation Design) → 実装 (Implementation)
+3. Create detailed tasks with clear acceptance criteria
+4. Identify dependencies between tasks
+5. Flag potential file conflicts
+
+Output MUST be a YAML block with the following structure:
+type: decompose
+version: 1
+payload:
+  understanding: "ユーザーの要求を理解した内容..."
+  phases:
+    - name: "概念設計"
+      milestone: "M1-Feature-Design"
+      tasks:
+        - id: "temp-001"
+          title: "タスクタイトル"
+          description: "詳細な説明"
+          acceptance_criteria:
+            - "達成条件1"
+            - "達成条件2"
+          dependencies: []
+          wbs_level: 1
+          estimated_effort: "small"
+    - name: "実装設計"
+      milestone: "M1-Feature-Design"
+      tasks:
+        - id: "temp-002"
+          title: "..."
+          description: "..."
+          acceptance_criteria: [...]
+          dependencies: ["temp-001"]
+          wbs_level: 2
+          estimated_effort: "medium"
+    - name: "実装"
+      milestone: "M2-Feature-Impl"
+      tasks:
+        - id: "temp-003"
+          title: "..."
+          description: "..."
+          acceptance_criteria: [...]
+          dependencies: ["temp-002"]
+          wbs_level: 3
+          estimated_effort: "large"
+  potential_conflicts:
+    - file: "src/example.ts"
+      tasks: ["temp-003"]
+      warning: "既存ファイルを変更する可能性があります"
+
+Guidelines:
+- WBS levels: 1=概念設計, 2=実装設計, 3=実装
+- Estimated effort: small (< 1 hour), medium (1-4 hours), large (> 4 hours)
+- Task IDs must start with "temp-" (they will be replaced with permanent IDs)
+- Dependencies can reference other temp IDs from the same batch
+- Be specific about acceptance criteria - they should be verifiable
+- Consider existing tasks to avoid duplication
+`
+
+// buildDecomposeUserPrompt はユーザープロンプトを構築する
+func buildDecomposeUserPrompt(req *DecomposeRequest) string {
+	var sb strings.Builder
+
+	sb.WriteString("## User Request\n")
+	sb.WriteString(req.UserInput)
+	sb.WriteString("\n\n")
+
+	sb.WriteString("## Context\n")
+	sb.WriteString(fmt.Sprintf("Workspace: %s\n\n", req.Context.WorkspacePath))
+
+	if len(req.Context.ExistingTasks) > 0 {
+		sb.WriteString("### Existing Tasks\n")
+		for _, task := range req.Context.ExistingTasks {
+			deps := ""
+			if len(task.Dependencies) > 0 {
+				deps = fmt.Sprintf(" (depends: %s)", strings.Join(task.Dependencies, ", "))
+			}
+			sb.WriteString(fmt.Sprintf("- [%s] %s: %s%s\n", task.Status, task.ID, task.Title, deps))
+		}
+		sb.WriteString("\n")
+	}
+
+	if len(req.Context.ConversationHistory) > 0 {
+		sb.WriteString("### Conversation History\n")
+		for _, msg := range req.Context.ConversationHistory {
+			sb.WriteString(fmt.Sprintf("%s: %s\n", msg.Role, msg.Content))
+		}
+		sb.WriteString("\n")
+	}
+
+	sb.WriteString("Please decompose this request into structured tasks.")
+	return sb.String()
+}
+
 // NewMockClient creates a mock Meta client (kind="mock")
 func NewMockClient() *Client {
 	return &Client{

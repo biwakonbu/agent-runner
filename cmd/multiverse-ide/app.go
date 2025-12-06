@@ -7,7 +7,9 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/biwakonbu/agent-runner/internal/chat"
 	"github.com/biwakonbu/agent-runner/internal/ide"
+	"github.com/biwakonbu/agent-runner/internal/meta"
 	"github.com/biwakonbu/agent-runner/internal/orchestrator"
 	"github.com/biwakonbu/agent-runner/internal/orchestrator/ipc"
 	"github.com/google/uuid"
@@ -20,6 +22,7 @@ type App struct {
 	workspaceStore *ide.WorkspaceStore
 	taskStore      *orchestrator.TaskStore
 	scheduler      *orchestrator.Scheduler
+	chatHandler    *chat.Handler
 	currentWS      *ide.Workspace
 }
 
@@ -77,11 +80,16 @@ func (a *App) SelectWorkspace() string {
 
 	a.currentWS = ws
 
-	// Initialize TaskStore and Scheduler for this workspace
+	// Initialize TaskStore, Scheduler, and ChatHandler for this workspace
 	wsDir := a.workspaceStore.GetWorkspaceDir(id)
 	a.taskStore = orchestrator.NewTaskStore(wsDir)
 	queue := ipc.NewFilesystemQueue(wsDir)
 	a.scheduler = orchestrator.NewScheduler(a.taskStore, queue)
+
+	// Initialize ChatHandler with mock Meta client (TODO: configurable)
+	sessionStore := chat.NewChatSessionStore(wsDir)
+	metaClient := meta.NewMockClient()
+	a.chatHandler = chat.NewHandler(metaClient, a.taskStore, sessionStore, id, ws.ProjectRoot)
 
 	return id
 }
@@ -122,11 +130,16 @@ func (a *App) OpenWorkspaceByID(id string) string {
 
 	a.currentWS = ws
 
-	// Initialize TaskStore and Scheduler for this workspace
+	// Initialize TaskStore, Scheduler, and ChatHandler for this workspace
 	wsDir := a.workspaceStore.GetWorkspaceDir(id)
 	a.taskStore = orchestrator.NewTaskStore(wsDir)
 	queue := ipc.NewFilesystemQueue(wsDir)
 	a.scheduler = orchestrator.NewScheduler(a.taskStore, queue)
+
+	// Initialize ChatHandler with mock Meta client (TODO: configurable)
+	sessionStore := chat.NewChatSessionStore(wsDir)
+	metaClient := meta.NewMockClient()
+	a.chatHandler = chat.NewHandler(metaClient, a.taskStore, sessionStore, id, ws.ProjectRoot)
 
 	return id
 }
@@ -227,4 +240,67 @@ func (a *App) GetAvailablePools() []orchestrator.Pool {
 		return orchestrator.DefaultPools
 	}
 	return a.taskStore.GetAvailablePools()
+}
+
+// ============================================================================
+// Chat API (v2.0): チャット駆動タスク生成
+// ============================================================================
+
+// ChatResponseDTO はフロントエンドに返すチャット応答
+type ChatResponseDTO struct {
+	Message        chat.ChatMessage    `json:"message"`
+	GeneratedTasks []orchestrator.Task `json:"generatedTasks"`
+	Understanding  string              `json:"understanding"`
+	Error          string              `json:"error,omitempty"`
+}
+
+// CreateChatSession は新しいチャットセッションを作成する
+func (a *App) CreateChatSession() *chat.ChatSession {
+	if a.chatHandler == nil {
+		runtime.LogErrorf(a.ctx, "ChatHandler not initialized")
+		return nil
+	}
+
+	session, err := a.chatHandler.CreateSession(a.ctx)
+	if err != nil {
+		runtime.LogErrorf(a.ctx, "Failed to create chat session: %v", err)
+		return nil
+	}
+	return session
+}
+
+// SendChatMessage はチャットメッセージを送信し、タスクを生成する
+func (a *App) SendChatMessage(sessionID string, message string) *ChatResponseDTO {
+	if a.chatHandler == nil {
+		return &ChatResponseDTO{
+			Error: "ChatHandler not initialized",
+		}
+	}
+
+	resp, err := a.chatHandler.HandleMessage(a.ctx, sessionID, message)
+	if err != nil {
+		return &ChatResponseDTO{
+			Error: err.Error(),
+		}
+	}
+
+	return &ChatResponseDTO{
+		Message:        resp.Message,
+		GeneratedTasks: resp.GeneratedTasks,
+		Understanding:  resp.Understanding,
+	}
+}
+
+// GetChatHistory はチャット履歴を取得する
+func (a *App) GetChatHistory(sessionID string) []chat.ChatMessage {
+	if a.chatHandler == nil {
+		return []chat.ChatMessage{}
+	}
+
+	messages, err := a.chatHandler.GetHistory(a.ctx, sessionID)
+	if err != nil {
+		runtime.LogErrorf(a.ctx, "Failed to get chat history: %v", err)
+		return []chat.ChatMessage{}
+	}
+	return messages
 }

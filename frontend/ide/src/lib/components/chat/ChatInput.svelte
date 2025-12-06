@@ -1,14 +1,14 @@
 <script lang="ts">
   import { createEventDispatcher } from "svelte";
-  import Button from "../../../design-system/components/Button.svelte";
-  import Input from "../../../design-system/components/Input.svelte";
+
+  export let disabled = false;
 
   const dispatch = createEventDispatcher<{ send: string }>();
 
   let value = "";
 
   function handleSend() {
-    if (value.trim()) {
+    if (value.trim() && !disabled) {
       dispatch("send", value);
       value = "";
     }
@@ -29,8 +29,10 @@
       bind:value
       placeholder="何か話す..."
       class="transparent-input"
+      class:disabled
       on:keydown={handleKeydown}
       rows="2"
+      {disabled}
     ></textarea>
   </div>
 </div>
@@ -73,5 +75,10 @@
   .transparent-input::placeholder {
     color: var(--mv-color-text-disabled);
     opacity: 0.6;
+  }
+
+  .transparent-input.disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
   }
 </style>

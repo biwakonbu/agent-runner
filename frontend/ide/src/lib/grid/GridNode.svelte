@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { Task } from '../../types';
+  import type { Task, PhaseName } from '../../types';
   import { gridToCanvas } from '../../design-system';
   import { statusToCssClass, statusLabels } from '../../types';
   import { selectedTaskId } from '../../stores';
@@ -10,10 +10,32 @@
   export let row: number;
   export let zoomLevel: number = 1;
 
+  // フェーズ名からCSSクラス名への変換
+  function phaseToClass(phase: PhaseName | undefined): string {
+    if (!phase) return '';
+    const phaseMap: Record<string, string> = {
+      '概念設計': 'phase-concept',
+      '実装設計': 'phase-design',
+      '実装': 'phase-impl',
+      '検証': 'phase-verify',
+    };
+    return phaseMap[phase] || '';
+  }
+
+  // フェーズの表示ラベル
+  const phaseLabels: Record<string, string> = {
+    '概念設計': 'CONCEPT',
+    '実装設計': 'DESIGN',
+    '実装': 'IMPL',
+    '検証': 'VERIFY',
+  };
+
   // キャンバス座標を計算
   $: position = gridToCanvas(col, row);
   $: isSelected = $selectedTaskId === task.id;
   $: statusClass = statusToCssClass(task.status);
+  $: phaseClass = phaseToClass(task.phaseName);
+  $: hasDependencies = task.dependencies && task.dependencies.length > 0;
 
   // ズームレベルに応じた表示制御
   $: showTitle = zoomLevel >= 0.4;
@@ -32,8 +54,9 @@
 </script>
 
 <div
-  class="node status-{statusClass}"
+  class="node status-{statusClass} {phaseClass}"
   class:selected={isSelected}
+  class:has-deps={hasDependencies}
   style="left: {position.x}px; top: {position.y}px;"
   on:click={handleClick}
   on:keydown={handleKeydown}
@@ -41,10 +64,18 @@
   tabindex="0"
   aria-label="{task.title} - {statusLabels[task.status]}"
 >
+  <!-- フェーズインジケーター（左端のバー） -->
+  {#if task.phaseName && phaseClass}
+    <div class="phase-bar" aria-hidden="true"></div>
+  {/if}
+
   <!-- ステータスインジケーター -->
   <div class="status-indicator">
     <span class="status-dot"></span>
     <span class="status-text">{statusLabels[task.status]}</span>
+    {#if task.phaseName}
+      <span class="phase-badge">{phaseLabels[task.phaseName] || ''}</span>
+    {/if}
   </div>
 
   <!-- タイトル（ズームレベルに応じて表示） -->
@@ -58,6 +89,11 @@
   {#if showDetails}
     <div class="details">
       <span class="pool">{task.poolId}</span>
+      {#if hasDependencies}
+        <span class="deps-count" title="依存タスク数">
+          {task.dependencies?.length || 0}
+        </span>
+      {/if}
     </div>
   {/if}
 </div>
@@ -239,5 +275,84 @@
     background: var(--mv-color-surface-secondary);
     padding: var(--mv-spacing-xxs) var(--mv-spacing-xxs);
     border-radius: var(--mv-radius-sm);
+  }
+
+  /* 依存タスク数バッジ */
+  .deps-count {
+    font-size: var(--mv-font-size-xs);
+    font-family: var(--mv-font-mono);
+    color: var(--mv-color-text-muted);
+    background: var(--mv-color-surface-overlay);
+    padding: var(--mv-spacing-xxs) var(--mv-spacing-xxs);
+    border-radius: var(--mv-radius-sm);
+  }
+
+  .deps-count::before {
+    content: '\2192 '; /* 矢印 → */
+  }
+
+  /* フェーズバー（左端のカラーインジケーター） */
+  .phase-bar {
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: var(--mv-spacing-xxs);
+    border-radius: var(--mv-radius-md) 0 0 var(--mv-radius-md);
+  }
+
+  /* フェーズバッジ */
+  .phase-badge {
+    font-size: var(--mv-font-size-xs);
+    font-weight: var(--mv-font-weight-bold);
+    padding: 0 var(--mv-spacing-xxs);
+    border-radius: var(--mv-radius-sm);
+    margin-left: auto;
+    letter-spacing: var(--mv-letter-spacing-wide);
+  }
+
+  /* フェーズ別カラー - 概念設計（青系） */
+  .phase-concept .phase-bar {
+    background: var(--mv-primitive-frost-3);
+  }
+
+  .phase-concept .phase-badge {
+    color: var(--mv-primitive-frost-3);
+    background: var(--mv-color-surface-secondary);
+  }
+
+  /* フェーズ別カラー - 実装設計（紫系） */
+  .phase-design .phase-bar {
+    background: var(--mv-primitive-aurora-purple);
+  }
+
+  .phase-design .phase-badge {
+    color: var(--mv-primitive-aurora-purple);
+    background: var(--mv-color-surface-secondary);
+  }
+
+  /* フェーズ別カラー - 実装（緑系） */
+  .phase-impl .phase-bar {
+    background: var(--mv-primitive-aurora-green);
+  }
+
+  .phase-impl .phase-badge {
+    color: var(--mv-primitive-aurora-green);
+    background: var(--mv-color-surface-secondary);
+  }
+
+  /* フェーズ別カラー - 検証（オレンジ系） */
+  .phase-verify .phase-bar {
+    background: var(--mv-primitive-aurora-yellow);
+  }
+
+  .phase-verify .phase-badge {
+    color: var(--mv-primitive-aurora-yellow);
+    background: var(--mv-color-surface-secondary);
+  }
+
+  /* 依存がある場合のスタイル */
+  .has-deps {
+    padding-left: var(--mv-spacing-md);
   }
 </style>

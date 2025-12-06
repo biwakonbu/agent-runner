@@ -1,77 +1,66 @@
 <script lang="ts">
-  import { createEventDispatcher } from "svelte";
+  import { createEventDispatcher, onMount } from "svelte";
   import ChatMessage from "./ChatMessage.svelte";
   import ChatInput from "./ChatInput.svelte";
+  import { chatStore, chatMessages, isChatLoading } from "../../../stores/chat";
 
   export let initialPosition = { x: 20, y: 20 };
 
   let position = { ...initialPosition };
   let isDragging = false;
   let dragOffset = { x: 0, y: 0 };
-  let windowEl: HTMLElement;
+  let windowEl: HTMLElement | undefined;
+  let contentEl: HTMLElement | undefined;
 
   // Tabs
-  let tabs = ["General", "Log"];
+  const tabs = ["General", "Log"];
   let activeTab = "General";
 
   let isMinimized = false;
 
-  function toggleMinimize() {
-    isMinimized = !isMinimized;
-    // Adjust position if minimized to avoid jumping?
-    // Actually, since it's top/left, shrinking height pulls bottom up (visually),
-    // but 'top' stays same, so it shrinks downwards from top.
-    // If we want it to stick to bottom, we'd need to adjust top.
-    // But for now simple height shrink is fine.
+  // セッション初期化
+  onMount(async () => {
+    await chatStore.createSession();
+  });
+
+  // メッセージ追加時に自動スクロール
+  $: if ($chatMessages.length > 0 && contentEl) {
+    const el = contentEl;
+    setTimeout(() => {
+      el.scrollTop = el.scrollHeight;
+    }, 100);
   }
 
-  // Use createEventDispatcher for close
+  function toggleMinimize() {
+    isMinimized = !isMinimized;
+  }
+
   const dispatch = createEventDispatcher();
 
   function closeWindow() {
     dispatch("close");
   }
 
-  // チャットメッセージ
-  export let messages: Array<{
-    id: string;
-    role: "user" | "assistant" | "system";
-    content: string;
-    timestamp: string;
-  }> = [];
-
   function startDrag(e: MouseEvent) {
-    if (e.button !== 0) return; // Only left click
-    // Don't drag if clicking buttons
+    if (e.button !== 0) return;
     if ((e.target as HTMLElement).closest(".window-controls")) return;
+    if (!windowEl) return;
 
     isDragging = true;
     const rect = windowEl.getBoundingClientRect();
-    // Calculate offset from the top-left corner of the element
     dragOffset = {
       x: e.clientX - rect.left,
       y: e.clientY - rect.top,
     };
 
-    // Bring to front logic could go here
     window.addEventListener("mouseup", stopDrag);
   }
 
   function onMouseMove(e: MouseEvent) {
     if (!isDragging) return;
 
-    // Calculate new position relative to viewport (since fixed/absolute)
-    // If strict absolute within a container is needed, we need container offset,
-    // but clientX/Y are viewport coordinates.
-    // For absolute positioning inside a relative container, we need to account for container position,
-    // BUT MockMainView sets context.
-    // Let's stick to standard drag logic for fixed/absolute elements.
-
-    let newX = e.clientX - dragOffset.x;
-    let newY = e.clientY - dragOffset.y;
-
-    // Constraint is handled by CSS/bounds mostly, but we can clamp here if needed
-    // For now, let it be free
+    const newX = e.clientX - dragOffset.x;
+    const newY = e.clientY - dragOffset.y;
 
     position = { x: newX, y: newY };
   }
@@ -81,31 +70,20 @@
     window.removeEventListener("mouseup", stopDrag);
   }
 
-  // チャット機能は将来実装予定
-  // 現在は入力を受け付けるが、バックエンド API が未実装のため
-  // システムメッセージでその旨を通知する
-  function handleSend(e: CustomEvent<string>) {
+  // チャット送信処理
+  async function handleSend(e: CustomEvent<string>) {
     const text = e.detail;
-    messages = [
-      ...messages,
-      {
-        id: crypto.randomUUID(),
-        role: "user",
-        content: text,
-        timestamp: new Date().toISOString(),
-      },
-    ];
-    setTimeout(() => {
-      messages = [
-        ...messages,
-        {
-          id: crypto.randomUUID(),
-          role: "assistant",
-          content: `受信しました: "${text}"`,
-          timestamp: new Date().toISOString(),
-        },
-      ];
-    }, 1000);
+    if (!text.trim()) return;
+
+    const response = await chatStore.sendMessage(text);
+
+    // タスクが生成された場合はイベントを発行
+    if (response?.generatedTasks && response.generatedTasks.length > 0) {
+      dispatch("tasksGenerated", {
+        tasks: response.generatedTasks,
+        understanding: response.understanding,
+      });
+    }
   }
 </script>
 
@@ -122,29 +100,30 @@
     <div class="tabs">
       {#each tabs as tab}
         <!-- svelte-ignore a11y-click-events-have-key-events -->
-        <div
+        <button
           class="tab"
           class:active={activeTab === tab}
           on:click|stopPropagation={() => (activeTab = tab)}
+          type="button"
         >
           {tab}
-        </div>
+        </button>
       {/each}
     </div>
     <div class="window-controls">
-      <!-- Minimize Button -->
       <button
         class="control-btn"
         on:click|stopPropagation={toggleMinimize}
         aria-label="Minimize"
+        type="button"
       >
         _
       </button>
-      <!-- Close Button -->
       <button
         class="control-btn close"
         on:click|stopPropagation={closeWindow}
         aria-label="Close"
+        type="button"
       >
         ×
       </button>
@@ -152,24 +131,30 @@
   </div>
 
   {#if !isMinimized}
-    <div class="content">
+    <div class="content" bind:this={contentEl}>
       {#if activeTab === "General"}
-        {#each messages as msg (msg.id)}
+        {#each $chatMessages as msg (msg.id)}
           <ChatMessage
             role={msg.role}
             content={msg.content}
             timestamp={msg.timestamp}
           />
         {/each}
+        {#if $isChatLoading}
+          <div class="loading-indicator">
+            <span class="dot"></span>
+            <span class="dot"></span>
+            <span class="dot"></span>
+          </div>
+        {/if}
       {:else if activeTab === "Log"}
-        <!-- Filter showing only system/log messages could go here -->
         <div class="log-placeholder">
           <ChatMessage
             role="system"
             content="[System] Log tab selected."
             timestamp={new Date().toISOString()}
           />
-          {#each messages.filter((m) => m.role === "system") as msg (msg.id)}
+          {#each $chatMessages.filter((m) => m.role === "system") as msg (msg.id)}
             <ChatMessage
               role={msg.role}
               content={msg.content}
@@ -181,7 +166,7 @@
     </div>
 
     <div class="footer">
-      <ChatInput on:send={handleSend} />
+      <ChatInput on:send={handleSend} disabled={$isChatLoading} />
     </div>
   {/if}
 </div>
@@ -204,12 +189,12 @@
     flex-direction: column;
     z-index: 1000;
     overflow: hidden;
-    transition: height 0.2s cubic-bezier(0.16, 1, 0.3, 1); /* Animation for minimize */
+    transition: height 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   }
 
   .floating-window.minimized {
-    height: var(--mv-icon-size-xl); /* Header height only */
-    background: var(--mv-color-surface-overlay); /* Darker when minimized */
+    height: var(--mv-icon-size-xl);
+    background: var(--mv-color-surface-overlay);
   }
 
   .floating-window:focus-within {
@@ -223,14 +208,12 @@
   .header {
     height: var(--mv-icon-size-xl);
     display: flex;
-    align-items: flex-end; /* Tabs sit at the bottom of header */
-    justify-content: space-between; /* Space between tabs and controls */
+    align-items: flex-end;
+    justify-content: space-between;
     padding: 0 var(--mv-spacing-xs);
     cursor: grab;
     user-select: none;
     flex-shrink: 0;
-
-    /* Subtle separation */
     background: var(--mv-color-surface-overlay);
   }
 
@@ -238,7 +221,7 @@
     display: flex;
     align-items: center;
     gap: var(--mv-spacing-xxs);
-    margin-bottom: var(--mv-spacing-xxs); /* Align with tab vertical center roughly */
+    margin-bottom: var(--mv-spacing-xxs);
   }
 
   .control-btn {
@@ -260,7 +243,7 @@
   }
 
   .control-btn.close:hover {
-    color: var(--mv-primitive-flamingo-1); /* Red for close */
+    color: var(--mv-primitive-flamingo-1);
   }
 
   .header:active {
@@ -277,6 +260,7 @@
     font-size: var(--mv-font-size-sm);
     color: var(--mv-color-text-muted);
     background: var(--mv-color-surface-primary);
+    border: none;
     border-top-left-radius: var(--mv-radius-sm);
     border-top-right-radius: var(--mv-radius-sm);
     cursor: pointer;
@@ -303,17 +287,13 @@
     padding: var(--mv-spacing-xs) var(--mv-spacing-sm);
     display: flex;
     flex-direction: column;
-
-    /* Log messages flow from bottom usually, but standard scroll for now is fine.
-       Maybe add logic to keep scroll at bottom. */
     mask-image: linear-gradient(
       to bottom,
       transparent,
       var(--mv-primitive-deep-0) 10px
-    ); /* Fade out top slightly */
+    );
   }
 
-  /* Custom scrollbar for MMO feel (thin, unobtrusive) */
   .content::-webkit-scrollbar {
     width: var(--mv-scrollbar-width);
   }
@@ -327,5 +307,45 @@
 
   .footer {
     flex-shrink: 0;
+  }
+
+  /* ローディングインジケーター */
+  .loading-indicator {
+    display: flex;
+    gap: var(--mv-spacing-xxs);
+    padding: var(--mv-spacing-xs);
+    justify-content: center;
+  }
+
+  .dot {
+    width: var(--mv-indicator-size-sm);
+    height: var(--mv-indicator-size-sm);
+    background: var(--mv-color-text-muted);
+    border-radius: var(--mv-radius-full);
+    animation: bounce 1.4s infinite ease-in-out both;
+  }
+
+  .dot:nth-child(1) {
+    animation-delay: -0.32s;
+  }
+
+  .dot:nth-child(2) {
+    animation-delay: -0.16s;
+  }
+
+  @keyframes bounce {
+    0%,
+    80%,
+    100% {
+      transform: scale(0);
+    }
+    40% {
+      transform: scale(1);
+    }
+  }
+
+  .log-placeholder {
+    display: flex;
+    flex-direction: column;
   }
 </style>
