@@ -75,6 +75,10 @@ export function StopExecution() {
   return window['go']['main']['App']['StopExecution']();
 }
 
+export function GetExecutionState() {
+  return window['go']['main']['App']['GetExecutionState']();
+}
+
 // Backlog API
 export function GetBacklogItems() {
   return window['go']['main']['App']['GetBacklogItems']();

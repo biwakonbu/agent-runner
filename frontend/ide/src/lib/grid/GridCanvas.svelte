@@ -1,10 +1,10 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
-  import GridNode from './GridNode.svelte';
-  import ConnectionLine from './ConnectionLine.svelte';
-  import { viewport, drag, canvasTransform, zoomPercent } from '../../stores';
-  import { taskNodes, gridBounds, taskEdges } from '../../stores';
-  import { zoom as zoomConfig } from '../../design-system';
+  import { onMount } from "svelte";
+  import GridNode from "./GridNode.svelte";
+  import ConnectionLine from "./ConnectionLine.svelte";
+  import { viewport, drag, canvasTransform, zoomPercent } from "../../stores";
+  import { taskNodes, gridBounds, taskEdges } from "../../stores";
+  import { zoom as zoomConfig } from "../../design-system";
 
   let containerRef: HTMLDivElement;
 
@@ -33,7 +33,12 @@
     if (event.button === 1 || (event.button === 0 && event.shiftKey)) {
       event.preventDefault();
       containerRef.setPointerCapture(event.pointerId);
-      drag.startDrag(event.clientX, event.clientY, $viewport.panX, $viewport.panY);
+      drag.startDrag(
+        event.clientX,
+        event.clientY,
+        $viewport.panX,
+        $viewport.panY
+      );
     }
   }
 
@@ -58,13 +63,13 @@
   // キーボードショートカット
   function handleKeydown(event: KeyboardEvent) {
     // ズームショートカット
-    if (event.key === '+' || event.key === '=') {
+    if (event.key === "+" || event.key === "=") {
       event.preventDefault();
       viewport.zoomIn();
-    } else if (event.key === '-') {
+    } else if (event.key === "-") {
       event.preventDefault();
       viewport.zoomOut();
-    } else if (event.key === '0') {
+    } else if (event.key === "0") {
       event.preventDefault();
       viewport.reset();
     }
@@ -72,9 +77,9 @@
 
   onMount(() => {
     // グローバルキーボードイベント
-    window.addEventListener('keydown', handleKeydown);
+    window.addEventListener("keydown", handleKeydown);
     return () => {
-      window.removeEventListener('keydown', handleKeydown);
+      window.removeEventListener("keydown", handleKeydown);
     };
   });
 </script>
@@ -97,47 +102,55 @@
     <svg class="grid-pattern" width="100%" height="100%">
       <defs>
         <pattern
-          id="grid-dots"
+          id="grid-cross"
           width="200"
           height="140"
           patternUnits="userSpaceOnUse"
         >
-          <circle cx="100" cy="70" r="1.5" fill="var(--mv-color-border-subtle)" />
+          <path
+            d="M96 70H104M100 66V74"
+            stroke="var(--mv-primitive-aurora-yellow)"
+            stroke-width="1"
+            opacity="0.15"
+          />
         </pattern>
       </defs>
-      <rect width="100%" height="100%" fill="url(#grid-dots)" />
+      <rect width="100%" height="100%" fill="url(#grid-cross)" />
     </svg>
   </div>
 
   <!-- 接続線レイヤー（ノードの下に表示） -->
   <svg class="connections-layer" style="transform: {$canvasTransform};">
     <defs>
-      <!-- 矢印マーカー（満たされた依存） -->
+      <!-- クールな矢印マーカー（満たされた依存） -->
       <marker
         id="arrowhead-satisfied"
-        markerWidth="10"
-        markerHeight="7"
-        refX="9"
-        refY="3.5"
+        markerWidth="16"
+        markerHeight="12"
+        refX="14"
+        refY="6"
         orient="auto"
+        markerUnits="userSpaceOnUse"
       >
-        <polygon
-          points="0 0, 10 3.5, 0 7"
+        <path
+          d="M0 0 L16 6 L0 12 L4 6 Z"
           fill="var(--mv-color-status-succeeded-border)"
         />
       </marker>
-      <!-- 矢印マーカー（未満の依存） -->
+      <!-- クールな矢印マーカー（未満の依存） -->
       <marker
         id="arrowhead-unsatisfied"
-        markerWidth="10"
-        markerHeight="7"
-        refX="9"
-        refY="3.5"
+        markerWidth="16"
+        markerHeight="12"
+        refX="14"
+        refY="6"
         orient="auto"
+        markerUnits="userSpaceOnUse"
       >
-        <polygon
-          points="0 0, 10 3.5, 0 7"
+        <path
+          d="M0 0 L16 6 L0 12 L4 6 Z"
           fill="var(--mv-color-status-blocked-border)"
+          fill-opacity="0.8"
         />
       </marker>
     </defs>

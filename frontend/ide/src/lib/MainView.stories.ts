@@ -31,6 +31,9 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
+// VRT用に固定タイムスタンプを使用（動的な値は視覚回帰テストを不安定にする）
+const FIXED_DATE = new Date('2024-01-15T10:00:00Z').toISOString();
+
 // ヘルパー: タスクを生成
 function createTask(
   id: string,
@@ -38,14 +41,13 @@ function createTask(
   status: TaskStatus,
   opts: Partial<Task> = {}
 ): Task {
-  const now = new Date().toISOString();
   return {
     id,
     title,
     status,
     poolId: opts.poolId || "codegen",
-    createdAt: opts.createdAt || now,
-    updatedAt: opts.updatedAt || now,
+    createdAt: opts.createdAt || FIXED_DATE,
+    updatedAt: opts.updatedAt || FIXED_DATE,
     startedAt: opts.startedAt,
     doneAt: opts.doneAt,
     description: opts.description,

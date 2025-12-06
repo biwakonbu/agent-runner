@@ -1,26 +1,34 @@
 <script lang="ts">
   import type { WBSNode } from "../../stores/wbsStore";
-  import { expandedNodes, viewMode } from "../../stores/wbsStore";
+  import { expandedNodes } from "../../stores/wbsStore";
   import { selectedTaskId } from "../../stores";
-  import { phaseToCssClass, type PhaseName } from "../../schemas";
-  import StatusBadge from "./StatusBadge.svelte"; // Import new component
-  import ProgressBar from "./ProgressBar.svelte"; // Import ProgressBar
-  import { getProgressColor } from "./utils"; // Import color logic
+  import { phaseToCssClass } from "../../schemas";
+  import StatusBadge from "./StatusBadge.svelte";
+  import ProgressBar from "./ProgressBar.svelte";
+  import { getProgressColor } from "./utils";
   import { onDestroy } from "svelte";
 
   // Props
   export let node: WBSNode;
   export let expanded: boolean = true;
+  export let index: number = 0;
 
   $: isPhase = node.type === "phase";
   $: isTask = node.type === "task";
   $: hasChildren = node.children.length > 0;
   $: phaseClass = phaseToCssClass(node.phaseName);
-  // statusClass removed as it's handled by StatusBadge
   $: isSelected = node.task && $selectedTaskId === node.task.id;
   $: progressPercent = node.progress.percentage;
-  $: progressColor = getProgressColor(progressPercent); // Get dynamic color
-  $: indentStyle = `padding-left: ${node.level * 24 + 12}px`;
+  $: progressColor = getProgressColor(progressPercent);
+  $: isOdd = index % 2 !== 0; // Check for zebra striping
+
+  // Indentation with fixed width unit
+  const INDENT_WIDTH = 20;
+  const INDENT_BASE = 12;
+  $: indentStyle = `padding-left: ${node.level * INDENT_WIDTH + INDENT_BASE}px`;
+
+  // Calculate guides for levels 0 to node.level - 1
+  $: indentGuides = Array(Math.max(0, node.level)).fill(0);
 
   // Retry Logic
   $: isRetryWait = node.task?.status === "RETRY_WAIT";
@@ -40,7 +48,7 @@
     const diff = target.getTime() - now.getTime();
 
     if (diff <= 0) {
-      timeRemaining = ""; // 0秒以下は表示しない（すぐにリセットされるはず）
+      timeRemaining = "";
     } else {
       const seconds = Math.ceil(diff / 1000);
       timeRemaining = `${seconds}s`;
@@ -101,6 +109,7 @@
   class:phase-design={phaseClass === "phase-design"}
   class:phase-impl={phaseClass === "phase-impl"}
   class:phase-verify={phaseClass === "phase-verify"}
+  class:is-odd={isOdd}
   style={indentStyle}
   role={isPhase ? "treeitem" : "button"}
   tabindex="0"
@@ -109,6 +118,14 @@
   on:click={handleClick}
   on:keydown={handleKeydown}
 >
+  <!-- Indentation Guides -->
+  {#each indentGuides as _, i}
+    <div
+      class="indent-guide"
+      style="left: {i * INDENT_WIDTH + INDENT_BASE + INDENT_WIDTH / 2 - 1}px"
+    ></div>
+  {/each}
+
   <!-- 展開/折りたたみトグル -->
   {#if isPhase && hasChildren}
     <button
@@ -116,12 +133,21 @@
       on:click={handleToggle}
       aria-label={expanded ? "折りたたむ" : "展開する"}
     >
-      <span class="toggle-icon" class:expanded>{expanded ? "▼" : "▶"}</span>
+      <svg
+        class="chevron"
+        class:expanded
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      >
+        <polyline points="9 18 15 12 9 6" />
+      </svg>
     </button>
-  {:else if isTask}
-    <span class="task-bullet">•</span>
   {:else}
-    <span class="spacer"></span>
+    <div class="spacer"></div>
   {/if}
 
   <!-- フェーズバー（カラーインジケーター） -->
@@ -166,71 +192,92 @@
     align-items: center;
     gap: var(--mv-spacing-xs);
     height: var(--mv-wbs-node-height);
-    padding: 0 var(--mv-spacing-xs); /* Added padding */
+    padding-right: var(--mv-spacing-md);
     cursor: pointer;
-    border-radius: var(--mv-radius-sm);
-    border: var(--mv-border-width-thin) solid transparent; /* Prepare for border */
+    border-bottom: 1px solid transparent; /* Separator placeholder */
     transition:
       background-color var(--mv-transition-hover),
       border-color var(--mv-transition-hover),
       box-shadow var(--mv-transition-hover),
       transform var(--mv-transition-hover);
     user-select: none;
-    position: relative; /* For absolute positioning if needed */
+    position: relative;
+    color: var(--mv-color-text-secondary);
   }
 
+  /* Zebra Striping (Subtle) */
+  .wbs-node.is-odd {
+    background: rgba(255, 255, 255, 0.015);
+  }
+
+  /* Indentation Guide */
+  .indent-guide {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: linear-gradient(
+      to bottom,
+      transparent,
+      var(--mv-glass-border-subtle) 20%,
+      var(--mv-glass-border-subtle) 80%,
+      transparent
+    );
+    opacity: 0.5;
+    pointer-events: none;
+    z-index: 1; /* Ensure visible above background */
+  }
+
+  /* Hover Effects */
   .wbs-node:hover {
-    background: var(--mv-color-surface-hover);
-    border-color: var(--mv-color-border-subtle);
-    box-shadow: var(--mv-shadow-glow-sm);
+    background: var(--mv-glass-hover);
+    color: var(--mv-color-text-primary);
   }
 
   .wbs-node:focus {
     outline: none;
-    background: var(--mv-color-surface-hover);
-    border-color: var(--mv-color-border-focus);
-    box-shadow: var(--mv-shadow-focus);
+    background: var(--mv-glass-hover-strong);
+    box-shadow: inset 2px 0 0 var(--mv-color-interactive-primary);
   }
 
+  /* Selected State */
   .wbs-node.selected {
-    background: var(--mv-color-surface-selected);
-    border-color: var(--mv-color-border-focus);
-    box-shadow: var(--mv-shadow-focus);
+    background: var(--mv-glass-active);
+    color: var(--mv-color-text-primary);
+    box-shadow:
+      inset 2px 0 0 var(--mv-color-interactive-primary),
+      var(--mv-shadow-glow-sm);
   }
 
-  /* フェーズノード */
+  /* Phase Node Styling */
   .wbs-node.is-phase {
     font-weight: var(--mv-font-weight-semibold);
     color: var(--mv-color-text-primary);
-    background: var(
-      --mv-color-surface-secondary
-    ); /* Slight background for phases */
-    border-color: var(--mv-color-border-subtle);
+    border-bottom: 1px solid var(--mv-glass-border-subtle);
   }
 
   .wbs-node.is-phase:hover {
-    background: var(--mv-color-surface-hover);
-    border-color: var(--mv-color-border-default);
-    box-shadow: var(--mv-shadow-card);
+    background: var(--mv-glass-hover);
   }
 
   .wbs-node.is-phase .node-label {
-    font-size: var(--mv-font-size-base);
-    letter-spacing: var(--mv-letter-spacing-widest);
+    font-family: var(--mv-font-display);
+    font-size: var(--mv-font-size-md);
+    letter-spacing: var(--mv-letter-spacing-wide);
+    text-shadow: var(--mv-text-shadow-subtle);
   }
 
-  /* タスクノード */
+  /* Task Node Styling */
   .wbs-node.is-task {
     font-weight: var(--mv-font-weight-normal);
-    color: var(--mv-color-text-secondary);
+    font-family: var(--mv-font-sans);
   }
 
   .wbs-node.is-task:hover {
-    color: var(--mv-color-text-primary);
-    transform: translateX(2px); /* Micro-interaction */
+    transform: translateX(2px);
   }
 
-  /* トグルボタン */
+  /* Toggle Button */
   .toggle-btn {
     display: flex;
     align-items: center;
@@ -242,80 +289,67 @@
     background: transparent;
     cursor: pointer;
     color: var(--mv-color-text-muted);
-    border-radius: var(--mv-radius-sm);
-    transition:
-      background-color var(--mv-transition-hover),
-      color var(--mv-transition-hover),
-      transform var(--mv-transition-hover);
+    transition: color var(--mv-transition-hover);
   }
 
   .toggle-btn:hover {
-    background: var(--mv-color-surface-secondary);
-    color: var(--mv-color-text-primary);
-    transform: scale(1.1);
+    color: var(--mv-color-interactive-primary);
   }
 
-  .toggle-icon {
-    font-size: var(--mv-wbs-toggle-icon-size);
-    transition: transform var(--mv-transition-hover);
+  .chevron {
+    width: 14px;
+    height: 14px;
+    transition: transform var(--mv-duration-fast) var(--mv-easing-spring);
   }
 
-  .task-bullet {
-    width: var(--mv-wbs-toggle-size);
-    text-align: center;
-    color: var(--mv-color-border-strong); /* Subtler bullet */
-    font-size: var(--mv-font-size-xs);
-    opacity: 0.5;
+  .chevron.expanded {
+    transform: rotate(90deg);
   }
 
   .spacer {
     width: var(--mv-wbs-toggle-size);
   }
 
-  /* フェーズインジケーター */
+  /* Phase Indicator */
   .phase-indicator {
-    width: var(--mv-wbs-phase-bar-width);
-    height: var(--mv-wbs-toggle-size);
-    border-radius: var(--mv-radius-pill);
+    width: 3px;
+    height: 14px;
+    border-radius: 2px;
     flex-shrink: 0;
-    box-shadow: var(--mv-shadow-phase-indicator-glow) var(--phase-color);
-    opacity: 0.8;
+    opacity: 0.9;
+    box-shadow: 0 0 5px var(--phase-color);
   }
 
   .phase-concept .phase-indicator {
     background: var(--mv-primitive-frost-3);
-    box-shadow: var(--mv-shadow-phase-glow-sm) var(--mv-primitive-frost-3);
+    box-shadow: 0 0 8px var(--mv-primitive-frost-3);
   }
-
   .phase-design .phase-indicator {
     background: var(--mv-primitive-aurora-purple);
-    box-shadow: var(--mv-shadow-phase-glow-sm) var(--mv-primitive-aurora-purple);
+    box-shadow: 0 0 8px var(--mv-primitive-aurora-purple);
   }
-
   .phase-impl .phase-indicator {
     background: var(--mv-primitive-aurora-green);
-    box-shadow: var(--mv-shadow-phase-glow-sm) var(--mv-primitive-aurora-green);
+    box-shadow: 0 0 8px var(--mv-primitive-aurora-green);
   }
-
   .phase-verify .phase-indicator {
     background: var(--mv-primitive-aurora-yellow);
-    box-shadow: var(--mv-shadow-phase-glow-sm) var(--mv-primitive-aurora-yellow);
+    box-shadow: 0 0 8px var(--mv-primitive-aurora-yellow);
   }
 
-  /* ノードラベル */
+  /* Node Label */
   .node-label {
     flex: 1;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    text-shadow: var(--mv-text-shadow-subtle);
   }
 
-  /* 進捗バー */
+  /* Progress Container */
   .progress-container {
     display: flex;
     align-items: center;
-    gap: var(--mv-spacing-xs);
+    gap: var(--mv-spacing-sm);
     margin-left: auto;
   }
 

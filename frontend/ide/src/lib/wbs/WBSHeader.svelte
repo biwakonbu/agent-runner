@@ -43,15 +43,45 @@
         class="action-btn"
         on:click={() => expandedNodes.expandAll()}
         title="Expand All"
+        aria-label="Expand All"
       >
-        <span class="icon">↕</span>
+        <svg
+          class="icon-svg"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <path d="m21 21-6-6m6 6v-4.8m0 4.8h-4.8" />
+          <path d="M3 16.2V21m0 0h4.8M3 21l6-6" />
+          <path d="M21 7.8V3m0 0h-4.8M21 3l-6 6" />
+          <path d="M3 7.8V3m0 0h4.8M3 3l6 6" />
+        </svg>
       </button>
       <button
         class="action-btn"
         on:click={() => expandedNodes.collapseAll()}
         title="Collapse All"
+        aria-label="Collapse All"
       >
-        <span class="icon">⇕</span>
+        <svg
+          class="icon-svg"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <path d="m4 14 6 6" />
+          <path d="M10 14v6" />
+          <path d="M10 14H4" />
+          <path d="m20 10-6-6" />
+          <path d="M14 10V4" />
+          <path d="M14 10h6" />
+        </svg>
       </button>
     </div>
   </div>
@@ -180,8 +210,8 @@
     transform: scale(0.95);
   }
 
-  .icon {
-    line-height: 1;
-    display: block;
+  .icon-svg {
+    width: var(--mv-icon-size-sm);
+    height: var(--mv-icon-size-sm);
   }
 </style>

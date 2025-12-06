@@ -9,16 +9,48 @@
   import BrandText from "../components/brand/BrandText.svelte";
   import ProgressBar from "../wbs/ProgressBar.svelte";
   import ExecutionControls from "./ExecutionControls.svelte";
+  import Button from "../../design-system/components/Button.svelte";
+  import Badge from "../../design-system/components/Badge.svelte";
+  import { Network, ListTree } from "lucide-svelte";
 
-  // ステータスサマリの表示設定（フォールバック用）
+  // Badge status type
+  type BadgeStatus =
+    | "pending"
+    | "ready"
+    | "running"
+    | "succeeded"
+    | "failed"
+    | "canceled"
+    | "blocked";
+
+  // TaskStatus → BadgeStatus マッピング
+  const statusToLower: Record<string, BadgeStatus> = {
+    PENDING: "pending",
+    READY: "ready",
+    RUNNING: "running",
+    SUCCEEDED: "succeeded",
+    FAILED: "failed",
+    CANCELED: "canceled",
+    BLOCKED: "blocked",
+  };
+
+  // ステータスサマリの表示設定
   const statusDisplay: {
     key: TaskStatus;
     label: string;
     showCount: boolean;
+    color:
+      | "primary"
+      | "secondary"
+      | "success"
+      | "warning"
+      | "danger"
+      | "info"
+      | "neutral";
   }[] = [
-    { key: "RUNNING", label: "実行中", showCount: true },
-    { key: "PENDING", label: "待機", showCount: true },
-    { key: "FAILED", label: "失敗", showCount: true },
+    { key: "RUNNING", label: "実行中", showCount: true, color: "success" },
+    { key: "PENDING", label: "待機", showCount: true, color: "warning" },
+    { key: "FAILED", label: "失敗", showCount: true, color: "danger" },
   ];
 
   // Pool別サマリがある場合はそれを表示、なければステータス別サマリを表示
@@ -38,7 +70,7 @@
       <!-- Pool別サマリ -->
       <div class="pool-summary">
         {#each $poolSummaries as pool (pool.poolId)}
-          <div class="pool-badge">
+          <Badge variant="glass" color="neutral" size="medium">
             <span class="pool-name">{pool.poolId}</span>
             <span class="pool-separator">:</span>
             {#if pool.running > 0}
@@ -53,25 +85,23 @@
             {#if pool.running === 0 && pool.queued === 0 && pool.failed === 0}
               <span class="pool-stat idle">{pool.total} タスク</span>
             {/if}
-          </div>
+          </Badge>
         {/each}
       </div>
     {:else}
       <!-- フォールバック: ステータス別サマリ -->
       <div class="status-summary">
-        {#each statusDisplay as { key, label, showCount }}
+        {#each statusDisplay as { key, label, showCount, color }}
           {#if showCount && $taskCountsByStatus[key] > 0}
-            <div class="status-badge status-{key.toLowerCase()}">
+            <Badge variant="glass" {color} {label}>
               <span class="status-count">{$taskCountsByStatus[key]}</span>
-              <span class="status-label">{label}</span>
-            </div>
+            </Badge>
           {/if}
         {/each}
       </div>
     {/if}
   </div>
 
-  <!-- 右側：進捗・ビュー切替 -->
   <!-- 右側：進捗・ビュー切替 -->
   <div class="toolbar-right">
     <!-- 実行コントロール -->
@@ -85,29 +115,28 @@
 
     <!-- ビュー切替 -->
     <div class="view-toggle">
-      <button
-        class="view-btn"
-        class:active={isGraphMode}
+      <Button
+        variant={isGraphMode ? "secondary" : "ghost"}
+        size="small"
         on:click={() => viewMode.setGraph()}
-        aria-label="グラフビュー"
         title="グラフビュー"
       >
-        <span class="view-icon">◇</span>
-        Graph
-      </button>
-      <button
-        class="view-btn"
-        class:active={!isGraphMode}
+        <Network size="14" />
+        <span>Graph</span>
+      </Button>
+      <Button
+        variant={!isGraphMode ? "secondary" : "ghost"}
+        size="small"
         on:click={() => viewMode.setWBS()}
-        aria-label="WBSビュー"
         title="WBSビュー"
       >
-        <span class="view-icon">≡</span>
-        WBS
-      </button>
+        <ListTree size="14" />
+        <span>WBS</span>
+      </Button>
     </div>
   </div>
 </header>
+```
 
 <style>
   .toolbar {
@@ -115,11 +144,19 @@
     align-items: center;
     justify-content: space-between;
     height: var(--mv-layout-toolbar-height);
-    padding: 0 var(--mv-spacing-md);
-    background: var(--mv-color-surface-primary);
+    padding: 0 var(--mv-spacing-lg);
+
+    /* Crystal HUD Style */
+    background: var(--mv-glass-bg);
+    backdrop-filter: blur(12px);
     border-bottom: var(--mv-border-width-thin) solid
-      var(--mv-color-border-subtle);
+      var(--mv-glass-border-subtle);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+
     flex-shrink: 0;
+    gap: var(--mv-spacing-md);
+    position: relative;
+    z-index: 100;
   }
 
   .toolbar-left,
@@ -146,72 +183,21 @@
     gap: var(--mv-spacing-md);
   }
 
-  .app-title {
-    font-size: var(--mv-font-size-lg);
-    font-weight: var(--mv-font-weight-semibold);
-    color: var(--mv-color-text-primary);
-    margin: 0;
-  }
-
-  .btn-icon {
-    font-size: var(--mv-font-size-lg);
-    line-height: 1;
-  }
-
   /* ステータスサマリ */
   .status-summary {
     display: flex;
     gap: var(--mv-spacing-sm);
   }
 
-  .status-badge {
-    display: flex;
-    align-items: center;
-    gap: var(--mv-spacing-xxs);
-    padding: var(--mv-spacing-xxs) var(--mv-spacing-xs);
-    border-radius: var(--mv-radius-sm);
-    font-size: var(--mv-font-size-xs);
-  }
-
-  .status-badge.status-running {
-    background: var(--mv-color-status-running-bg);
-    color: var(--mv-color-status-running-text);
-  }
-
-  .status-badge.status-pending {
-    background: var(--mv-color-status-pending-bg);
-    color: var(--mv-color-status-pending-text);
-  }
-
-  .status-badge.status-failed {
-    background: var(--mv-color-status-failed-bg);
-    color: var(--mv-color-status-failed-text);
-  }
-
   .status-count {
     font-weight: var(--mv-font-weight-bold);
-  }
-
-  .status-label {
-    font-weight: var(--mv-font-weight-normal);
+    margin-right: var(--mv-spacing-xxs);
   }
 
   /* Pool別サマリ */
   .pool-summary {
     display: flex;
     gap: var(--mv-spacing-md);
-  }
-
-  .pool-badge {
-    display: flex;
-    align-items: center;
-    gap: var(--mv-spacing-xxs);
-    padding: var(--mv-spacing-xxs) var(--mv-spacing-sm);
-    background: var(--mv-color-surface-secondary);
-    border: var(--mv-border-width-thin) solid var(--mv-color-glow-ambient); /* ボーダーをグロー色に */
-    border-radius: var(--mv-radius-sm);
-    font-size: var(--mv-font-size-xs);
-    box-shadow: var(--mv-shadow-node-glow); /* 常時微発光 */
   }
 
   .pool-name {
@@ -222,26 +208,24 @@
 
   .pool-separator {
     color: var(--mv-color-text-muted);
+    margin: 0 var(--mv-spacing-xxs);
   }
 
   .pool-stat {
-    padding: var(--mv-spacing-xxs) var(--mv-spacing-xs);
-    border-radius: var(--mv-radius-sm);
+    margin-left: var(--mv-spacing-xs);
     font-weight: var(--mv-font-weight-medium);
   }
 
   .pool-stat.running {
-    background: var(--mv-color-status-running-bg);
     color: var(--mv-color-status-running-text);
+    text-shadow: 0 0 5px var(--mv-color-status-running-glow);
   }
 
   .pool-stat.queued {
-    background: var(--mv-color-status-pending-bg);
     color: var(--mv-color-status-pending-text);
   }
 
   .pool-stat.failed {
-    background: var(--mv-color-status-failed-bg);
     color: var(--mv-color-status-failed-text);
   }
 
@@ -264,42 +248,14 @@
     text-align: right;
   }
 
-  /* ビュー切り替え */
+  /* ビュー切り替え - Cleaned up to rely on Button component */
   .view-toggle {
     display: flex;
-    background: var(--mv-color-surface-secondary);
-    border: var(--mv-border-width-thin) solid var(--mv-color-border-default);
-    border-radius: var(--mv-radius-sm);
-    overflow: hidden;
-  }
-
-  .view-btn {
-    display: flex;
-    align-items: center;
     gap: var(--mv-spacing-xxs);
-    padding: var(--mv-spacing-xxs) var(--mv-spacing-sm);
-    font-size: var(--mv-font-size-xs);
-    font-weight: var(--mv-font-weight-medium);
-    color: var(--mv-color-text-muted);
-    background: transparent;
-    border: none;
-    cursor: pointer;
-    transition:
-      background-color var(--mv-transition-hover),
-      color var(--mv-transition-hover);
-  }
-
-  .view-btn:hover {
-    color: var(--mv-color-text-primary);
-    background: var(--mv-color-surface-hover);
-  }
-
-  .view-btn.active {
-    color: var(--mv-color-text-primary);
-    background: var(--mv-color-surface-primary);
-  }
-
-  .view-icon {
-    font-size: var(--mv-font-size-sm);
+    /* Remove background/border to let Buttons stand on glass */
+    /* background: var(--mv-color-surface-secondary); */
+    /* border: var(--mv-border-width-thin) solid var(--mv-color-border-default); */
+    /* border-radius: var(--mv-radius-sm); */
+    /* padding: 2px; */
   }
 </style>

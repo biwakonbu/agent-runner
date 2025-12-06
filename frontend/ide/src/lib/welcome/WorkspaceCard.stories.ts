@@ -1,6 +1,9 @@
 import type { Meta, StoryObj } from '@storybook/svelte';
 import WorkspaceCard from './WorkspaceCard.svelte';
 
+// VRT用に固定タイムスタンプを使用（動的な値は視覚回帰テストを不安定にする）
+const FIXED_DATE = new Date('2024-01-15T10:00:00Z');
+
 const meta = {
   title: 'Welcome/WorkspaceCard',
   component: WorkspaceCard,
@@ -35,7 +38,7 @@ export const Default: Story = {
       id: 'workspace-1',
       displayName: 'My Project',
       projectRoot: '/Users/demo/projects/my-project',
-      lastOpenedAt: new Date().toISOString()
+      lastOpenedAt: FIXED_DATE.toISOString()
     }
   }
 };
@@ -46,7 +49,7 @@ export const LongPath: Story = {
       id: 'workspace-2',
       displayName: 'Very Long Project Name That Should Be Truncated',
       projectRoot: '/Users/demo/very/long/path/to/a/deeply/nested/project/directory',
-      lastOpenedAt: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString()
+      lastOpenedAt: new Date(FIXED_DATE.getTime() - 1000 * 60 * 60 * 24).toISOString()
     }
   },
   parameters: {
@@ -64,7 +67,7 @@ export const RecentlyUsed: Story = {
       id: 'workspace-3',
       displayName: 'Recent Project',
       projectRoot: '/Users/demo/projects/recent',
-      lastOpenedAt: new Date(Date.now() - 1000 * 60 * 5).toISOString() // 5分前
+      lastOpenedAt: new Date(FIXED_DATE.getTime() - 1000 * 60 * 5).toISOString() // 5分前
     }
   },
   parameters: {
@@ -82,7 +85,7 @@ export const OldWorkspace: Story = {
       id: 'workspace-4',
       displayName: 'Old Project',
       projectRoot: '/Users/demo/projects/old',
-      lastOpenedAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 30).toISOString() // 30日前
+      lastOpenedAt: new Date(FIXED_DATE.getTime() - 1000 * 60 * 60 * 24 * 30).toISOString() // 30日前
     }
   },
   parameters: {

@@ -33,24 +33,27 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
+// VRT用に固定タイムスタンプを使用（動的な値は視覚回帰テストを不安定にする）
+const FIXED_DATE = new Date('2024-01-15T10:00:00Z');
+
 const mockWorkspaces = [
   {
     id: 'workspace-1',
     displayName: 'My Project',
     projectRoot: '/Users/demo/projects/my-project',
-    lastOpenedAt: new Date(Date.now() - 1000 * 60 * 30).toISOString()
+    lastOpenedAt: new Date(FIXED_DATE.getTime() - 1000 * 60 * 30).toISOString()
   },
   {
     id: 'workspace-2',
     displayName: 'Another Project',
     projectRoot: '/Users/demo/projects/another-project',
-    lastOpenedAt: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString()
+    lastOpenedAt: new Date(FIXED_DATE.getTime() - 1000 * 60 * 60 * 24).toISOString()
   },
   {
     id: 'workspace-3',
     displayName: 'Third Project',
     projectRoot: '/Users/demo/projects/third',
-    lastOpenedAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 3).toISOString()
+    lastOpenedAt: new Date(FIXED_DATE.getTime() - 1000 * 60 * 60 * 24 * 3).toISOString()
   }
 ];
 
@@ -97,19 +100,19 @@ export const ManyWorkspaces: Story = {
         id: 'workspace-4',
         displayName: 'Fourth Project',
         projectRoot: '/Users/demo/projects/fourth',
-        lastOpenedAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 5).toISOString()
+        lastOpenedAt: new Date(FIXED_DATE.getTime() - 1000 * 60 * 60 * 24 * 5).toISOString()
       },
       {
         id: 'workspace-5',
         displayName: 'Fifth Project',
         projectRoot: '/Users/demo/projects/fifth',
-        lastOpenedAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 7).toISOString()
+        lastOpenedAt: new Date(FIXED_DATE.getTime() - 1000 * 60 * 60 * 24 * 7).toISOString()
       },
       {
         id: 'workspace-6',
         displayName: 'Sixth Project',
         projectRoot: '/Users/demo/projects/sixth',
-        lastOpenedAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 10).toISOString()
+        lastOpenedAt: new Date(FIXED_DATE.getTime() - 1000 * 60 * 60 * 24 * 10).toISOString()
       }
     ],
     loading: false

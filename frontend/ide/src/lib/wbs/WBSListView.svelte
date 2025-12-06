@@ -55,8 +55,8 @@
         <p class="empty-hint">チャットからタスクを生成してください</p>
       </div>
     {:else}
-      {#each visibleNodes as { node, expanded } (node.id)}
-        <WBSNode {node} {expanded} />
+      {#each visibleNodes as { node, expanded }, i (node.id)}
+        <WBSNode {node} {expanded} index={i} />
       {/each}
     {/if}
   </div>

@@ -44,7 +44,8 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-const now = new Date().toISOString();
+// VRT用に固定タイムスタンプを使用（動的な値は視覚回帰テストを不安定にする）
+const now = new Date('2024-01-15T10:00:00Z').toISOString();
 
 // ユーザーメッセージ
 export const UserMessage: Story = {

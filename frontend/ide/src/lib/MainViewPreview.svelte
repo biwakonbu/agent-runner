@@ -11,6 +11,7 @@
   import FloatingChatWindow from "./components/chat/FloatingChatWindow.svelte";
   import { tasks, selectedTaskId } from "../stores/taskStore";
   import type { Task, TaskStatus, PoolSummary } from "../types";
+  import { MessageSquare } from "lucide-svelte";
 
   const dispatch = createEventDispatcher();
 
@@ -92,7 +93,6 @@
         <WBSListView />
       </div>
     {/if}
-
   </div>
 
   <!-- チャットウィンドウ -->
@@ -114,7 +114,7 @@
       tabindex="0"
       aria-label="Open Chat"
     >
-      💬
+      <MessageSquare size="24" />
     </div>
   {/if}
 </main>

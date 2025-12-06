@@ -7,7 +7,7 @@
 
 import { writable } from 'svelte/store';
 import { EventsOn } from '../../wailsjs/wailsjs/runtime/runtime';
-import { StartExecution, PauseExecution, ResumeExecution, StopExecution } from '../../wailsjs/go/main/App';
+import { StartExecution, PauseExecution, ResumeExecution, StopExecution, GetExecutionState } from '../../wailsjs/go/main/App';
 
 export type ExecutionState = 'IDLE' | 'RUNNING' | 'PAUSED';
 
@@ -53,5 +53,15 @@ export async function stopExecution(): Promise<void> {
         await StopExecution();
     } catch (e) {
         console.error('Failed to stop execution:', e);
+    }
+}
+
+// サーバーから実行状態を同期
+export async function syncExecutionState(): Promise<void> {
+    try {
+        const state = await GetExecutionState();
+        executionState.set(state as ExecutionState);
+    } catch (e) {
+        console.error('Failed to sync execution state:', e);
     }
 }

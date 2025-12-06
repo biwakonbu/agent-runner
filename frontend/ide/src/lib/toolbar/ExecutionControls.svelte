@@ -6,53 +6,55 @@
     resumeExecution,
     stopExecution,
   } from "../../stores/executionStore";
+  import Button from "../../design-system/components/Button.svelte";
+  import { Play, Pause, Square } from "lucide-svelte";
 </script>
 
 <div class="execution-controls">
   {#if $executionState === "IDLE"}
-    <button
-      class="control-btn start"
+    <Button
+      variant="primary"
+      size="small"
       on:click={startExecution}
-      title="自律実行開始"
-      aria-label="Start Execution"
+      title="Start Execution"
     >
-      <span class="icon">▶</span>
-      <span class="label">Start</span>
-    </button>
+      <Play size="14" />
+      <span>Start</span>
+    </Button>
   {:else if $executionState === "RUNNING"}
-    <button
-      class="control-btn pause"
+    <Button
+      variant="secondary"
+      size="small"
       on:click={pauseExecution}
-      title="一時停止"
-      aria-label="Pause Execution"
+      title="Pause Execution"
     >
-      <span class="icon">⏸</span>
-    </button>
-    <button
-      class="control-btn stop"
+      <Pause size="14" />
+    </Button>
+    <Button
+      variant="danger"
+      size="small"
       on:click={stopExecution}
-      title="停止"
-      aria-label="Stop Execution"
+      title="Stop Execution"
     >
-      <span class="icon">⏹</span>
-    </button>
+      <Square size="14" />
+    </Button>
   {:else if $executionState === "PAUSED"}
-    <button
-      class="control-btn resume"
+    <Button
+      variant="primary"
+      size="small"
       on:click={resumeExecution}
-      title="再開"
-      aria-label="Resume Execution"
+      title="Resume Execution"
     >
-      <span class="icon">▶</span>
-    </button>
-    <button
-      class="control-btn stop"
+      <Play size="14" />
+    </Button>
+    <Button
+      variant="danger"
+      size="small"
       on:click={stopExecution}
-      title="停止"
-      aria-label="Stop Execution"
+      title="Stop Execution"
     >
-      <span class="icon">⏹</span>
-    </button>
+      <Square size="14" />
+    </Button>
   {/if}
 
   <div class="state-indicator" class:active={$executionState !== "IDLE"}>
@@ -72,53 +74,7 @@
     border-radius: var(--mv-radius-sm);
   }
 
-  .control-btn {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: var(--mv-spacing-xs);
-    border: none;
-    border-radius: var(--mv-radius-sm);
-    cursor: pointer;
-    font-size: var(--mv-font-size-sm);
-    font-weight: var(--mv-font-weight-medium);
-    transition: all var(--mv-transition-hover);
-    padding: var(--mv-spacing-xxs) var(--mv-spacing-sm);
-    min-width: var(--mv-btn-min-width-sm);
-  }
-
-  .control-btn.start {
-    background: var(--mv-color-status-running-bg);
-    color: var(--mv-color-status-running-text);
-  }
-
-  .control-btn.resume {
-    background: var(--mv-color-status-ready-bg);
-    color: var(--mv-color-status-ready-text);
-  }
-
-  .control-btn.pause {
-    background: var(--mv-color-surface-overlay);
-    color: var(--mv-color-text-primary);
-  }
-
-  .control-btn.stop {
-    background: var(--mv-color-status-failed-bg);
-    color: var(--mv-color-status-failed-text);
-  }
-
-  .control-btn:hover {
-    filter: brightness(1.1);
-    transform: translateY(-1px);
-  }
-
-  .control-btn:active {
-    transform: translateY(0);
-  }
-
-  .icon {
-    font-family: var(--mv-font-mono); /* For generic symbols */
-  }
+  /* Adjust button spacing/layout if needed, but Button component should handle it. */
 
   .state-indicator {
     display: flex;
@@ -143,7 +99,12 @@
   }
 
   .status-dot.paused {
-    background: var(--mv-color-text-warning);
+    background: var(
+      --mv-color-status-ready-text
+    ); /* Use Ready color (Cyan) for paused? or Warning? Original used warning text color which might be undefined in snippet */
+    background: var(
+      --mv-primitive-aurora-yellow
+    ); /* Explicitly yellow for paused */
   }
 
   .status-text {

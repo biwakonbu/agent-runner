@@ -41,6 +41,8 @@ export function ResumeExecution():Promise<void>;
 
 export function StopExecution():Promise<void>;
 
+export function GetExecutionState():Promise<string>;
+
 // Backlog API
 export function GetBacklogItems():Promise<Array<orchestrator.BacklogItem>>;
 

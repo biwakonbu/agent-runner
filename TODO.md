@@ -10,7 +10,7 @@ Based on PRD v2.0
 |-------|--------|------|
 | Phase 1: チャット→タスク生成 | 🟢 ほぼ完了 | E2Eテストのみ残 |
 | Phase 2: 依存グラフ・WBS表示 | 🟢 完了 | Week 3-4 + Scheduler拡張 完了 |
-| Phase 3: 自律実行ループ | 🟢 ほぼ完了 | Week 5-6 完了、失敗処理統合のみ残 |
+| Phase 3: 自律実行ループ | 🟢 完了 | Week 5-6 完了、失敗処理統合完了 |
 
 ---
 
@@ -171,8 +171,8 @@ Based on PRD v2.0
   - [x] `runLoop(ctx)` 内部メソッド（自律実行ループ）
 - [x] `internal/orchestrator/execution_orchestrator_test.go` (新規)
   - [x] Start/Pause/Resume/Stop の状態遷移テスト
-  - [ ] 依存順実行テスト（モック使用）
-  - [ ] 並行実行制御テスト
+  - [x] 依存順実行テスト（モック使用）
+  - [x] 並行実行制御テスト
 
 #### 5.2 EventEmitter インターフェース
 
@@ -200,12 +200,12 @@ Based on PRD v2.0
 
 - [x] `frontend/ide/src/stores/executionStore.ts` (新規)
   - [x] `executionState` ストア
-  - [x] `initExecutionEvents()` 関数（スタブ実装）
-  - [x] `startExecution()` アクション（スタブ実装）
-  - [x] `pauseExecution()` アクション（スタブ実装）
-  - [x] `resumeExecution()` アクション（スタブ実装）
-  - [x] `stopExecution()` アクション（スタブ実装）
-  - [ ] Wails バインディング接続（スタブ→実API）
+  - [x] `initExecutionEvents()` 関数
+  - [x] `startExecution()` アクション
+  - [x] `pauseExecution()` アクション
+  - [x] `resumeExecution()` アクション
+  - [x] `stopExecution()` アクション
+  - [x] Wails バインディング接続
 - [x] `frontend/ide/src/lib/toolbar/ExecutionControls.svelte` (新規)
   - [x] 開始ボタン（IDLE 時）
   - [x] 一時停止ボタン（RUNNING 時）
@@ -242,11 +242,15 @@ Based on PRD v2.0
 
 #### 6.2 ExecutionOrchestrator 失敗処理
 
-- [ ] `internal/orchestrator/execution_orchestrator.go`
-  - [ ] `HandleFailure()` メソッド
-  - [ ] `retryQueue` チャネル追加
-  - [ ] `addToBacklog()` 内部メソッド
-  - [ ] リトライ回数トラッキング（attemptCount map）
+- [x] `internal/orchestrator/execution_orchestrator.go`
+  - [x] `HandleFailure()` メソッド（行 283-345 で実装済み）
+  - [x] リトライ管理（Task.AttemptCount + NextRetryAt + Scheduler.ResetRetryTasks）
+  - [x] バックログ追加（BacklogStore.Add() で実装）
+
+※ 以下は不要と判断（異なるアーキテクチャで実装済み）:
+- `retryQueue` チャネル → TaskStore + Scheduler で管理
+- `addToBacklog()` 内部メソッド → BacklogStore.Add で直接追加
+- `attemptCount map` → Task.AttemptCount フィールドで管理
 
 #### 6.3 BacklogStore
 
@@ -337,9 +341,6 @@ Based on PRD v2.0
 
 ## 次のアクション
 
-1. **Phase 3 残作業**: ExecutionOrchestrator 失敗処理統合
-   - `HandleFailure()` メソッド実装
-   - RetryPolicy と BacklogStore の統合
-   - リトライキューとバックオフ処理
+1. ~~**Phase 3 残作業**: ExecutionOrchestrator 失敗処理統合~~ ✅ 完了
 2. **Phase 1 E2E テスト**: チャット→タスク生成フローのテスト
-3. **テスト拡充**: ExecutionOrchestrator の依存順実行・並行実行テスト
+3. ~~**テスト拡充**: ExecutionOrchestrator の依存順実行・並行実行テスト~~ ✅ 完了

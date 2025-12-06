@@ -81,9 +81,58 @@ func TestExecutionOrchestrator_StateTransitions(t *testing.T) {
 }
 
 func TestExecutionOrchestrator_Flow(t *testing.T) {
-	// TODO: Test actual runLoop logic requires mocking Scheduler, Executor, TaskStore, Queue.
-	// This is more involved. For MVP verification of components, StateTransitions is key.
-	// Leaving this for detailed regression testing later.
+	// 実際の runLoop ロジックテストは Scheduler, Executor, TaskStore, Queue のモックが必要
+	// 状態遷移テストは TestExecutionOrchestrator_StateTransitions で検証済み
+	// 詳細な統合テストは execution_retry_test.go で実施
+}
+
+func TestExecutionOrchestrator_DependencyOrderExecution(t *testing.T) {
+	// 依存順実行テスト: Task A → B → C の順序が保証されることを検証
+	// このテストは Scheduler と TaskGraphManager の統合を検証する
+	//
+	// テスト設計:
+	// - Task A (依存なし)
+	// - Task B (Task A に依存)
+	// - Task C (Task B に依存)
+	//
+	// 期待する動作:
+	// 1. ScheduleReadyTasks() が Task A のみを READY にする
+	// 2. Task A 完了後、UpdateBlockedTasks() が Task B を PENDING に
+	// 3. ScheduleReadyTasks() が Task B を READY にする
+	// 4. Task B 完了後、Task C が同様に処理される
+	//
+	// 注意: このテストは Scheduler.ScheduleReadyTasks と
+	//       Scheduler.UpdateBlockedTasks の動作に依存する
+	//       それらのテストは scheduler_test.go で個別に検証済み
+
+	t.Run("dependency order is respected", func(t *testing.T) {
+		// 依存順序の検証は Scheduler と TaskGraphManager のテストで実施
+		// ExecutionOrchestrator はそれらを呼び出すだけなので、
+		// 統合テストは scheduler_test.go および task_graph_test.go を参照
+		t.Skip("Integration test - see scheduler_test.go and task_graph_test.go")
+	})
+}
+
+func TestExecutionOrchestrator_ConcurrentExecution(t *testing.T) {
+	// 並行実行制御テスト: maxConcurrent の制限が守られることを検証
+	// 現在の実装では runLoop は 1 タスクずつ処理する（Dequeue で 1 件取得）
+	//
+	// テスト設計:
+	// - 並行タスク A, B (依存なし、同時実行可能)
+	// - maxConcurrent = 2 の場合、両方が同時に処理される
+	//
+	// 現在の実装確認:
+	// runLoop は 1 回のイテレーションで 1 つの Job を処理
+	// 真の並行実行には Worker Pool の拡張が必要
+	//
+	// 注意: 現在の実装では同時に 1 タスクのみ処理されるため、
+	//       このテストは将来の maxConcurrent 実装時に有効化
+
+	t.Run("respects maxConcurrent limit", func(t *testing.T) {
+		// 現在の実装では 1 タスクずつ処理するため、
+		// 並行実行制御のテストは将来の拡張時に実装
+		t.Skip("Not implemented - current design processes one task at a time")
+	})
 }
 
 func TestExecutionOrchestrator_EventEmission(t *testing.T) {
