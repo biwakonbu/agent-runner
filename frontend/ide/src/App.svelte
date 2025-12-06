@@ -16,7 +16,7 @@
   // @ts-ignore - Wails自動生成ファイル
   import { ListTasks, GetPoolSummaries } from "../wailsjs/go/main/App";
   import FloatingChatWindow from "./lib/components/chat/FloatingChatWindow.svelte";
-  import { initExecutionEvents } from "./stores/executionStore";
+  import { initExecutionEvents, syncExecutionState } from "./stores/executionStore";
   import { initTaskEvents } from "./stores/taskStore";
   import { initChatEvents } from "./stores/chat";
   import { initBacklogEvents, unresolvedCount } from "./stores/backlogStore";
@@ -105,6 +105,8 @@
     workspaceId = event.detail;
     log.info("workspace selected", { workspaceId });
     loadData();
+    // 実行状態をバックエンドと同期
+    syncExecutionState();
     // 10秒間隔でポーリング（Wails Events でリアルタイム更新されるためフォールバック）
     interval = setInterval(loadData, 10000);
     log.info("polling started", { interval: 10000 });
