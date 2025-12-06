@@ -518,7 +518,7 @@ await CreateTask(workspaceId, title, poolId);
 
 ## 関連ドキュメント
 
-- [../../cmd/multiverse-ide/CLAUDE.md](../../cmd/multiverse-ide/CLAUDE.md): Go バックエンド
+- [../../cmd/multiverse/CLAUDE.md](../../cmd/multiverse/CLAUDE.md): Go バックエンド
 - [../../internal/orchestrator/CLAUDE.md](../../internal/orchestrator/CLAUDE.md): Task データモデル
 - [src/design-system/CLAUDE.md](src/design-system/CLAUDE.md): デザインシステム詳細
 - [src/lib/grid/CLAUDE.md](src/lib/grid/CLAUDE.md): グリッドコンポーネント詳細

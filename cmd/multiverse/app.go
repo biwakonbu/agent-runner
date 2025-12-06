@@ -46,6 +46,27 @@ func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
 }
 
+// newMetaClientFromEnv は環境変数に応じて Meta クライアントを生成する
+// 優先度:
+// 1. MULTIVERSE_META_KIND=openai-chat なら OpenAI 接続 (OPENAI_API_KEY 必須想定)
+// 2. それ以外/未設定はモック
+func newMetaClientFromEnv() *meta.Client {
+	kind := os.Getenv("MULTIVERSE_META_KIND")
+	if kind == "" {
+		kind = "mock"
+	}
+
+	switch kind {
+	case "openai-chat":
+		apiKey := os.Getenv("OPENAI_API_KEY")
+		model := os.Getenv("MULTIVERSE_META_MODEL")
+		systemPrompt := os.Getenv("MULTIVERSE_META_SYSTEM_PROMPT")
+		return meta.NewClient("openai-chat", apiKey, model, systemPrompt)
+	default:
+		return meta.NewMockClient()
+	}
+}
+
 // SelectWorkspace opens a directory selection dialog and loads the workspace.
 func (a *App) SelectWorkspace() string {
 	selection, err := runtime.OpenDirectoryDialog(a.ctx, runtime.OpenDialogOptions{
@@ -86,7 +107,6 @@ func (a *App) SelectWorkspace() string {
 	wsDir := a.workspaceStore.GetWorkspaceDir(id)
 	a.taskStore = orchestrator.NewTaskStore(wsDir)
 	queue := ipc.NewFilesystemQueue(wsDir)
-	a.scheduler = orchestrator.NewScheduler(a.taskStore, queue)
 
 	// Initialize Execution Environment
 	agentRunnerPath := "agent-runner"
@@ -95,6 +115,8 @@ func (a *App) SelectWorkspace() string {
 	}
 	executor := orchestrator.NewExecutor(agentRunnerPath, a.taskStore)
 	eventEmitter := orchestrator.NewWailsEventEmitter(a.ctx)
+
+	a.scheduler = orchestrator.NewScheduler(a.taskStore, queue, eventEmitter)
 
 	// Initialize BacklogStore (before ExecutionOrchestrator)
 	a.backlogStore = orchestrator.NewBacklogStore(wsDir)
@@ -106,11 +128,12 @@ func (a *App) SelectWorkspace() string {
 		queue,
 		eventEmitter,
 		a.backlogStore,
+		"default",
 	)
 
 	// Initialize ChatHandler with mock Meta client (TODO: configurable)
 	sessionStore := chat.NewChatSessionStore(wsDir)
-	metaClient := meta.NewMockClient()
+	metaClient := newMetaClientFromEnv()
 	a.chatHandler = chat.NewHandler(metaClient, a.taskStore, sessionStore, id, ws.ProjectRoot, eventEmitter)
 
 	return id
@@ -156,7 +179,6 @@ func (a *App) OpenWorkspaceByID(id string) string {
 	wsDir := a.workspaceStore.GetWorkspaceDir(id)
 	a.taskStore = orchestrator.NewTaskStore(wsDir)
 	queue := ipc.NewFilesystemQueue(wsDir)
-	a.scheduler = orchestrator.NewScheduler(a.taskStore, queue)
 
 	// Initialize Execution Environment
 	agentRunnerPath := "agent-runner"
@@ -165,6 +187,8 @@ func (a *App) OpenWorkspaceByID(id string) string {
 	}
 	executor := orchestrator.NewExecutor(agentRunnerPath, a.taskStore)
 	eventEmitter := orchestrator.NewWailsEventEmitter(a.ctx)
+
+	a.scheduler = orchestrator.NewScheduler(a.taskStore, queue, eventEmitter)
 
 	// Initialize BacklogStore (ExecutionOrchestrator depends on it)
 	a.backlogStore = orchestrator.NewBacklogStore(wsDir)
@@ -176,11 +200,12 @@ func (a *App) OpenWorkspaceByID(id string) string {
 		queue,
 		eventEmitter,
 		a.backlogStore,
+		"default",
 	)
 
 	// Initialize ChatHandler with mock Meta client (TODO: configurable)
 	sessionStore := chat.NewChatSessionStore(wsDir)
-	metaClient := meta.NewMockClient()
+	metaClient := newMetaClientFromEnv()
 	a.chatHandler = chat.NewHandler(metaClient, a.taskStore, sessionStore, id, ws.ProjectRoot, eventEmitter)
 
 	return id

@@ -33,6 +33,7 @@ func (w *WailsEventEmitter) Emit(eventName string, data any) {
 const (
 	EventTaskStateChange      = "task:stateChange"
 	EventExecutionStateChange = "execution:stateChange"
+	EventTaskCreated          = "task:created"
 	EventChatProgress         = "chat:progress"
 	EventBacklogAdded         = "backlog:added"
 )
@@ -43,6 +44,11 @@ type TaskStateChangeEvent struct {
 	OldStatus TaskStatus `json:"oldStatus"`
 	NewStatus TaskStatus `json:"newStatus"`
 	Timestamp time.Time  `json:"timestamp"`
+}
+
+// TaskCreatedEvent represents a task creation event
+type TaskCreatedEvent struct {
+	Task Task `json:"task"`
 }
 
 // ExecutionStateChangeEvent represents an execution state change event

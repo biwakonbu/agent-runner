@@ -18,7 +18,8 @@ function createTask(
   id: string,
   title: string,
   status: Task['status'],
-  phaseName: PhaseName = ''
+  phaseName: PhaseName = '',
+  milestone: string = 'default'
 ): Task {
   return {
     id,
@@ -28,6 +29,7 @@ function createTask(
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     phaseName,
+    milestone,
     dependencies: [],
   };
 }
@@ -38,7 +40,7 @@ describe('expandedNodes', () => {
   });
 
   it('toggle で展開/折りたたみを切り替える', () => {
-    const nodeId = 'phase-概念設計';
+    const nodeId = 'phase-default-概念設計';
 
     // 初期状態: 折りたたまれている
     expect(get(expandedNodes).has(nodeId)).toBe(false);
@@ -53,14 +55,14 @@ describe('expandedNodes', () => {
   });
 
   it('expand で展開する', () => {
-    const nodeId = 'phase-実装';
+    const nodeId = 'phase-default-実装';
 
     expandedNodes.expand(nodeId);
     expect(get(expandedNodes).has(nodeId)).toBe(true);
   });
 
   it('collapse で折りたたむ', () => {
-    const nodeId = 'phase-検証';
+    const nodeId = 'phase-default-検証';
 
     expandedNodes.expand(nodeId);
     expandedNodes.collapse(nodeId);
@@ -71,10 +73,11 @@ describe('expandedNodes', () => {
     expandedNodes.expandAll();
 
     const expanded = get(expandedNodes);
-    expect(expanded.has('phase-概念設計')).toBe(true);
-    expect(expanded.has('phase-実装設計')).toBe(true);
-    expect(expanded.has('phase-実装')).toBe(true);
-    expect(expanded.has('phase-検証')).toBe(true);
+    expect(expanded.has('milestone-default')).toBe(true);
+    expect(expanded.has('phase-default-概念設計')).toBe(true);
+    expect(expanded.has('phase-default-実装設計')).toBe(true);
+    expect(expanded.has('phase-default-実装')).toBe(true);
+    expect(expanded.has('phase-default-検証')).toBe(true);
   });
 
   it('collapseAll で全て折りたたむ', () => {
@@ -138,16 +141,17 @@ describe('wbsTree', () => {
 
     const tree = get(wbsTree);
 
-    // 2 つのフェーズ
-    expect(tree.length).toBe(2);
+    // マイルストーンは1件
+    expect(tree.length).toBe(1);
+    const milestone = tree[0];
 
     // 概念設計フェーズ
-    const conceptPhase = tree.find((n) => n.phaseName === '概念設計');
+    const conceptPhase = milestone.children.find((n) => n.phaseName === '概念設計');
     expect(conceptPhase).toBeDefined();
     expect(conceptPhase?.children.length).toBe(2);
 
     // 実装フェーズ
-    const implPhase = tree.find((n) => n.phaseName === '実装');
+    const implPhase = milestone.children.find((n) => n.phaseName === '実装');
     expect(implPhase).toBeDefined();
     expect(implPhase?.children.length).toBe(1);
   });
@@ -159,7 +163,7 @@ describe('wbsTree', () => {
     ]);
 
     const tree = get(wbsTree);
-    const conceptPhase = tree.find((n) => n.phaseName === '概念設計');
+    const conceptPhase = tree[0].children.find((n) => n.phaseName === '概念設計');
 
     expect(conceptPhase?.progress.completed).toBe(1);
     expect(conceptPhase?.progress.total).toBe(2);
@@ -173,7 +177,7 @@ describe('wbsTree', () => {
     ]);
 
     const tree = get(wbsTree);
-    const implPhase = tree.find((n) => n.phaseName === '実装');
+    const implPhase = tree[0].children.find((n) => n.phaseName === '実装');
 
     expect(implPhase?.progress.completed).toBe(2);
     expect(implPhase?.progress.percentage).toBe(100);
@@ -219,13 +223,14 @@ describe('flattenedWBSNodes', () => {
       createTask('task-2', 'Task 2', 'PENDING', '概念設計'),
     ]);
 
-    // 折りたたまれている場合: フェーズのみ表示
+    // 折りたたまれている場合: マイルストーンのみ表示
     const collapsedNodes = get(flattenedWBSNodes);
-    expect(collapsedNodes.length).toBe(1); // フェーズノードのみ
+    expect(collapsedNodes.length).toBe(1); // マイルストーンノードのみ
 
-    // 展開した場合: フェーズ + タスク
-    expandedNodes.expand('phase-概念設計');
+    // 展開した場合: マイルストーン + フェーズ + タスク
+    expandedNodes.expand('milestone-default');
+    expandedNodes.expand('phase-default-概念設計');
     const expandedNodesResult = get(flattenedWBSNodes);
-    expect(expandedNodesResult.length).toBe(3); // フェーズ + 2 タスク
+    expect(expandedNodesResult.length).toBe(4); // マイルストーン + フェーズ + 2 タスク
   });
 });

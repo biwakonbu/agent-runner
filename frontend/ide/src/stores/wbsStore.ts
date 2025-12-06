@@ -5,15 +5,16 @@
  * 折りたたみ状態と進捗率を管理
  */
 
-import { writable, derived } from 'svelte/store';
+import { writable, derived, get } from 'svelte/store';
 import { tasks } from './taskStore';
 import type { Task, PhaseName, TaskStatus } from '../types';
 
 // WBS ツリーノードの型
 export interface WBSNode {
   id: string;
-  type: 'phase' | 'task';
+  type: 'milestone' | 'phase' | 'task';
   label: string;
+  milestone?: string;
   phaseName?: PhaseName;
   task?: Task;
   children: WBSNode[];
@@ -29,7 +30,6 @@ export interface WBSNode {
 const phaseOrder: PhaseName[] = ['概念設計', '実装設計', '実装', '検証', ''];
 
 // フェーズのラベル
-// フェーズのラベル
 const phaseLabels: Record<PhaseName, string> = {
   概念設計: 'Concept Design',
   実装設計: 'Architecture Design',
@@ -37,6 +37,8 @@ const phaseLabels: Record<PhaseName, string> = {
   検証: 'Verification',
   '': 'Other',
 };
+
+const defaultMilestoneLabel = 'General';
 
 // 折りたたみ状態ストア
 function createExpandedStore() {
@@ -78,10 +80,19 @@ function createExpandedStore() {
 
     // 全て展開
     expandAll: () => {
-      // ストア値から全ノードIDを展開
-      // 実際にはWBSツリーから全IDを取得する必要があるが、
-      // ここではフェーズIDのみを初期展開
-      set(new Set(phaseOrder.map((p) => `phase-${p}`)));
+      const currentTasks = get(tasks);
+      const milestoneKeys = new Set<string>();
+      currentTasks.forEach((t) => milestoneKeys.add(t.milestone?.trim() || 'default'));
+
+      const next = new Set<string>();
+      for (const m of milestoneKeys) {
+        const milestoneId = m === '' ? 'default' : m;
+        next.add(`milestone-${milestoneId}`);
+        for (const p of phaseOrder) {
+          next.add(`phase-${milestoneId}-${p}`);
+        }
+      }
+      set(next);
     },
 
     // 全て折りたたむ
@@ -91,7 +102,19 @@ function createExpandedStore() {
 
     // 初期状態にリセット（全フェーズを展開）
     reset: () => {
-      set(new Set(phaseOrder.map((p) => `phase-${p}`)));
+      const currentTasks = get(tasks);
+      const milestoneKeys = new Set<string>();
+      currentTasks.forEach((t) => milestoneKeys.add(t.milestone?.trim() || 'default'));
+
+      const next = new Set<string>();
+      for (const m of milestoneKeys) {
+        const milestoneId = m === '' ? 'default' : m;
+        next.add(`milestone-${milestoneId}`);
+        for (const p of phaseOrder) {
+          next.add(`phase-${milestoneId}-${p}`);
+        }
+      }
+      set(next);
     },
   };
 }
@@ -137,62 +160,87 @@ function calculateProgress(tasks: Task[]): {
 
 // WBS ツリー構造を生成
 export const wbsTree = derived(tasks, ($tasks): WBSNode[] => {
-  // フェーズ別にタスクをグループ化
-  const tasksByPhase = new Map<PhaseName, Task[]>();
+  // マイルストーン -> フェーズ -> タスク の三層で構築
+  const milestones = new Map<string, Map<PhaseName, Task[]>>();
 
-  // 初期化（空の配列を設定）
-  for (const phase of phaseOrder) {
-    tasksByPhase.set(phase, []);
-  }
-
-  // タスクを振り分け
   for (const task of $tasks) {
+    const milestoneKey = task.milestone?.trim() || '';
     const phase = (task.phaseName || '') as PhaseName;
     const phaseKey = phaseOrder.includes(phase) ? phase : '';
-    tasksByPhase.get(phaseKey)!.push(task);
+
+    if (!milestones.has(milestoneKey)) {
+      const phaseMap = new Map<PhaseName, Task[]>();
+      for (const p of phaseOrder) {
+        phaseMap.set(p, []);
+      }
+      milestones.set(milestoneKey, phaseMap);
+    }
+
+    const phaseMap = milestones.get(milestoneKey)!;
+    phaseMap.get(phaseKey)!.push(task);
   }
 
   // ツリー構造を生成
   const tree: WBSNode[] = [];
 
-  for (const phase of phaseOrder) {
-    const phaseTasks = tasksByPhase.get(phase) || [];
+  for (const [milestoneKey, phaseMap] of milestones) {
+    // ミドル層（フェーズ）ノードを構築
+    const phaseNodes: WBSNode[] = [];
+    let milestoneTasks: Task[] = [];
 
-    // タスクがないフェーズはスキップ（'その他' 以外）
-    if (phaseTasks.length === 0 && phase !== '') {
-      continue;
-    }
+    const milestoneId = milestoneKey !== '' ? milestoneKey : 'default';
 
-    // タスクがない場合（'その他' 含む）もスキップ
-    if (phaseTasks.length === 0) {
-      continue;
-    }
+    for (const phase of phaseOrder) {
+      const phaseTasks = phaseMap.get(phase) || [];
+      if (phaseTasks.length === 0) {
+        continue;
+      }
 
-    const phaseProgress = calculateProgress(phaseTasks);
+      milestoneTasks = milestoneTasks.concat(phaseTasks);
 
-    const phaseNode: WBSNode = {
-      id: `phase-${phase}`,
-      type: 'phase',
-      label: phaseLabels[phase],
-      phaseName: phase,
-      children: phaseTasks.map((task) => ({
-        id: task.id,
-        type: 'task' as const,
-        label: task.title,
-        task,
-        children: [],
+      const phaseProgress = calculateProgress(phaseTasks);
+      phaseNodes.push({
+        id: `phase-${milestoneId}-${phase}`,
+        type: 'phase',
+        label: phaseLabels[phase],
+        phaseName: phase,
+        milestone: milestoneKey,
+        children: phaseTasks.map((task) => ({
+          id: task.id,
+          type: 'task' as const,
+          label: task.title,
+          task,
+          children: [],
+          level: 2,
+          progress: {
+            completed: isTaskCompleted(task.status) ? 1 : 0,
+            total: 1,
+            percentage: isTaskCompleted(task.status) ? 100 : 0,
+          },
+        })),
         level: 1,
-        progress: {
-          completed: isTaskCompleted(task.status) ? 1 : 0,
-          total: 1,
-          percentage: isTaskCompleted(task.status) ? 100 : 0,
-        },
-      })),
-      level: 0,
-      progress: phaseProgress,
-    };
+        progress: phaseProgress,
+      });
+    }
 
-    tree.push(phaseNode);
+    // タスクが無いマイルストーンはスキップ
+    if (phaseNodes.length === 0) {
+      continue;
+    }
+
+    const milestoneProgress = calculateProgress(milestoneTasks);
+    const milestoneLabel = milestoneKey !== '' ? milestoneKey : defaultMilestoneLabel;
+
+    tree.push({
+      id: `milestone-${milestoneId}`,
+      type: 'milestone',
+      label: milestoneLabel,
+      milestone: milestoneKey,
+      phaseName: '',
+      children: phaseNodes,
+      level: 0,
+      progress: milestoneProgress,
+    });
   }
 
   return tree;

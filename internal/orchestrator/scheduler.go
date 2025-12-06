@@ -15,15 +15,17 @@ type Scheduler struct {
 	GraphManager *TaskGraphManager
 	Queue        *ipc.FilesystemQueue
 	logger       *slog.Logger
+	events       EventEmitter
 }
 
 // NewScheduler creates a new Scheduler.
-func NewScheduler(ts *TaskStore, q *ipc.FilesystemQueue) *Scheduler {
+func NewScheduler(ts *TaskStore, q *ipc.FilesystemQueue, events EventEmitter) *Scheduler {
 	return &Scheduler{
 		TaskStore:    ts,
 		GraphManager: NewTaskGraphManager(ts),
 		Queue:        q,
 		logger:       logging.WithComponent(slog.Default(), "scheduler"),
+		events:       events,
 	}
 }
 
@@ -43,10 +45,12 @@ func (s *Scheduler) ScheduleTask(taskID string) error {
 	if !s.allDependenciesSatisfied(task) {
 		// 依存が満たされていない場合は BLOCKED 状態に設定
 		if task.Status != TaskStatusBlocked {
+			oldStatus := task.Status
 			task.Status = TaskStatusBlocked
 			if err := s.TaskStore.SaveTask(task); err != nil {
 				return fmt.Errorf("failed to update task status to BLOCKED: %w", err)
 			}
+			s.emitStateChange(task.ID, oldStatus, TaskStatusBlocked)
 			s.logger.Info("task blocked due to unsatisfied dependencies",
 				slog.String("task_id", task.ID),
 				slog.Any("dependencies", task.Dependencies),
@@ -56,10 +60,13 @@ func (s *Scheduler) ScheduleTask(taskID string) error {
 	}
 
 	// Update task status to READY
+	// Update task status to READY
+	oldStatus := task.Status
 	task.Status = TaskStatusReady
 	if err := s.TaskStore.SaveTask(task); err != nil {
 		return fmt.Errorf("failed to update task status: %w", err)
 	}
+	s.emitStateChange(task.ID, oldStatus, TaskStatusReady)
 
 	// Create a job for the queue
 	job := &ipc.Job{
@@ -152,6 +159,7 @@ func (s *Scheduler) UpdateBlockedTasks() ([]string, error) {
 	for i := range blockedTasks {
 		task := &blockedTasks[i]
 		if s.allDependenciesSatisfied(task) {
+			oldStatus := task.Status
 			task.Status = TaskStatusPending
 			if err := s.TaskStore.SaveTask(task); err != nil {
 				s.logger.Warn("failed to unblock task",
@@ -160,6 +168,7 @@ func (s *Scheduler) UpdateBlockedTasks() ([]string, error) {
 				)
 				continue
 			}
+			s.emitStateChange(task.ID, oldStatus, TaskStatusPending)
 			unblocked = append(unblocked, task.ID)
 			s.logger.Info("task unblocked",
 				slog.String("task_id", task.ID),
@@ -181,6 +190,7 @@ func (s *Scheduler) SetBlockedStatusForPendingWithUnsatisfiedDeps() ([]string, e
 	for i := range pendingTasks {
 		task := &pendingTasks[i]
 		if len(task.Dependencies) > 0 && !s.allDependenciesSatisfied(task) {
+			oldStatus := task.Status
 			task.Status = TaskStatusBlocked
 			if err := s.TaskStore.SaveTask(task); err != nil {
 				s.logger.Warn("failed to set task to blocked",
@@ -189,6 +199,7 @@ func (s *Scheduler) SetBlockedStatusForPendingWithUnsatisfiedDeps() ([]string, e
 				)
 				continue
 			}
+			s.emitStateChange(task.ID, oldStatus, TaskStatusBlocked)
 			blocked = append(blocked, task.ID)
 			s.logger.Info("task set to blocked",
 				slog.String("task_id", task.ID),
@@ -215,6 +226,7 @@ func (s *Scheduler) ResetRetryTasks() ([]string, error) {
 		task := &tasks[i]
 		if task.NextRetryAt != nil && !now.Before(*task.NextRetryAt) {
 			// Time to retry
+			oldStatus := task.Status
 			task.Status = TaskStatusPending
 			task.NextRetryAt = nil // Clear retry time
 			if err := s.TaskStore.SaveTask(task); err != nil {
@@ -224,6 +236,7 @@ func (s *Scheduler) ResetRetryTasks() ([]string, error) {
 				)
 				continue
 			}
+			s.emitStateChange(task.ID, oldStatus, TaskStatusPending)
 			reset = append(reset, task.ID)
 			s.logger.Info("task reset for retry (wait time elapsed)",
 				slog.String("task_id", task.ID),
@@ -232,4 +245,16 @@ func (s *Scheduler) ResetRetryTasks() ([]string, error) {
 	}
 
 	return reset, nil
+}
+
+// emitStateChange emits a task state change event
+func (s *Scheduler) emitStateChange(taskID string, oldStatus, newStatus TaskStatus) {
+	if s.events != nil {
+		s.events.Emit(EventTaskStateChange, TaskStateChangeEvent{
+			TaskID:    taskID,
+			OldStatus: oldStatus,
+			NewStatus: newStatus,
+			Timestamp: time.Now(),
+		})
+	}
 }

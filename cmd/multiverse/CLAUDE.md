@@ -1,4 +1,4 @@
-# multiverse-ide - Wails デスクトップアプリケーション
+# multiverse - Wails デスクトップアプリケーション
 
 このディレクトリは multiverse IDE の Wails デスクトップアプリケーションを提供します。
 
@@ -114,7 +114,7 @@ func (a *App) RunTask(taskID string) error
 
 ```go
 wails.Run(&options.App{
-    Title:  "multiverse-ide",
+    Title:  "multiverse",
     Width:  1024,
     Height: 768,
     AssetServer: &assetserver.Options{

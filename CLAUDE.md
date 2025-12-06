@@ -31,7 +31,7 @@ multiverse/
 ├── cmd/
 │   ├── agent-runner/              # 既存 Core CLI エントリポイント
 │   │   └── main.go
-│   ├── multiverse-ide/            # Wails デスクトップアプリ
+│   ├── multiverse/            # Wails デスクトップアプリ
 │   │   ├── main.go                # Wails 初期化・Asset 埋め込み
 │   │   └── app.go                 # IDE バックエンドロジック
 │   └── multiverse-orchestrator/   # Orchestrator CLI（実装予定）
@@ -113,7 +113,7 @@ multiverse/
 | ディレクトリ | 役割 | 詳細 |
 |------------|------|------|
 | `cmd/agent-runner/` | Core CLI エントリポイント | [CLAUDE.md](cmd/agent-runner/CLAUDE.md) |
-| `cmd/multiverse-ide/` | Wails デスクトップアプリ | [CLAUDE.md](cmd/multiverse-ide/CLAUDE.md) |
+| `cmd/multiverse/` | Wails デスクトップアプリ | [CLAUDE.md](cmd/multiverse/CLAUDE.md) |
 | `cmd/multiverse-orchestrator/` | Orchestrator CLI | [CLAUDE.md](cmd/multiverse-orchestrator/CLAUDE.md) |
 | `internal/core/` | タスク FSM とオーケストレーション | [CLAUDE.md](internal/core/CLAUDE.md) |
 | `internal/meta/` | Meta-agent（LLM）との通信層 | [CLAUDE.md](internal/meta/CLAUDE.md) |
@@ -202,7 +202,7 @@ docker build -t agent-runner-codex:latest sandbox/
 
 ```
 ┌─────────────────────────────────────────────────────┐
-│  multiverse-ide (Desktop UI)                        │
+│  multiverse (Desktop UI)                        │
 │  - ChatWindow → タスク生成（チャット駆動）            │
 │  - GridCanvas → 依存グラフ表示（有向グラフ）          │
 │  - WBSView → マイルストーン表示                      │
@@ -561,7 +561,7 @@ export CODEX_API_KEY="..."
 | パッケージ | 責務 | 詳細 |
 |-----------|------|------|
 | cmd/agent-runner | AgentRunner Core CLI | [CLAUDE.md](cmd/agent-runner/CLAUDE.md) |
-| cmd/multiverse-ide | Wails デスクトップアプリ | [CLAUDE.md](cmd/multiverse-ide/CLAUDE.md) |
+| cmd/multiverse | Wails デスクトップアプリ | [CLAUDE.md](cmd/multiverse/CLAUDE.md) |
 | cmd/multiverse-orchestrator | Orchestrator CLI | [CLAUDE.md](cmd/multiverse-orchestrator/CLAUDE.md) |
 
 ### フロントエンド

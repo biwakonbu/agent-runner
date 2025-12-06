@@ -63,6 +63,7 @@ export const TaskSchema = z.object({
   parentId: z.string().optional().nullable(),
   wbsLevel: z.number().int().nonnegative().optional(),
   phaseName: PhaseNameSchema.optional(),
+  milestone: z.string().optional(),
   sourceChatId: z.string().optional().nullable(),
   acceptanceCriteria: z.array(z.string()).optional(),
 

@@ -179,17 +179,17 @@ cd frontend/ide && pnpm install && cd ../..
 wails build
 
 # 生成されたアプリ
-# macOS: build/bin/multiverse-ide.app
+# macOS: build/bin/multiverse.app
 ```
 
 ### 起動方法
 
 ```bash
 # macOS
-open build/bin/multiverse-ide.app
+open build/bin/multiverse.app
 
 # または直接実行
-./build/bin/multiverse-ide.app/Contents/MacOS/multiverse-ide
+./build/bin/multiverse.app/Contents/MacOS/multiverse
 ```
 
 ### 使い方
@@ -214,7 +214,7 @@ open build/bin/multiverse-ide.app
 
    ```bash
    # 対策: agent-runner を先にビルドしてコピー
-   go build -o build/bin/multiverse-ide.app/Contents/MacOS/agent-runner ./cmd/agent-runner
+   go build -o build/bin/multiverse.app/Contents/MacOS/agent-runner ./cmd/agent-runner
    ```
 
 2. **Worker CLI の設定**: 現在は `codex` CLI をハードコードしています（将来的に設定可能にする予定）
@@ -248,7 +248,7 @@ wails build
 
 ```
 cmd/
-├── multiverse-ide/        # IDE バックエンド（Wails バインディング）
+├── multiverse/        # IDE バックエンド（Wails バインディング）
 └── multiverse-orchestrator/  # Orchestrator CLI（将来用）
 
 internal/

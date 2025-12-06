@@ -21,10 +21,10 @@ func TestRetryPersistence_Integration(t *testing.T) {
 	taskStore := NewTaskStore(tmpDir)
 	backlogStore := NewBacklogStore(tmpDir)
 	queue := ipc.NewFilesystemQueue(tmpDir)
-	scheduler := NewScheduler(taskStore, queue)
+	scheduler := NewScheduler(taskStore, queue, nil)
 
 	// Create Orchestrator with nil Executor/EventEmitter (not needed for this test)
-	orch := NewExecutionOrchestrator(scheduler, nil, taskStore, queue, nil, backlogStore)
+	orch := NewExecutionOrchestrator(scheduler, nil, taskStore, queue, nil, backlogStore, "default")
 
 	t.Run("HandleFailure persists retry state", func(t *testing.T) {
 		// Create a task

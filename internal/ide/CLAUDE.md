@@ -138,5 +138,5 @@ func TestWorkspaceStore(t *testing.T) {
 ## 関連ドキュメント
 
 - [../orchestrator/CLAUDE.md](../orchestrator/CLAUDE.md): Task/Attempt 永続化
-- [../../cmd/multiverse-ide/CLAUDE.md](../../cmd/multiverse-ide/CLAUDE.md): IDE バックエンド
+- [../../cmd/multiverse/CLAUDE.md](../../cmd/multiverse/CLAUDE.md): IDE バックエンド
 - [../../frontend/ide/CLAUDE.md](../../frontend/ide/CLAUDE.md): フロントエンド

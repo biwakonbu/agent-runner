@@ -28,8 +28,13 @@ function createTasksStore() {
 
     // タスクを追加
     addTask: (task: Task) => {
-      log.info('task added', { taskId: task.id, title: task.title });
-      update((tasks) => [...tasks, task]);
+      update((tasks) => {
+        if (tasks.some(t => t.id === task.id)) {
+            return tasks;
+        }
+        log.info('task added', { taskId: task.id, title: task.title });
+        return [...tasks, task];
+      });
     },
 
     // タスクを更新
@@ -140,6 +145,7 @@ export const taskEdges = derived(tasks, ($tasks): TaskEdge[] => {
   const edges: TaskEdge[] = [];
   const taskMap = new Map($tasks.map((t) => [t.id, t]));
   const completedStatuses = new Set(['SUCCEEDED', 'COMPLETED', 'CANCELED']);
+  const missingDeps: string[] = [];
 
   for (const task of $tasks) {
     if (!task.dependencies || task.dependencies.length === 0) continue;
@@ -149,6 +155,9 @@ export const taskEdges = derived(tasks, ($tasks): TaskEdge[] => {
       const satisfied = depTask
         ? completedStatuses.has(depTask.status)
         : false;
+      if (!depTask) {
+        missingDeps.push(depId);
+      }
 
       edges.push({
         from: depId,
@@ -157,6 +166,29 @@ export const taskEdges = derived(tasks, ($tasks): TaskEdge[] => {
       });
     }
   }
+
+  const unsatisfiedCount = edges.filter((e) => !e.satisfied).length;
+
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/e0c5926c-4256-4f95-83f1-ee92ab435f0c', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      sessionId: 'debug-session',
+      runId: 'pre-fix',
+      hypothesisId: 'A',
+      location: 'taskStore.ts:139',
+      message: 'task edges recomputed',
+      data: {
+        taskCount: $tasks.length,
+        edgeCount: edges.length,
+        unsatisfiedCount,
+        missingDeps: missingDeps.slice(0, 5),
+      },
+      timestamp: Date.now(),
+    }),
+  }).catch(() => {});
+  // #endregion agent log
 
   return edges;
 });
@@ -208,6 +240,11 @@ interface TaskStateChangeEvent {
   timestamp: string;
 }
 
+// タスク作成イベントの型
+interface TaskCreatedEvent {
+  task: Task;
+}
+
 // Wails イベントリスナー初期化
 export function initTaskEvents(): void {
   // task:stateChange イベントをリッスン
@@ -218,6 +255,15 @@ export function initTaskEvents(): void {
       newStatus: event.newStatus,
     });
     tasks.updateTask(event.taskId, { status: event.newStatus });
+  });
+
+  // task:created イベントをリッスン
+  EventsOn('task:created', (event: TaskCreatedEvent) => {
+    log.info('task created via event', {
+      taskId: event.task.id,
+      title: event.task.title,
+    });
+    tasks.addTask(event.task);
   });
 
   log.info('task events initialized');

@@ -29,6 +29,7 @@ type ExecutionOrchestrator struct {
 	EventEmitter EventEmitter
 	BacklogStore *BacklogStore
 	RetryPolicy  *RetryPolicy
+	PoolID       string
 
 	state   ExecutionState
 	stateMu sync.RWMutex
@@ -47,7 +48,11 @@ func NewExecutionOrchestrator(
 	queue *ipc.FilesystemQueue,
 	eventEmitter EventEmitter,
 	backlogStore *BacklogStore,
+	poolID string,
 ) *ExecutionOrchestrator {
+	if poolID == "" {
+		poolID = "default"
+	}
 	return &ExecutionOrchestrator{
 		Scheduler:    scheduler,
 		Executor:     executor,
@@ -56,6 +61,7 @@ func NewExecutionOrchestrator(
 		EventEmitter: eventEmitter,
 		BacklogStore: backlogStore,
 		RetryPolicy:  DefaultRetryPolicy(),
+		PoolID:       poolID,
 		state:        ExecutionStateIdle,
 		stopCh:       nil,
 		resumeCh:     make(chan struct{}),
@@ -202,6 +208,17 @@ func (e *ExecutionOrchestrator) runLoop(ctx context.Context, stopCh <-chan struc
 				}
 			}
 
+			// 0-c. Set BLOCKED status for pending tasks with unsatisfied dependencies
+			if e.Scheduler != nil {
+				if newlyBlocked, err := e.Scheduler.SetBlockedStatusForPendingWithUnsatisfiedDeps(); err != nil {
+					e.logger.Error("failed to set blocked status for pending tasks", slog.Any("error", err))
+				} else {
+					for _, id := range newlyBlocked {
+						e.emitTaskStateChange(id, TaskStatusPending, TaskStatusBlocked)
+					}
+				}
+			}
+
 			// 1. Schedule Ready Tasks
 			// This moves tasks from PENDING/BLOCKED -> READY -> QUEUE
 			if _, err := e.Scheduler.ScheduleReadyTasks(); err != nil {
@@ -209,9 +226,8 @@ func (e *ExecutionOrchestrator) runLoop(ctx context.Context, stopCh <-chan struc
 			}
 
 			// 2. Consume from Queue (Simulating Worker Pool resource availability)
-			// For MVP we process one at a time per pool or just default pool
-			// Check default pool
-			job, err := e.Queue.Dequeue("default") // Assuming "default" pool for now
+			// Process job for the configured pool
+			job, err := e.Queue.Dequeue(e.PoolID)
 			if err != nil {
 				e.logger.Error("failed to dequeue job", slog.Any("error", err))
 				continue

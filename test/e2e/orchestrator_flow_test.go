@@ -55,7 +55,7 @@ func TestOrchestratorFlow(t *testing.T) {
 	wsDir := wsStore.GetWorkspaceDir(wsID)
 	taskStore := orchestrator.NewTaskStore(wsDir)
 	queue := ipc.NewFilesystemQueue(wsDir)
-	scheduler := orchestrator.NewScheduler(taskStore, queue)
+	scheduler := orchestrator.NewScheduler(taskStore, queue, nil)
 
 	// 4. Create Task (Simulating IDE creates task)
 	task := &orchestrator.Task{

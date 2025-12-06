@@ -13,6 +13,7 @@
   export let expanded: boolean = true;
   export let index: number = 0;
 
+  $: isMilestone = node.type === "milestone";
   $: isPhase = node.type === "phase";
   $: isTask = node.type === "task";
   $: hasChildren = node.children.length > 0;
@@ -103,6 +104,7 @@
 <div
   class="wbs-node"
   class:is-phase={isPhase}
+  class:is-milestone={isMilestone}
   class:is-task={isTask}
   class:selected={isSelected}
   class:phase-concept={phaseClass === "phase-concept"}
@@ -111,9 +113,9 @@
   class:phase-verify={phaseClass === "phase-verify"}
   class:is-odd={isOdd}
   style={indentStyle}
-  role={isPhase ? "treeitem" : "button"}
+  role={isPhase || isMilestone ? "treeitem" : "button"}
   tabindex="0"
-  aria-expanded={isPhase && hasChildren ? expanded : undefined}
+  aria-expanded={(isPhase || isMilestone) && hasChildren ? expanded : undefined}
   aria-label={node.label}
   on:click={handleClick}
   on:keydown={handleKeydown}
@@ -128,7 +130,7 @@
   {/each}
 
   <!-- 展開/折りたたみトグル -->
-  {#if isPhase && hasChildren}
+  {#if (isPhase || isMilestone) && hasChildren}
     <button
       class="toggle-btn"
       on:click={handleToggle}
@@ -172,7 +174,7 @@
   {/if}
 
   <!-- 進捗バー -->
-  {#if isPhase}
+  {#if isPhase || isMilestone}
     <div class="progress-container">
       <ProgressBar percentage={progressPercent} size="sm" />
       <span
@@ -248,15 +250,26 @@
     box-shadow: var(--mv-shadow-wbs-node-selected);
   }
 
-  /* Phase Node Styling */
+  /* Phase / Milestone Styling */
   .wbs-node.is-phase {
     font-weight: var(--mv-font-weight-semibold);
     color: var(--mv-color-text-primary);
     border-bottom: var(--mv-border-width-thin) solid var(--mv-glass-border-subtle);
   }
 
+  .wbs-node.is-milestone {
+    font-weight: var(--mv-font-weight-bold);
+    color: var(--mv-color-text-primary);
+    border-bottom: var(--mv-border-width-thin) solid var(--mv-glass-border-strong);
+    background: var(--mv-glass-bg-dark);
+  }
+
   .wbs-node.is-phase:hover {
     background: var(--mv-glass-hover);
+  }
+
+  .wbs-node.is-milestone:hover {
+    background: var(--mv-glass-hover-strong);
   }
 
   .wbs-node.is-phase .node-label {
@@ -264,6 +277,12 @@
     font-size: var(--mv-font-size-md);
     letter-spacing: var(--mv-letter-spacing-wide);
     text-shadow: var(--mv-text-shadow-subtle);
+  }
+
+  .wbs-node.is-milestone .node-label {
+    font-family: var(--mv-font-display);
+    font-size: var(--mv-font-size-lg);
+    letter-spacing: var(--mv-letter-spacing-wide);
   }
 
   /* Task Node Styling */

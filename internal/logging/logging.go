@@ -197,7 +197,7 @@ type FileLoggerConfig struct {
 	// LogDir is the directory where log files are stored.
 	LogDir string
 
-	// FilePrefix is the prefix for log file names (e.g., "multiverse-ide").
+	// FilePrefix is the prefix for log file names (e.g., "multiverse").
 	FilePrefix string
 
 	// Config is the base logger configuration.

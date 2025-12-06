@@ -62,7 +62,7 @@ pnpm storybook    # Storybook 起動
 
 ## ディレクトリ構成
 
-- `cmd/`: 各コンポーネントのエントリポイント (`agent-runner`, `multiverse-ide`, `multiverse-orchestrator`)
+- `cmd/`: 各コンポーネントのエントリポイント (`agent-runner`, `multiverse`, `multiverse-orchestrator`)
 - `internal/`: 内部ロジック (`core`, `meta`, `worker`, `orchestrator`, `ide`)
 - `frontend/`: IDE のフロントエンドコード (Svelte)
 - `docs/`: プロジェクト全体のドキュメント

@@ -1,5 +1,7 @@
 <script lang="ts">
   import { formatLocalTime } from "../../utils/time";
+  import { marked } from "marked";
+  import DOMPurify from "dompurify";
 
   export let role: "user" | "assistant" | "system" = "user";
   export let content: string;
@@ -9,6 +11,17 @@
   const isSystem = role === "system";
 
   $: displayTime = formatLocalTime(timestamp);
+
+  let htmlContent = "";
+
+  $: {
+    // marked.parse returns string | Promise<string>.
+    // Without async extensions, it is synchronous.
+    // We cast to string to satisfy TS if we are sure we aren't using async features.
+    // Or we handle the promise if needed. For now assuming sync.
+    const raw = marked.parse(content, { async: false }) as string;
+    htmlContent = DOMPurify.sanitize(raw);
+  }
 </script>
 
 <div class="message-container {role}">
@@ -18,9 +31,8 @@
     >
     <span class="timestamp">{displayTime}</span>
   </div>
-  <div class="content">
-    {@html content}
-    <!-- Allow basic HTML formatting if safe, or just text -->
+  <div class="content markdown-body">
+    {@html htmlContent}
   </div>
 </div>
 
@@ -69,10 +81,72 @@
     color: var(--mv-color-text-primary);
     font-weight: var(--mv-font-weight-semibold);
     padding-left: var(--mv-spacing-xs);
-    white-space: pre-wrap;
+    /* Removed white-space: pre-wrap because marked handles formatting */
 
     /* Base glow for readability */
     text-shadow: var(--mv-text-shadow-base);
+  }
+
+  /* Markdown Styles Scope */
+  .content :global(p) {
+    margin: 0.5em 0;
+  }
+  .content :global(p:first-child) {
+    margin-top: 0;
+  }
+  .content :global(p:last-child) {
+    margin-bottom: 0;
+  }
+
+  .content :global(pre) {
+    background: var(--mv-glass-bg-base);
+    padding: var(--mv-spacing-sm);
+    border-radius: var(--mv-radius-md);
+    overflow-x: auto;
+    border: var(--mv-border-width-thin) solid var(--mv-glass-border-subtle);
+    margin: 0.5em 0;
+  }
+
+  .content :global(code) {
+    font-family: var(--mv-font-mono);
+    font-size: 0.9em;
+    background: rgba(255, 255, 255, 0.1);
+    padding: 0.2em 0.4em;
+    border-radius: var(--mv-radius-sm);
+  }
+
+  .content :global(pre code) {
+    background: none;
+    padding: 0;
+    color: var(--mv-color-text-primary);
+  }
+
+  .content :global(ul),
+  .content :global(ol) {
+    margin: 0.5em 0;
+    padding-left: 1.5em;
+  }
+
+  .content :global(li) {
+    margin: 0.25em 0;
+  }
+
+  .content :global(a) {
+    color: var(--mv-primitive-frost-2);
+    text-decoration: none;
+    border-bottom: 1px dashed var(--mv-primitive-frost-2);
+  }
+
+  .content :global(a:hover) {
+    color: var(--mv-primitive-frost-1);
+    border-bottom-style: solid;
+  }
+
+  .content :global(blockquote) {
+    border-left: 3px solid var(--mv-primitive-frost-3);
+    margin: 0.5em 0;
+    padding-left: var(--mv-spacing-sm);
+    color: var(--mv-color-text-secondary);
   }
 
   /* Role Specific Styles */

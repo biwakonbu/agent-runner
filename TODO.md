@@ -55,7 +55,7 @@ Based on PRD v2.0
 
 #### 1.4 IDE バックエンド API
 
-- [x] `cmd/multiverse-ide/app.go`
+- [x] `cmd/multiverse/app.go`
   - [x] `SendChatMessage(sessionID, message string) (*ChatResponse, error)`
   - [x] `GetChatHistory(sessionID string) ([]ChatMessage, error)`
   - [x] `CreateChatSession() (string, error)`
@@ -187,7 +187,7 @@ Based on PRD v2.0
 
 #### 5.3 IDE バックエンド API 拡張
 
-- [x] `cmd/multiverse-ide/app.go`
+- [x] `cmd/multiverse/app.go`
   - [x] `executionOrchestrator` フィールド追加
   - [x] `StartExecution()` API
   - [x] `PauseExecution()` API
@@ -272,7 +272,7 @@ Based on PRD v2.0
 
 #### 6.4 バックログ API
 
-- [x] `cmd/multiverse-ide/app.go`
+- [x] `cmd/multiverse/app.go`
   - [x] `backlogStore` フィールド追加
   - [x] `GetBacklogItems()` API
   - [x] `GetAllBacklogItems()` API
@@ -344,3 +344,10 @@ Based on PRD v2.0
 1. ~~**Phase 3 残作業**: ExecutionOrchestrator 失敗処理統合~~ ✅ 完了
 2. **Phase 1 E2E テスト**: チャット→タスク生成フローのテスト
 3. ~~**テスト拡充**: ExecutionOrchestrator の依存順実行・並行実行テスト~~ ✅ 完了
+4. **依存グラフ UI 統合**: Graphモードで GridCanvas + ConnectionLine を表示し AC-P2-01/02 を満たす
+5. **チャット生成タスクの即時反映**: ChatHandler でタスク生成イベントを発火し、フロントの taskStore へ即時反映
+6. **プール別実行対応**: ExecutionOrchestrator の Dequeue を PoolID ベースにして非 default プールも実行
+7. **READY/BLOCKED リアルタイム通知**: Scheduler 更新時に task:stateChange を発火し、ポーリング依存を削減
+8. **Graph表示の依存矢印対応**: Graphモードを`GridCanvas`/`ConnectionLine`で依存矢印表示に切替（WBSグラフのみになっている問題の解消）
+9. **go test ./... 失敗修正**: `frontend/ide/dist` 不足でルートテストが落ちるため、ビルド生成 or テスト対象除外の対応
+

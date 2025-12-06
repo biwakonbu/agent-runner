@@ -1,6 +1,8 @@
 {
+  "$schema": "https://wails.io/schemas/config.v2.json",
   "name": "Multiverse",
   "outputfilename": "Multiverse",
+  "main": "./cmd/multiverse",
   "frontend:install": "pnpm install",
   "frontend:build": "pnpm run build",
   "frontend:dev:watcher": "pnpm run dev",
@@ -8,8 +10,8 @@
   "frontend:dir": "frontend/ide",
   "assetdir": "frontend/ide/dist",
   "author": {
-    "name": "AgentRunner",
-    "email": "agent@example.com"
+    "name": "Ryo Higasigawa",
+    "email": "ryo.higasigawa@gmail.com"
   },
   "wailsjsdir": "./frontend/ide/wailsjs",
   "version": "2"

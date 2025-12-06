@@ -160,14 +160,13 @@
     </div>
   </div>
 </header>
-```
 
 <style>
   :global(:root) {
     --hud-font: "Rajdhani", sans-serif;
     --hud-glass-bg: var(--mv-glass-bg);
     --hud-glass-border: var(--mv-glass-border-strong);
-    --hud-glass-highlight: var(--mv-glass-active);
+    --hud-glass-highlight: var(--mv-glass-border);
     --hud-neon-blue: var(--mv-primitive-frost-1);
     --hud-neon-green: var(--mv-primitive-aurora-green);
     --hud-neon-red: var(--mv-primitive-aurora-red);
@@ -184,7 +183,7 @@
     background: var(--hud-glass-bg);
     backdrop-filter: blur(16px);
     border-bottom: var(--mv-border-width-thin) solid var(--hud-glass-border);
-    box-shadow: var(--mv-shadow-ambient-lg);
+    box-shadow: var(--mv-shadow-lg);
 
     font-family: var(--hud-font);
     z-index: 100;
@@ -213,47 +212,47 @@
     display: flex;
     align-items: center;
     gap: var(--mv-spacing-md);
-    padding: var(--mv-spacing-xxs) var(--mv-spacing-md);
-    border-radius: var(--mv-spacing-xl);
-    background: var(--mv-glass-bg-dark);
-    box-shadow: var(--mv-shadow-inset-darker);
+    padding: var(--mv-spacing-xxs) var(--mv-spacing-lg);
+    border-radius: var(--mv-radius-full);
+    background: var(--mv-glass-bg-strong);
+    box-shadow: var(--mv-shadow-inset-sm);
     border: var(--mv-border-width-thin) solid var(--mv-glass-border);
   }
 
   .holo-group {
     display: flex;
     align-items: baseline;
-    gap: var(--mv-status-dot-size);
+    gap: var(--mv-spacing-xs);
   }
 
   .holo-label {
-    font-size: var(--mv-font-size-sm);
+    font-size: var(--mv-font-size-xs);
     font-weight: var(--mv-font-weight-semibold);
     color: var(--mv-color-text-muted);
-    letter-spacing: var(--mv-letter-spacing-tab);
+    letter-spacing: var(--mv-letter-spacing-wide);
   }
 
   .holo-value {
-    font-size: var(--mv-font-size-lg);
+    font-size: var(--mv-font-size-base);
     font-weight: var(--mv-font-weight-bold);
     color: var(--mv-color-text-primary);
   }
 
   .pool-id {
     color: var(--hud-neon-blue);
-    text-shadow: var(--mv-text-shadow-cyan);
+    text-shadow: var(--mv-glow-blue);
   }
 
   .holo-divider {
     width: var(--mv-border-width-thin);
-    height: var(--mv-indicator-size-lg);
+    height: var(--mv-spacing-lg);
     background: var(--mv-color-border-subtle);
     opacity: 0.5;
   }
 
   .holo-divider-sm {
     width: var(--mv-border-width-thin);
-    height: var(--mv-indicator-size-md);
+    height: var(--mv-spacing-md);
     background: var(--mv-color-border-subtle);
     opacity: 0.3;
     margin: 0 var(--mv-spacing-xxs);
@@ -261,7 +260,7 @@
 
   .holo-stats {
     display: flex;
-    gap: var(--mv-spacing-md);
+    gap: var(--mv-spacing-lg);
   }
 
   .holo-stat {
@@ -272,28 +271,31 @@
   }
 
   .stat-value {
-    font-size: var(--mv-font-size-xl);
+    font-size: var(--mv-font-size-lg);
     font-weight: var(--mv-font-weight-bold);
   }
 
   .stat-label {
-    font-size: var(--mv-font-size-sm);
+    font-size: var(--mv-font-size-xxs);
     font-weight: var(--mv-font-weight-semibold);
     opacity: 0.8;
-    letter-spacing: var(--mv-letter-spacing-count);
+    letter-spacing: var(--mv-letter-spacing-normal);
   }
 
   .holo-stat.running {
     color: var(--hud-neon-green);
-    text-shadow: var(--mv-text-shadow-green);
+    text-shadow: var(--mv-glow-green);
   }
+
   .holo-stat.pending {
     color: var(--hud-neon-yellow);
   }
+
   .holo-stat.failed {
     color: var(--hud-neon-red);
-    text-shadow: var(--mv-text-shadow-purple);
+    text-shadow: var(--mv-glow-red);
   }
+
   .holo-stat.idle {
     color: var(--mv-color-text-muted);
   }
@@ -304,20 +306,21 @@
     align-items: center;
     padding: var(--mv-spacing-xxxs);
     background: var(--mv-glass-border);
-    border-radius: var(--mv-radius-lg);
-    border: var(--mv-border-width-thin) solid var(--mv-glass-active);
+    border-radius: var(--mv-radius-md);
+    border: var(--mv-border-width-thin) solid var(--mv-glass-border);
   }
 
   /* Progress Module */
   .progress-module {
     display: flex;
     align-items: center;
-    gap: var(--mv-spacing-xs);
+    gap: var(--mv-spacing-sm);
   }
+
   .progress-readout {
     font-family: var(--hud-font);
     font-weight: var(--mv-font-weight-semibold);
-    font-size: var(--mv-font-size-md);
+    font-size: var(--mv-font-size-sm);
     color: var(--mv-color-text-secondary);
     min-width: var(--mv-zoom-label-min-width);
     text-align: right;
@@ -328,34 +331,34 @@
     display: flex;
     padding: var(--mv-spacing-xxxs);
     gap: var(--mv-spacing-xxxs);
-    background: var(--mv-glass-bg-darker);
-    border-radius: var(--mv-spacing-xl);
-    border: var(--mv-border-width-thin) solid var(--mv-glass-active);
+    background: var(--mv-glass-bg-strong);
+    border-radius: var(--mv-radius-full);
+    border: var(--mv-border-width-thin) solid var(--mv-glass-border);
   }
 
   .switch-item {
     display: flex;
     align-items: center;
     justify-content: center;
-    width: var(--mv-size-action-btn);
-    height: var(--mv-size-action-btn);
+    width: var(--mv-size-icon-lg);
+    height: var(--mv-size-icon-lg);
     border: none;
     border-radius: var(--mv-radius-full);
     background: transparent;
     color: var(--mv-color-text-muted);
     cursor: pointer;
-    transition: all var(--mv-duration-normal) cubic-bezier(0.2, 0.8, 0.2, 1);
+    transition: all 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
   }
 
   .switch-item:hover {
     color: var(--mv-color-text-primary);
-    background: var(--mv-glass-active);
+    background: var(--mv-glass-border);
   }
 
   .switch-item.active {
     color: var(--mv-color-text-primary);
     background: var(--mv-glass-active);
-    box-shadow: var(--mv-shadow-badge);
-    border: var(--mv-border-width-thin) solid var(--mv-glass-hover);
+    box-shadow: var(--mv-shadow-sm);
+    border: var(--mv-border-width-thin) solid var(--mv-glass-border-strong);
   }
 </style>

@@ -270,6 +270,7 @@ func (h *Handler) persistTasks(ctx context.Context, sessionID string, resp *meta
 				Dependencies:       dependencies,
 				WBSLevel:           decomposedTask.WBSLevel,
 				PhaseName:          phase.Name,
+				Milestone:          phase.Milestone,
 				SourceChatID:       &sessionID,
 				AcceptanceCriteria: decomposedTask.AcceptanceCriteria,
 			}
@@ -306,6 +307,13 @@ func (h *Handler) persistTasks(ctx context.Context, sessionID string, resp *meta
 			slog.String("title", task.Title),
 			slog.String("phase", task.PhaseName),
 		)
+
+		// Emit real-time event
+		if h.events != nil {
+			h.events.Emit(orchestrator.EventTaskCreated, orchestrator.TaskCreatedEvent{
+				Task: task,
+			})
+		}
 	}
 
 	return allTasks, nil

@@ -43,6 +43,7 @@ type Task struct {
 	ParentID           *string  `json:"parentId,omitempty"`           // 親タスクID（WBS階層用）
 	WBSLevel           int      `json:"wbsLevel,omitempty"`           // WBS階層レベル（1=概念設計, 2=実装設計, 3=実装）
 	PhaseName          string   `json:"phaseName,omitempty"`          // フェーズ名
+	Milestone          string   `json:"milestone,omitempty"`          // マイルストーン名（Phase単位のまとまり）
 	SourceChatID       *string  `json:"sourceChatId,omitempty"`       // 生成元チャットセッションID
 	AcceptanceCriteria []string `json:"acceptanceCriteria,omitempty"` // 達成条件リスト
 

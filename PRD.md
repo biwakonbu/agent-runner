@@ -329,7 +329,7 @@ type ExecutionStateChangeEvent struct {
 **バックエンド API:**
 
 ```go
-// cmd/multiverse-ide/app.go に追加
+// cmd/multiverse/app.go に追加
 
 // StartExecution は自律実行を開始する
 func (a *App) StartExecution() error {
@@ -574,7 +574,7 @@ func (s *BacklogStore) Delete(id string) error
 **バックログ API:**
 
 ```go
-// cmd/multiverse-ide/app.go に追加
+// cmd/multiverse/app.go に追加
 
 func (a *App) GetBacklogItems() ([]BacklogItem, error)
 func (a *App) ResolveBacklogItem(id string, resolution string) error
@@ -701,7 +701,7 @@ export function initTaskEvents() {
 
 ```
 ┌─────────────────────────────────────────────────────┐
-│  multiverse-ide (Desktop UI)                        │
+│  multiverse (Desktop UI)                        │
 │  - ChatWindow → タスク生成                           │
 │  - GridCanvas → 依存グラフ表示                       │
 │  - WBSView → マイルストーン表示                      │

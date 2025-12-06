@@ -18,7 +18,7 @@ var assets embed.FS
 func main() {
 	// ファイルロガーを初期化（ターミナル + ファイル出力）
 	logResult, err := logging.NewFileLogger(logging.FileLoggerConfig{
-		FilePrefix: "multiverse-ide",
+		FilePrefix: "multiverse",
 		Config:     logging.DebugConfig(),
 	})
 	if err != nil {

@@ -9,7 +9,19 @@ const meta = {
     status: {
       control: { type: 'select' },
       options: ['pending', 'ready', 'running', 'succeeded', 'failed', 'canceled', 'blocked'],
-      description: 'タスクのステータス'
+      description: 'タスクのステータス (Optional: sets default color/label)'
+    },
+    variant: {
+      control: { type: 'select' },
+      options: ['default', 'outline', 'glass'],
+      description: 'バッジのスタイルバリアント',
+      defaultValue: 'default'
+    },
+    color: {
+      control: { type: 'select' },
+      options: ['primary', 'secondary', 'success', 'warning', 'danger', 'info', 'neutral'],
+      description: 'バッジのカラーテーマ',
+      defaultValue: 'neutral'
     },
     size: {
       control: { type: 'select' },
@@ -89,5 +101,15 @@ export const CustomLabel: Story = {
   args: {
     status: 'running',
     label: '処理中...'
+  }
+};
+
+// Glass Variant
+export const GlassVariant: Story = {
+  args: {
+    variant: 'glass',
+    color: 'success',
+    label: 'GLASS MODE',
+    status: 'running'
   }
 };

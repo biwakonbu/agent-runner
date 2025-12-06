@@ -36,7 +36,7 @@ func TestExecutionOrchestrator_StateTransitions(t *testing.T) {
 	// We mock Emit calls
 	emitter.On("Emit", mock.Anything, mock.Anything).Return()
 
-	orch := NewExecutionOrchestrator(nil, nil, nil, nil, emitter, nil)
+	orch := NewExecutionOrchestrator(nil, nil, nil, nil, emitter, nil, "default")
 	// Suppress logging in tests if needed via custom logger, but defaults to stdout is fine
 
 	ctx := context.Background()
@@ -158,7 +158,7 @@ func TestExecutionOrchestrator_EventEmission(t *testing.T) {
 		return ok && event.NewState == ExecutionStateIdle
 	})).Return().Once()
 
-	orch := NewExecutionOrchestrator(nil, nil, nil, nil, emitter, nil)
+	orch := NewExecutionOrchestrator(nil, nil, nil, nil, emitter, nil, "default")
 	ctx := context.Background()
 
 	// Start → Pause → Resume → Stop の遷移でイベント発行を確認
@@ -177,7 +177,7 @@ func TestExecutionOrchestrator_InvalidTransitions(t *testing.T) {
 	emitter := new(MockEventEmitter)
 	emitter.On("Emit", mock.Anything, mock.Anything).Return()
 
-	orch := NewExecutionOrchestrator(nil, nil, nil, nil, emitter, nil)
+	orch := NewExecutionOrchestrator(nil, nil, nil, nil, emitter, nil, "default")
 	ctx := context.Background()
 
 	// IDLE 状態での無効な遷移
@@ -232,7 +232,7 @@ func TestExecutionOrchestrator_ContextCancellation(t *testing.T) {
 	emitter := new(MockEventEmitter)
 	emitter.On("Emit", mock.Anything, mock.Anything).Return()
 
-	orch := NewExecutionOrchestrator(nil, nil, nil, nil, emitter, nil)
+	orch := NewExecutionOrchestrator(nil, nil, nil, nil, emitter, nil, "default")
 	ctx, cancel := context.WithCancel(context.Background())
 
 	err := orch.Start(ctx)
@@ -256,7 +256,7 @@ func TestExecutionOrchestrator_ContextCancellation(t *testing.T) {
 
 func TestExecutionOrchestrator_NilEventEmitter(t *testing.T) {
 	// EventEmitter が nil でもパニックしないことを確認
-	orch := NewExecutionOrchestrator(nil, nil, nil, nil, nil, nil)
+	orch := NewExecutionOrchestrator(nil, nil, nil, nil, nil, nil, "default")
 	ctx := context.Background()
 
 	// 各操作がパニックせずに実行できることを確認
@@ -281,7 +281,7 @@ func TestExecutionOrchestrator_StateMethod(t *testing.T) {
 	emitter := new(MockEventEmitter)
 	emitter.On("Emit", mock.Anything, mock.Anything).Return()
 
-	orch := NewExecutionOrchestrator(nil, nil, nil, nil, emitter, nil)
+	orch := NewExecutionOrchestrator(nil, nil, nil, nil, emitter, nil, "default")
 	ctx := context.Background()
 
 	// 初期状態

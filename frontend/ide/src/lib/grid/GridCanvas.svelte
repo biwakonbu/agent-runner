@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { get } from "svelte/store";
   import { onMount } from "svelte";
   import GridNode from "./GridNode.svelte";
   import ConnectionLine from "./ConnectionLine.svelte";
@@ -76,6 +77,30 @@
   }
 
   onMount(() => {
+    const snapshot = {
+      nodes: get(taskNodes).length,
+      edges: get(taskEdges).length,
+      panX: get(viewport).panX,
+      panY: get(viewport).panY,
+      zoom: get(viewport).zoom,
+    };
+
+    // #region agent log
+    fetch("http://127.0.0.1:7242/ingest/e0c5926c-4256-4f95-83f1-ee92ab435f0c", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        sessionId: "debug-session",
+        runId: "pre-fix",
+        hypothesisId: "C",
+        location: "GridCanvas.svelte:onMount",
+        message: "grid canvas mounted",
+        data: snapshot,
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {});
+    // #endregion agent log
+
     // グローバルキーボードイベント
     window.addEventListener("keydown", handleKeydown);
     return () => {
@@ -122,35 +147,60 @@
   <!-- 接続線レイヤー（ノードの下に表示） -->
   <svg class="connections-layer" style="transform: {$canvasTransform};">
     <defs>
-      <!-- クールな矢印マーカー（満たされた依存） -->
+      <!-- Technical Markers -->
+
+      <!-- Source Port (Hollow Circle) -->
       <marker
-        id="arrowhead-satisfied"
-        markerWidth="16"
-        markerHeight="12"
-        refX="14"
-        refY="6"
+        id="marker-source"
+        markerWidth="8"
+        markerHeight="8"
+        refX="4"
+        refY="4"
         orient="auto"
         markerUnits="userSpaceOnUse"
       >
-        <path
-          d="M0 0 L16 6 L0 12 L4 6 Z"
+        <circle
+          cx="4"
+          cy="4"
+          r="2.5"
+          fill="var(--mv-color-surface-app)"
+          stroke="var(--mv-color-text-muted)"
+          stroke-width="1"
+        />
+      </marker>
+
+      <!-- Terminal: Satisfied (Solid Square) -->
+      <marker
+        id="marker-terminal-satisfied"
+        markerWidth="10"
+        markerHeight="10"
+        refX="5"
+        refY="5"
+        orient="auto"
+        markerUnits="userSpaceOnUse"
+      >
+        <rect
+          x="2"
+          y="2"
+          width="6"
+          height="6"
           fill="var(--mv-color-status-succeeded-border)"
         />
       </marker>
-      <!-- クールな矢印マーカー（未満の依存） -->
+
+      <!-- Terminal: Unsatisfied (Solid Diamond) -->
       <marker
-        id="arrowhead-unsatisfied"
-        markerWidth="16"
+        id="marker-terminal-unsatisfied"
+        markerWidth="12"
         markerHeight="12"
-        refX="14"
+        refX="6"
         refY="6"
         orient="auto"
         markerUnits="userSpaceOnUse"
       >
         <path
-          d="M0 0 L16 6 L0 12 L4 6 Z"
+          d="M6 1 L11 6 L6 11 L1 6 Z"
           fill="var(--mv-color-status-blocked-border)"
-          fill-opacity="0.8"
         />
       </marker>
     </defs>
@@ -225,17 +275,36 @@
     padding: var(--mv-spacing-xl);
   }
 
+  /* ズームインジケーター - ガラスモーフィズムスタイル */
   .zoom-indicator {
     position: absolute;
     bottom: var(--mv-spacing-md);
     right: var(--mv-spacing-md);
-    background: var(--mv-color-surface-secondary);
-    color: var(--mv-color-text-secondary);
-    padding: var(--mv-spacing-xxs) var(--mv-spacing-xs);
-    border-radius: var(--mv-radius-sm);
+
+    /* Glass background */
+    background: var(--mv-glass-bg-chat);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+
+    /* Refined border */
+    border: var(--mv-border-width-thin) solid var(--mv-glass-border-strong);
+    border-radius: var(--mv-radius-md);
+
+    /* Styling */
+    color: var(--mv-primitive-frost-1);
+    padding: var(--mv-spacing-xs) var(--mv-spacing-sm);
     font-size: var(--mv-font-size-xs);
-    font-family: var(--mv-font-mono);
+    font-family: var(--mv-font-display);
+    font-weight: var(--mv-font-weight-semibold);
+    letter-spacing: var(--mv-letter-spacing-wide);
+
+    /* Shadow and glow */
+    box-shadow:
+      var(--mv-shadow-glass-panel),
+      0 0 8px rgba(136, 192, 208, 0.1);
+    text-shadow: 0 0 8px rgba(136, 192, 208, 0.4);
+
     pointer-events: none;
-    opacity: 0.8;
+    transition: all var(--mv-duration-fast);
   }
 </style>

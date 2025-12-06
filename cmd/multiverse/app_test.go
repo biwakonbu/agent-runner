@@ -432,3 +432,65 @@ func TestSendChatMessage(t *testing.T) {
 		t.Error("Expected understanding, got empty string")
 	}
 }
+
+func TestSendChatMessage_PersistsTasksAndDependencies(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	taskStore := orchestrator.NewTaskStore(tmpDir)
+	sessionStore := chat.NewChatSessionStore(tmpDir)
+	metaClient := meta.NewMockClient()
+
+	handler := chat.NewHandler(metaClient, taskStore, sessionStore, "ws-id", tmpDir, nil)
+
+	app := NewApp()
+	app.chatHandler = handler
+	app.taskStore = taskStore
+	app.ctx = context.Background()
+
+	session := app.CreateChatSession()
+	if session == nil {
+		t.Fatal("CreateChatSession returned nil")
+	}
+
+	resp := app.SendChatMessage(session.ID, "Implement a feature with dependencies")
+	if resp.Error != "" {
+		t.Fatalf("SendChatMessage returned error: %s", resp.Error)
+	}
+	if len(resp.GeneratedTasks) == 0 {
+		t.Fatalf("expected generated tasks, got %d", len(resp.GeneratedTasks))
+	}
+
+	// Verify tasks are persisted to disk
+	allTasks, err := taskStore.ListAllTasks()
+	if err != nil {
+		t.Fatalf("failed to list tasks: %v", err)
+	}
+	if len(allTasks) != len(resp.GeneratedTasks) {
+		t.Fatalf("expected %d tasks persisted, got %d", len(resp.GeneratedTasks), len(allTasks))
+	}
+
+	taskMap := make(map[string]orchestrator.Task)
+	for _, task := range allTasks {
+		taskMap[task.ID] = task
+		if task.SourceChatID == nil || *task.SourceChatID != session.ID {
+			t.Errorf("task %s missing source chat id", task.ID)
+		}
+		if task.Status != orchestrator.TaskStatusPending {
+			t.Errorf("task %s expected status PENDING, got %s", task.ID, task.Status)
+		}
+
+		taskFile := filepath.Join(taskStore.GetTaskDir(), task.ID+".jsonl")
+		if _, err := os.Stat(taskFile); err != nil {
+			t.Errorf("task file not found for %s: %v", task.ID, err)
+		}
+	}
+
+	// Ensure dependencies refer to existing tasks (no temp IDs remain)
+	for _, task := range allTasks {
+		for _, dep := range task.Dependencies {
+			if _, ok := taskMap[dep]; !ok {
+				t.Errorf("task %s has unresolved dependency %s", task.ID, dep)
+			}
+		}
+	}
+}

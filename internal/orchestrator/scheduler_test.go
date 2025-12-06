@@ -11,7 +11,7 @@ func TestScheduler_ScheduleTask_WithDependencies(t *testing.T) {
 	tmpDir := t.TempDir()
 	store := NewTaskStore(tmpDir)
 	queue := ipc.NewFilesystemQueue(tmpDir)
-	scheduler := NewScheduler(store, queue)
+	scheduler := NewScheduler(store, queue, nil)
 
 	now := time.Now()
 
@@ -61,7 +61,7 @@ func TestScheduler_ScheduleTask_SatisfiedDependencies(t *testing.T) {
 	tmpDir := t.TempDir()
 	store := NewTaskStore(tmpDir)
 	queue := ipc.NewFilesystemQueue(tmpDir)
-	scheduler := NewScheduler(store, queue)
+	scheduler := NewScheduler(store, queue, nil)
 
 	now := time.Now()
 
@@ -111,7 +111,7 @@ func TestScheduler_ScheduleTask_NoDependencies(t *testing.T) {
 	tmpDir := t.TempDir()
 	store := NewTaskStore(tmpDir)
 	queue := ipc.NewFilesystemQueue(tmpDir)
-	scheduler := NewScheduler(store, queue)
+	scheduler := NewScheduler(store, queue, nil)
 
 	now := time.Now()
 
@@ -147,7 +147,7 @@ func TestScheduler_ScheduleReadyTasks(t *testing.T) {
 	tmpDir := t.TempDir()
 	store := NewTaskStore(tmpDir)
 	queue := ipc.NewFilesystemQueue(tmpDir)
-	scheduler := NewScheduler(store, queue)
+	scheduler := NewScheduler(store, queue, nil)
 
 	now := time.Now()
 
@@ -192,7 +192,7 @@ func TestScheduler_UpdateBlockedTasks(t *testing.T) {
 	tmpDir := t.TempDir()
 	store := NewTaskStore(tmpDir)
 	queue := ipc.NewFilesystemQueue(tmpDir)
-	scheduler := NewScheduler(store, queue)
+	scheduler := NewScheduler(store, queue, nil)
 
 	now := time.Now()
 
@@ -257,7 +257,7 @@ func TestScheduler_SetBlockedStatusForPendingWithUnsatisfiedDeps(t *testing.T) {
 	tmpDir := t.TempDir()
 	store := NewTaskStore(tmpDir)
 	queue := ipc.NewFilesystemQueue(tmpDir)
-	scheduler := NewScheduler(store, queue)
+	scheduler := NewScheduler(store, queue, nil)
 
 	now := time.Now()
 
@@ -307,7 +307,7 @@ func TestScheduler_AllDependenciesSatisfied(t *testing.T) {
 	tmpDir := t.TempDir()
 	store := NewTaskStore(tmpDir)
 	queue := ipc.NewFilesystemQueue(tmpDir)
-	scheduler := NewScheduler(store, queue)
+	scheduler := NewScheduler(store, queue, nil)
 
 	now := time.Now()
 
@@ -398,7 +398,7 @@ func TestScheduler_ScheduleTask_NotSchedulable(t *testing.T) {
 	tmpDir := t.TempDir()
 	store := NewTaskStore(tmpDir)
 	queue := ipc.NewFilesystemQueue(tmpDir)
-	scheduler := NewScheduler(store, queue)
+	scheduler := NewScheduler(store, queue, nil)
 
 	now := time.Now()
 
@@ -424,7 +424,7 @@ func TestScheduler_ScheduleTask_NotFound(t *testing.T) {
 	tmpDir := t.TempDir()
 	store := NewTaskStore(tmpDir)
 	queue := ipc.NewFilesystemQueue(tmpDir)
-	scheduler := NewScheduler(store, queue)
+	scheduler := NewScheduler(store, queue, nil)
 
 	err := scheduler.ScheduleTask("non-existent-task")
 	if err == nil {
@@ -436,7 +436,7 @@ func TestScheduler_ScheduleTask_FromBlocked(t *testing.T) {
 	tmpDir := t.TempDir()
 	store := NewTaskStore(tmpDir)
 	queue := ipc.NewFilesystemQueue(tmpDir)
-	scheduler := NewScheduler(store, queue)
+	scheduler := NewScheduler(store, queue, nil)
 
 	now := time.Now()
 
@@ -482,7 +482,7 @@ func TestScheduler_ScheduleTask_AlreadyBlocked(t *testing.T) {
 	tmpDir := t.TempDir()
 	store := NewTaskStore(tmpDir)
 	queue := ipc.NewFilesystemQueue(tmpDir)
-	scheduler := NewScheduler(store, queue)
+	scheduler := NewScheduler(store, queue, nil)
 
 	now := time.Now()
 

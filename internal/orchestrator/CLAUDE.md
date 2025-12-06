@@ -339,5 +339,5 @@ type BacklogItem struct {
 
 - [../ide/CLAUDE.md](../ide/CLAUDE.md): Workspace 管理
 - [../core/CLAUDE.md](../core/CLAUDE.md): AgentRunner Core FSM
-- [../../cmd/multiverse-ide/CLAUDE.md](../../cmd/multiverse-ide/CLAUDE.md): IDE バックエンド
+- [../../cmd/multiverse/CLAUDE.md](../../cmd/multiverse/CLAUDE.md): IDE バックエンド
 - [../../PRD.md](../../PRD.md): Phase 3 詳細設計

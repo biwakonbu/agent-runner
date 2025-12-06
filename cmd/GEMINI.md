@@ -11,7 +11,7 @@
 - **役割**: 単一タスクの実行、Docker サンドボックス管理、Meta-agent との通信。
 - **使用方法**: `agent-runner < task.yaml`
 
-### 2. `multiverse-ide/`
+### 2. `multiverse/`
 
 - **概要**: デスクトップ IDE アプリケーション。
 - **技術**: Wails (Go) + Svelte (Frontend)。

@@ -1,5 +1,5 @@
 {
-  "name": "multiverse-ide-frontend",
+  "name": "multiverse-frontend",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -32,6 +32,8 @@
     "@storybook/svelte-vite": "^8.4.7",
     "@sveltejs/vite-plugin-svelte": "^3.0.2",
     "@tsconfig/svelte": "^5.0.2",
+    "@types/dompurify": "^3.2.0",
+    "@types/marked": "^6.0.0",
     "@types/node": "^24.10.1",
     "jsdom": "^27.2.0",
     "knip": "^5.71.0",
@@ -50,7 +52,9 @@
     "vitest": "^4.0.15"
   },
   "dependencies": {
+    "dompurify": "^3.3.0",
     "lucide-svelte": "^0.556.0",
+    "marked": "^17.0.1",
     "zod": "^4.1.13"
   }
 }
