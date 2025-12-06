@@ -37,7 +37,7 @@
 </script>
 
 <div
-  style="width: 500px; background: var(--mv-color-surface-app); padding: 20px;"
+  style="width: var(--mv-preview-header-width); background: var(--mv-color-surface-app); padding: var(--mv-preview-header-padding);"
 >
   <WBSHeader />
 </div>

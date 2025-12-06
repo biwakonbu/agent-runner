@@ -29,7 +29,7 @@
     <span
       class="progress-percentage"
       style:color={progressColor.fill}
-      style:text-shadow="0 0 8px {progressColor.glow}"
+      style:text-shadow={progressColor.textShadowMd}
     >
       <span class="progress-first-digit">{progressParts.first}</span>
       <span class="progress-rest-digits">{progressParts.rest}</span>
@@ -100,8 +100,7 @@
     justify-content: flex-end;
     text-shadow: var(--mv-text-shadow-glow);
     line-height: 1;
-    font-style: italic; /* Added italic */
-    /* Removed tight letter-spacing */
+    font-style: italic;
   }
 
   .progress-first-digit {
@@ -115,11 +114,11 @@
   }
 
   .progress-symbol {
-    font-size: var(--mv-font-size-xl); /* Smaller than digits */
+    font-size: var(--mv-font-size-xl);
     font-weight: var(--mv-font-weight-bold);
-    margin-left: 2px;
+    margin-left: var(--mv-spacing-xxxs);
     opacity: 0.8;
-    font-style: italic; /* Explicitly set italic */
+    font-style: italic;
   }
 
   .header-actions {

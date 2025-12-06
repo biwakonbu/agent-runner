@@ -141,12 +141,12 @@
   --mv-color-status-succeeded-text: var(--mv-primitive-frost-1); /* Matching bright text */
 
   /* ========================================
-     ステータスカラー: Completed（完了 - 承認済み）
+     ステータスカラー: Completed（完了 - 承認済み - Premium Gold）
      ======================================== */
-  --mv-color-status-completed-bg: #1f3328; /* Richer Dark Green */
-  --mv-color-status-completed-border: var(--mv-primitive-aurora-green); /* Bright Green */
-  --mv-color-status-completed-text: var(--mv-primitive-aurora-green); /* Bright Green Text */
-  --mv-color-status-completed-glow: rgba(163, 190, 140, 0.6); /* Stronger opacity */
+  --mv-color-status-completed-bg: #2d261a; /* Dark Gold/Brown */
+  --mv-color-status-completed-border: var(--mv-primitive-aurora-yellow); /* Gold */
+  --mv-color-status-completed-text: var(--mv-primitive-aurora-yellow);
+  --mv-color-status-completed-glow: rgba(235, 203, 139, 0.6); /* Gold Glow */
 
   /* ========================================
      ステータスカラー: Failed（失敗）
@@ -163,11 +163,11 @@
   --mv-color-status-canceled-text: var(--mv-primitive-neutral-400);
 
   /* ========================================
-     ステータスカラー: Blocked（ブロック）
+     ステータスカラー: Blocked（ブロック - Purple）
      ======================================== */
-  --mv-color-status-blocked-bg: #2d2a1e;
-  --mv-color-status-blocked-border: var(--mv-primitive-pastel-yellow);
-  --mv-color-status-blocked-text: var(--mv-primitive-aurora-yellow);
+  --mv-color-status-blocked-bg: #2b202a; /* Dark Purple */
+  --mv-color-status-blocked-border: var(--mv-primitive-aurora-purple); /* Purple */
+  --mv-color-status-blocked-text: var(--mv-primitive-aurora-purple);
 
   /* ========================================
      スペーシング: グリッド
@@ -399,6 +399,44 @@
   --mv-text-shadow-glow: 0 0 4px var(--mv-color-glow-focus);
   --mv-shadow-progress-bar: 0 0 2px var(--mv-color-glow-focus), inset 0 1px 2px rgba(0, 0, 0, 0.2);
   --mv-shadow-floating-window: 0 0 15px var(--mv-color-glow-focus), 0 4px 12px var(--mv-color-shadow-deep);
+  --mv-shadow-badge: 0 1px 2px var(--mv-color-shadow-elevated);
+  --mv-shadow-badge-glow-sm: 0 0 4px;
+  --mv-shadow-badge-glow-md: 0 0 6px;
+  --mv-shadow-badge-glow-lg: 0 0 8px;
+  --mv-shadow-progress-fill: 0 0 3px;
+  --mv-shadow-inset-dark: inset 0 1px 2px rgba(0, 0, 0, 0.3);
+  --mv-shadow-inset-darker: inset 0 1px 2px rgba(0, 0, 0, 0.2);
+
+  /* ========================================
+     バッジ
+     ======================================== */
+  --mv-badge-min-width: 80px;
+
+  /* ========================================
+     追加スペーシング（微小値）
+     ======================================== */
+  --mv-spacing-xxxs: 2px;
+
+  /* ========================================
+     テキストシャドウ
+     ======================================== */
+  --mv-text-shadow-subtle: 0 0 1px rgba(0, 0, 0, 0.2);
+
+  /* ========================================
+     フェーズ インジケーター グロー
+     ======================================== */
+  --mv-shadow-phase-indicator-glow: 0 0 4px;
+  --mv-shadow-phase-glow-sm: 0 0 5px;
+  --mv-shadow-text-glow-xs: 0 0 1px;
+  --mv-shadow-text-glow-md: 0 0 8px;
+
+  /* ========================================
+     プレビューコンポーネント用サイズ
+     ======================================== */
+  --mv-preview-graph-node-width: 300px;
+  --mv-preview-graph-node-height: 100px;
+  --mv-preview-header-width: 500px;
+  --mv-preview-header-padding: 20px;
 
   /* ========================================
      固定サイズ（レイアウト用）

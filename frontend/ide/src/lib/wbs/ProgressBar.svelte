@@ -10,8 +10,8 @@
   // Calculate dynamic shadow and background for the container
   $: containerShadow =
     size === "md"
-      ? `0 0 2px ${progressColor.glow}, inset 0 1px 2px rgba(0, 0, 0, 0.2)`
-      : `inset 0 1px 2px rgba(0, 0, 0, 0.3)`;
+      ? `0 0 2px ${progressColor.glow}, ${progressColor.insetShadow}`
+      : progressColor.insetShadow;
 </script>
 
 <div
@@ -23,16 +23,14 @@
     class="progress-fill"
     style:width="{percentage}%"
     style:background-color={progressColor.fill}
-    style:box-shadow="0 0 6px {progressColor.glow}"
+    style:box-shadow="var(--mv-shadow-badge-glow-md) {progressColor.glow}"
   ></div>
 </div>
 
 <style>
   .progress-bar {
-    /* Background is now handled inline via style:background-color */
     border-radius: var(--mv-radius-sm);
     overflow: hidden;
-    /* box-shadow is now handled inline */
   }
 
   /* Size variants */
@@ -47,19 +45,17 @@
   }
 
   .progress-bar.md {
-    width: 100%; /* Header bar takes full width of container */
+    width: var(--mv-size-full);
     height: var(--mv-progress-bar-height-md);
-    /* Background is now handled inline */
-    /* box-shadow is now handled inline */
-    border: var(--mv-border-panel); /* Header bar had border */
+    border: var(--mv-border-panel);
   }
 
   .progress-fill {
-    height: 100%;
+    height: var(--mv-size-full);
     width: var(--progress, 0%);
     background: var(--mv-progress-bar-fill);
     border-radius: var(--mv-radius-sm);
     transition: width var(--mv-duration-slow);
-    box-shadow: 0 0 3px var(--mv-progress-bar-fill-glow);
+    box-shadow: var(--mv-shadow-progress-fill) var(--mv-progress-bar-fill-glow);
   }
 </style>

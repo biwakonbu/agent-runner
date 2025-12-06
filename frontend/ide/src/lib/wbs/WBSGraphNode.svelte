@@ -140,9 +140,6 @@
     border-radius: var(--mv-radius-sm);
     text-transform: uppercase;
     letter-spacing: var(--mv-letter-spacing-wide);
-  }
-
-  .phase-badge {
     background: var(--mv-color-surface-secondary);
     color: var(--mv-color-text-secondary);
   }

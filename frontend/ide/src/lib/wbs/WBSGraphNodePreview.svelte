@@ -36,6 +36,8 @@
   } as unknown as WBSNode; // Cast as WBSNode
 </script>
 
-<div style="position: relative; width: 300px; height: 100px;">
+<div
+  style="position: relative; width: var(--mv-preview-graph-node-width); height: var(--mv-preview-graph-node-height);"
+>
   <WBSGraphNode {node} x={50} y={20} />
 </div>

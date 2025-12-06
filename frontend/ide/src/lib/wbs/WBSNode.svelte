@@ -101,7 +101,7 @@
       <span
         class="progress-text"
         style:color={progressColor.fill}
-        style:text-shadow="0 0 1px {progressColor.glow}"
+        style:text-shadow={progressColor.textShadowXs}
       >
         {node.progress.completed}/{node.progress.total}
         ({progressPercent}%)
@@ -166,7 +166,7 @@
 
   .wbs-node.is-phase .node-label {
     font-size: var(--mv-font-size-base);
-    letter-spacing: 0.02em; /* Slightly wider for headers */
+    letter-spacing: var(--mv-letter-spacing-widest);
   }
 
   /* タスクノード */
@@ -226,30 +226,30 @@
   .phase-indicator {
     width: var(--mv-wbs-phase-bar-width);
     height: var(--mv-wbs-toggle-size);
-    border-radius: var(--mv-radius-pill); /* Rounder */
+    border-radius: var(--mv-radius-pill);
     flex-shrink: 0;
-    box-shadow: 0 0 4px var(--phase-color); /* Glow using css variable hack or specific classes */
+    box-shadow: var(--mv-shadow-phase-indicator-glow) var(--phase-color);
     opacity: 0.8;
   }
 
   .phase-concept .phase-indicator {
     background: var(--mv-primitive-frost-3);
-    box-shadow: 0 0 5px var(--mv-primitive-frost-3);
+    box-shadow: var(--mv-shadow-phase-glow-sm) var(--mv-primitive-frost-3);
   }
 
   .phase-design .phase-indicator {
     background: var(--mv-primitive-aurora-purple);
-    box-shadow: 0 0 5px var(--mv-primitive-aurora-purple);
+    box-shadow: var(--mv-shadow-phase-glow-sm) var(--mv-primitive-aurora-purple);
   }
 
   .phase-impl .phase-indicator {
     background: var(--mv-primitive-aurora-green);
-    box-shadow: 0 0 5px var(--mv-primitive-aurora-green);
+    box-shadow: var(--mv-shadow-phase-glow-sm) var(--mv-primitive-aurora-green);
   }
 
   .phase-verify .phase-indicator {
     background: var(--mv-primitive-aurora-yellow);
-    box-shadow: 0 0 5px var(--mv-primitive-aurora-yellow);
+    box-shadow: var(--mv-shadow-phase-glow-sm) var(--mv-primitive-aurora-yellow);
   }
 
   /* ノードラベル */
@@ -258,11 +258,8 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    text-shadow: 0 0 1px rgba(0, 0, 0, 0.2);
+    text-shadow: var(--mv-text-shadow-subtle);
   }
-
-  /* ステータスバッジ */
-  /* Logic moved to StatusBadge.svelte */
 
   /* 進捗バー */
   .progress-container {
