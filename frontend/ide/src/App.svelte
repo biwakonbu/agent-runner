@@ -144,8 +144,6 @@
         </div>
       {/if}
 
-      <!-- 詳細パネルはフローティングまたはオーバーレイとして扱う (一旦非表示/必要に応じて表示実装) -->
-      <!-- <DetailPanel /> -->
     </div>
 
     <!-- チャットウィンドウ -->
@@ -294,10 +292,10 @@
 
   .backlog-sidebar {
     position: fixed;
-    top: 80px; /* Toolbar の下 */
+    top: var(--mv-backlog-sidebar-top);
     left: 0;
     bottom: 0;
-    width: 320px;
+    width: var(--mv-backlog-sidebar-width);
     z-index: 100;
     box-shadow: var(--mv-shadow-modal);
   }

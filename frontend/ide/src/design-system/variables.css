@@ -252,6 +252,18 @@
   --mv-dialog-min-width: 400px;
   --mv-dialog-max-width: 90vw;
 
+  /* バックログサイドバー */
+  --mv-backlog-sidebar-top: 80px;
+  --mv-backlog-sidebar-width: 320px;
+
+  /* タイトルバー */
+  --mv-titlebar-height: 32px;
+  --mv-titlebar-padding-left: 80px;
+
+  /* チャットウィンドウ */
+  --mv-chat-timestamp-width: 60px;
+  --mv-chat-step-width: 80px;
+
   /* フローティングウィンドウ */
   --mv-floating-window-width: 600px;
   --mv-floating-window-height: 350px;

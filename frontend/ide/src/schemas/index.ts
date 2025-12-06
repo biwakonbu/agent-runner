@@ -17,6 +17,7 @@ export const TaskStatusSchema = z.enum([
   'FAILED',
   'CANCELED',
   'BLOCKED',
+  'RETRY_WAIT',
 ]);
 
 export type TaskStatus = z.infer<typeof TaskStatusSchema>;
@@ -64,6 +65,10 @@ export const TaskSchema = z.object({
   phaseName: PhaseNameSchema.optional(),
   sourceChatId: z.string().optional().nullable(),
   acceptanceCriteria: z.array(z.string()).optional(),
+
+  // リトライ管理用 (v2.0 Extension)
+  attemptCount: z.number().int().nonnegative().optional(),
+  nextRetryAt: z.string().datetime({ offset: true }).or(z.string()).optional().nullable(),
 });
 
 export type Task = z.infer<typeof TaskSchema>;
@@ -101,9 +106,9 @@ export const TaskNodeSchema = z.object({
 
 export type TaskNode = z.infer<typeof TaskNodeSchema>;
 
-// ステータスからCSS変数名サフィックスへの変換
+// ステータスからCSS変数名サフィックスへの変換（kebab-case）
 export function statusToCssClass(status: TaskStatus): string {
-  return status.toLowerCase();
+  return status.toLowerCase().replace(/_/g, '-');
 }
 
 // ステータスの表示名
@@ -116,6 +121,7 @@ export const statusLabels: Record<TaskStatus, string> = {
   FAILED: '失敗',
   CANCELED: 'キャンセル',
   BLOCKED: 'ブロック',
+  RETRY_WAIT: 'リトライ待機',
 };
 
 // AttemptStatus スキーマ

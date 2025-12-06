@@ -8,16 +8,17 @@
 
 <style>
   .title-bar {
-    height: 32px;
+    height: var(--mv-titlebar-height);
     width: 100%;
     display: flex;
     align-items: center;
     justify-content: center;
-    background: transparent; /* 背景は透明にして下のレイヤー（Appの背景）を見せる */
+    background: transparent;
     user-select: none;
     cursor: default;
     z-index: 9999;
+
     /* Macの信号機ボタン（左上）を避けるためのパディング */
-    padding-left: 80px;
+    padding-left: var(--mv-titlebar-padding-left);
   }
 </style>
