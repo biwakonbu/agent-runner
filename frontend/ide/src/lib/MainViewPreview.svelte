@@ -16,6 +16,8 @@
 
   const dispatch = createEventDispatcher();
 
+  import BacklogPanelPreview from "./backlog/BacklogPanelPreview.svelte";
+
   // === Props ===
 
   // ビュー設定
@@ -44,9 +46,11 @@
   // 選択中タスク（ストア同期用。UI描画では未使用）
   export let selectedTask: Task | null = null;
 
-  // モーダル・チャット
+  // モーダル・チャット・バックログ
   export let showChat = true;
   export let chatPosition = { x: 600, y: 300 };
+  export let showBacklog = false;
+  export let unresolvedCount = 0;
 
   // タスクストアを更新
   $: {
@@ -95,6 +99,31 @@
       </div>
     {/if}
   </div>
+
+  <!-- バックログ表示ボタン -->
+  <!-- svelte-ignore a11y-click-events-have-key-events -->
+  <div
+    class="backlog-fab"
+    class:has-items={unresolvedCount > 0}
+    on:click={() => (showBacklog = !showBacklog)}
+    on:keydown={(e) => e.key === "Enter" && (showBacklog = !showBacklog)}
+    role="button"
+    tabindex="0"
+    aria-label="Toggle Backlog"
+  >
+    {#if unresolvedCount > 0}
+      <span class="backlog-count">{unresolvedCount}</span>
+    {:else}
+      &#9776;
+    {/if}
+  </div>
+
+  <!-- バックログパネル -->
+  {#if showBacklog}
+    <div class="backlog-sidebar">
+      <BacklogPanelPreview />
+    </div>
+  {/if}
 
   <!-- チャットウィンドウ -->
   {#if showChat}
@@ -185,4 +214,49 @@
   }
 
   /* モーダルは削除済み */
+
+  /* Backlog Styles */
+  .backlog-fab {
+    position: fixed;
+    bottom: var(--mv-spacing-lg);
+    left: var(--mv-spacing-lg);
+    width: var(--mv-icon-size-xxxl);
+    height: var(--mv-icon-size-xxxl);
+    background: var(--mv-color-surface-primary);
+    border: var(--mv-border-width-thin) solid var(--mv-color-border-default);
+    border-radius: var(--mv-radius-full);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: var(--mv-shadow-card);
+    cursor: pointer;
+    z-index: 1000;
+    font-size: var(--mv-icon-size-md);
+    transition: all var(--mv-transition-hover);
+  }
+
+  .backlog-fab:hover {
+    background: var(--mv-color-surface-hover);
+  }
+
+  .backlog-fab.has-items {
+    background: var(--mv-color-status-failed-bg);
+    border-color: var(--mv-color-status-failed-text);
+  }
+
+  .backlog-count {
+    font-size: var(--mv-font-size-sm);
+    font-weight: var(--mv-font-weight-bold);
+    color: var(--mv-color-status-failed-text);
+  }
+
+  .backlog-sidebar {
+    position: fixed;
+    top: var(--mv-backlog-sidebar-top);
+    left: 0;
+    bottom: 0;
+    width: var(--mv-backlog-sidebar-width);
+    z-index: 100;
+    box-shadow: var(--mv-shadow-modal);
+  }
 </style>

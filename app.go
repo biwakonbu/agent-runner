@@ -58,8 +58,10 @@ func (a *App) startup(ctx context.Context) {
 func (a *App) newMetaClientFromConfig() *meta.Client {
 	config, err := a.llmConfigStore.GetEffectiveConfig()
 	if err != nil {
-		// エラー時はモックを返す
-		return meta.NewMockClient()
+		// エラー時でも実クライアント(codex-cli)を返す（モック廃止）
+		// エラーログは出しておく
+		runtime.LogErrorf(a.ctx, "Failed to load LLM config, falling back to default codex-cli: %v", err)
+		return meta.NewClient("codex-cli", "", "", "")
 	}
 
 	kind := config.Kind
@@ -75,7 +77,9 @@ func (a *App) newMetaClientFromConfig() *meta.Client {
 		apiKey := os.Getenv("OPENAI_API_KEY")
 		return meta.NewClient("openai-chat", apiKey, config.Model, config.SystemPrompt)
 	default:
-		return meta.NewMockClient()
+		// 未知の種類の時も実クライアント(codex-cli)を返す（モック廃止）
+		runtime.LogErrorf(a.ctx, "Unknown LLM kind '%s', falling back to codex-cli", kind)
+		return meta.NewClient("codex-cli", "", config.Model, config.SystemPrompt)
 	}
 }
 

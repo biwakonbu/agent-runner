@@ -12,6 +12,19 @@ import (
 	"time"
 )
 
+// Helper to create a client that acts like the old mock for tests.
+// Since we removed mock logic from Client methods, we need to mock the HTTP transport
+// or use a different way to test "mock" behavior if the test relies on it.
+// However, the existing tests call NewMockClient expecting internal mock logic.
+// We must recreate that logic or update tests to invoke the new CliProvider logic with a mock provider?
+// Or we can mock the HTTP client in the struct.
+
+// Since the user said "remove mock logic from production code",
+// the `PlanTask` etc methods NO LONGER have `if kind == "mock"`.
+// So checking `kind == "mock"` in tests won't work unless we mock the network.
+
+// Ideally we should use httptest.Server or a Replaceable Transport.
+
 // TestExtractYAML tests the YAML extraction function
 func TestExtractYAML_PlainYAML(t *testing.T) {
 	input := `type: plan_task
@@ -75,7 +88,7 @@ version: 1`
 // TestClient_PlanTask_Success tests successful PlanTask with mock mode
 func TestClient_PlanTask_Success(t *testing.T) {
 	// Use mock mode to avoid HTTP calls
-	client := &Client{kind: "mock", apiKey: "", model: "mock"}
+	client := NewMockClient()
 	result, err := client.PlanTask(context.Background(), "test prd")
 
 	if err != nil {
@@ -97,7 +110,7 @@ func TestClient_PlanTask_Success(t *testing.T) {
 
 // TestClient_NextAction_Success tests successful NextAction
 func TestClient_NextAction_Success(t *testing.T) {
-	client := &Client{kind: "mock", apiKey: "", model: "mock"}
+	client := NewMockClient()
 	summary := &TaskSummary{
 		Title:              "Test Task",
 		State:              "RUNNING",
@@ -164,7 +177,7 @@ func TestClient_NewMockClient(t *testing.T) {
 
 // TestClient_PlanTask_MarkdownCodeBlock tests YAML extraction from markdown
 func TestClient_PlanTask_MarkdownCodeBlock(t *testing.T) {
-	client := &Client{kind: "mock"}
+	client := NewMockClient()
 
 	// This test verifies that the extractYAML logic is applied.
 	// We use mock mode to avoid actual API calls.

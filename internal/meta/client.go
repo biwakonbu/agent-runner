@@ -352,15 +352,6 @@ func jsonToYAML(jsonStr string) (string, error) {
 }
 
 func (c *Client) PlanTask(ctx context.Context, prdText string) (*PlanTaskResponse, error) {
-	if c.kind == "mock" {
-		return &PlanTaskResponse{
-			TaskID: "TASK-MOCK",
-			AcceptanceCriteria: []AcceptanceCriterion{
-				{ID: "AC-1", Description: "Mock AC 1", Type: "mock", Critical: true},
-			},
-		}, nil
-	}
-
 	// CLI プロバイダを使用する場合
 	if c.cliProvider != nil {
 		return c.cliProvider.PlanTask(ctx, prdText)
@@ -418,23 +409,6 @@ Output MUST be a JSON block with the following structure:
 }
 
 func (c *Client) NextAction(ctx context.Context, taskSummary *TaskSummary) (*NextActionResponse, error) {
-	if c.kind == "mock" {
-		// Simple mock logic: Run worker once, then complete
-		if taskSummary.WorkerRunsCount == 0 {
-			return &NextActionResponse{
-				Decision: Decision{Action: "run_worker", Reason: "Mock run"},
-				WorkerCall: WorkerCall{
-					WorkerType: "codex-cli",
-					Mode:       "exec",
-					Prompt:     "echo 'Hello from Mock Worker'",
-				},
-			}, nil
-		}
-		return &NextActionResponse{
-			Decision: Decision{Action: "mark_complete", Reason: "Mock complete"},
-		}, nil
-	}
-
 	// CLI プロバイダを使用する場合
 	if c.cliProvider != nil {
 		return c.cliProvider.NextAction(ctx, taskSummary)
@@ -507,23 +481,6 @@ Schema for 'mark_complete' action:
 }
 
 func (c *Client) CompletionAssessment(ctx context.Context, taskSummary *TaskSummary) (*CompletionAssessmentResponse, error) {
-	if c.kind == "mock" {
-		// Mock implementation: all criteria passed
-		criteria := []CriterionResult{}
-		for _, ac := range taskSummary.AcceptanceCriteria {
-			criteria = append(criteria, CriterionResult{
-				ID:      ac.ID,
-				Status:  "passed",
-				Comment: "Mock assessment: passed",
-			})
-		}
-		return &CompletionAssessmentResponse{
-			AllCriteriaSatisfied: true,
-			Summary:              "Mock: All criteria satisfied",
-			ByCriterion:          criteria,
-		}, nil
-	}
-
 	// CLI プロバイダを使用する場合
 	if c.cliProvider != nil {
 		return c.cliProvider.CompletionAssessment(ctx, taskSummary)
@@ -608,46 +565,6 @@ Evaluate whether all acceptance criteria are satisfied.`,
 // Decompose はユーザー入力からタスクを分解する（v2.0 チャット駆動）
 func (c *Client) Decompose(ctx context.Context, req *DecomposeRequest) (*DecomposeResponse, error) {
 	logger := logging.WithTraceID(c.logger, ctx)
-
-	if c.kind == "mock" {
-		logger.Debug("using mock decompose response")
-		return &DecomposeResponse{
-			Understanding: "Mock: ユーザーの要求を理解しました",
-			Phases: []DecomposedPhase{
-				{
-					Name:      "概念設計",
-					Milestone: "M1-Mock-Design",
-					Tasks: []DecomposedTask{
-						{
-							ID:                 "temp-001",
-							Title:              "Mock概念設計タスク",
-							Description:        "モック用の概念設計タスクです",
-							AcceptanceCriteria: []string{"設計ドキュメントが作成されている"},
-							Dependencies:       []string{},
-							WBSLevel:           1,
-							EstimatedEffort:    "small",
-						},
-					},
-				},
-				{
-					Name:      "実装",
-					Milestone: "M2-Mock-Impl",
-					Tasks: []DecomposedTask{
-						{
-							ID:                 "temp-002",
-							Title:              "Mock実装タスク",
-							Description:        "モック用の実装タスクです",
-							AcceptanceCriteria: []string{"機能が実装されている", "テストが通過している"},
-							Dependencies:       []string{"temp-001"},
-							WBSLevel:           3,
-							EstimatedEffort:    "medium",
-						},
-					},
-				},
-			},
-			PotentialConflicts: []PotentialConflict{},
-		}, nil
-	}
 
 	// CLI プロバイダを使用する場合
 	if c.cliProvider != nil {
@@ -828,15 +745,4 @@ func buildDecomposeUserPrompt(req *DecomposeRequest) string {
 
 	sb.WriteString("Please decompose this request into structured tasks.")
 	return sb.String()
-}
-
-// NewMockClient creates a mock Meta client (kind="mock")
-func NewMockClient() *Client {
-	return &Client{
-		kind:   "mock",
-		apiKey: "",
-		model:  "mock",
-		client: &http.Client{Timeout: 60 * time.Second},
-		logger: logging.WithComponent(slog.Default(), "meta-client-mock"),
-	}
 }

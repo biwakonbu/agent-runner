@@ -40,7 +40,7 @@
   .zoom-controls {
     position: absolute;
     bottom: var(--mv-spacing-lg);
-    left: var(--mv-spacing-lg);
+    left: calc(var(--mv-spacing-lg) * 2 + var(--mv-icon-size-xxxl));
     display: flex;
     align-items: center;
     gap: var(--mv-spacing-xs);

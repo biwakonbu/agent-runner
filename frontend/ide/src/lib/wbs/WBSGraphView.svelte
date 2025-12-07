@@ -358,7 +358,7 @@
   /* 操作ヒント */
   .controls-hint {
     position: absolute;
-    bottom: var(--mv-spacing-lg);
+    bottom: calc(var(--mv-spacing-lg) * 2 + var(--mv-icon-size-xxxl));
     right: var(--mv-spacing-lg);
     display: flex;
     flex-direction: column;
