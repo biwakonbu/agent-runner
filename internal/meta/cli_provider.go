@@ -77,7 +77,8 @@ func (p *CodexCLIProvider) callCodexChat(ctx context.Context, systemPrompt, user
 	fullPrompt := systemPrompt + "\n\n" + userPrompt
 
 	// Use --stdin to avoid CLI parsing issues with long/structured prompts
-	cmd := exec.CommandContext(ctx, "codex", "chat", "--stdin")
+	// The codex CLI requires `--` before passthrough flags.
+	cmd := exec.CommandContext(ctx, "codex", "chat", "--", "--stdin")
 	cmd.Stdin = strings.NewReader(fullPrompt)
 
 	logger.Info("calling codex CLI",
