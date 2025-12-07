@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/biwakonbu/agent-runner/internal/orchestrator/ipc"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -36,7 +37,7 @@ func TestExecutionOrchestrator_StateTransitions(t *testing.T) {
 	// We mock Emit calls
 	emitter.On("Emit", mock.Anything, mock.Anything).Return()
 
-	orch := NewExecutionOrchestrator(nil, nil, nil, nil, emitter, nil, "default")
+	orch := NewExecutionOrchestrator(nil, nil, nil, nil, emitter, nil, []string{"default"})
 	// Suppress logging in tests if needed via custom logger, but defaults to stdout is fine
 
 	ctx := context.Background()
@@ -158,7 +159,7 @@ func TestExecutionOrchestrator_EventEmission(t *testing.T) {
 		return ok && event.NewState == ExecutionStateIdle
 	})).Return().Once()
 
-	orch := NewExecutionOrchestrator(nil, nil, nil, nil, emitter, nil, "default")
+	orch := NewExecutionOrchestrator(nil, nil, nil, nil, emitter, nil, []string{"default"})
 	ctx := context.Background()
 
 	// Start → Pause → Resume → Stop の遷移でイベント発行を確認
@@ -177,7 +178,7 @@ func TestExecutionOrchestrator_InvalidTransitions(t *testing.T) {
 	emitter := new(MockEventEmitter)
 	emitter.On("Emit", mock.Anything, mock.Anything).Return()
 
-	orch := NewExecutionOrchestrator(nil, nil, nil, nil, emitter, nil, "default")
+	orch := NewExecutionOrchestrator(nil, nil, nil, nil, emitter, nil, []string{"default"})
 	ctx := context.Background()
 
 	// IDLE 状態での無効な遷移
@@ -232,7 +233,7 @@ func TestExecutionOrchestrator_ContextCancellation(t *testing.T) {
 	emitter := new(MockEventEmitter)
 	emitter.On("Emit", mock.Anything, mock.Anything).Return()
 
-	orch := NewExecutionOrchestrator(nil, nil, nil, nil, emitter, nil, "default")
+	orch := NewExecutionOrchestrator(nil, nil, nil, nil, emitter, nil, []string{"default"})
 	ctx, cancel := context.WithCancel(context.Background())
 
 	err := orch.Start(ctx)
@@ -256,7 +257,7 @@ func TestExecutionOrchestrator_ContextCancellation(t *testing.T) {
 
 func TestExecutionOrchestrator_NilEventEmitter(t *testing.T) {
 	// EventEmitter が nil でもパニックしないことを確認
-	orch := NewExecutionOrchestrator(nil, nil, nil, nil, nil, nil, "default")
+	orch := NewExecutionOrchestrator(nil, nil, nil, nil, nil, nil, []string{"default"})
 	ctx := context.Background()
 
 	// 各操作がパニックせずに実行できることを確認
@@ -281,7 +282,7 @@ func TestExecutionOrchestrator_StateMethod(t *testing.T) {
 	emitter := new(MockEventEmitter)
 	emitter.On("Emit", mock.Anything, mock.Anything).Return()
 
-	orch := NewExecutionOrchestrator(nil, nil, nil, nil, emitter, nil, "default")
+	orch := NewExecutionOrchestrator(nil, nil, nil, nil, emitter, nil, []string{"default"})
 	ctx := context.Background()
 
 	// 初期状態
@@ -304,5 +305,96 @@ func TestExecutionOrchestrator_StateMethod(t *testing.T) {
 	assert.Equal(t, ExecutionStateIdle, orch.State())
 
 	// ゴルーチン終了を待つ
+	waitForStop()
+}
+
+// MockExecutor implements TaskExecutor for testing
+type MockExecutor struct {
+	mock.Mock
+}
+
+func (m *MockExecutor) ExecuteTask(ctx context.Context, task *Task) (*Attempt, error) {
+	args := m.Called(ctx, task)
+	if attempt, ok := args.Get(0).(*Attempt); ok {
+		return attempt, args.Error(1)
+	}
+	return nil, args.Error(1)
+}
+
+func TestExecutionOrchestrator_Stop_CancelsRunningTask(t *testing.T) {
+	// Setup dependencies
+	emitter := new(MockEventEmitter)
+	emitter.On("Emit", mock.Anything, mock.Anything).Return()
+
+	// Mock TaskStore
+	taskStore := NewTaskStore(t.TempDir()) // Use temp dir for real store, or mock it too. Real store is easier if it works with minimal setup.
+	// Actually, TaskStore.LoadTask requires a file on disk. Let's seed it.
+	taskID := "task-1"
+	task := &Task{
+		ID:     taskID,
+		Title:  "Long Running Task",
+		Status: TaskStatusPending,
+		PoolID: "default",
+	}
+	_ = taskStore.SaveTask(task)
+
+	// Mock Queue
+	queue := ipc.NewFilesystemQueue(t.TempDir())
+	_ = queue.Enqueue(&ipc.Job{
+		ID:     "job-1",
+		TaskID: taskID,
+		PoolID: "default",
+	})
+
+	// Mock Executor
+	mockExecutor := new(MockExecutor)
+	// ExecuteTask should block until context is canceled
+	executeCalled := make(chan struct{})
+	mockExecutor.On("ExecuteTask", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
+		ctx := args.Get(0).(context.Context)
+		close(executeCalled) // Signal that execution started
+		<-ctx.Done()         // Wait for cancellation
+	}).Return(&Attempt{Status: AttemptStatusFailed}, context.Canceled)
+
+	// Create Orchestrator
+	orch := NewExecutionOrchestrator(
+		nil, // Scheduler: not needed if we manually enqueue (ExecutionOrchestrator 2. Consume from Queue)
+		// But Wait, runLoop 0-a, 0-b, 0-c uses Scheduler. If Scheduler is nil, it skips.
+		mockExecutor,
+		taskStore,
+		queue,
+		emitter,
+		nil,
+		[]string{"default"},
+	)
+
+	ctx := context.Background()
+
+	// Start Orchestrator
+	err := orch.Start(ctx)
+	assert.NoError(t, err)
+
+	// Wait for ExecuteTask to be called
+	select {
+	case <-executeCalled:
+		// Execution started
+	case <-time.After(5 * time.Second):
+		t.Fatal("ExecuteTask was not called within timeout")
+	}
+
+	// Verify state is RUNNING
+	assert.Equal(t, ExecutionStateRunning, orch.State())
+
+	// Stop Orchestrator
+	err = orch.Stop()
+	assert.NoError(t, err)
+
+	// Verify executed task was canceled
+	mockExecutor.AssertExpectations(t)
+
+	// Verify state is IDLE
+	assert.Equal(t, ExecutionStateIdle, orch.State())
+
+	// Verify runLoop exits
 	waitForStop()
 }

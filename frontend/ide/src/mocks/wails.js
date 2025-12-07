@@ -151,3 +151,63 @@ export function CreateChatSession() {
     console.log("[Mock] CreateChatSession called");
     return Promise.resolve("mock-session-" + Date.now());
 }
+
+// 実行状態
+let executionState = 'IDLE';
+
+// Execution control
+export function StartExecution() {
+    console.log("[Mock] StartExecution called");
+    executionState = 'RUNNING';
+    return Promise.resolve();
+}
+
+export function PauseExecution() {
+    console.log("[Mock] PauseExecution called");
+    executionState = 'PAUSED';
+    return Promise.resolve();
+}
+
+export function ResumeExecution() {
+    console.log("[Mock] ResumeExecution called");
+    executionState = 'RUNNING';
+    return Promise.resolve();
+}
+
+export function StopExecution() {
+    console.log("[Mock] StopExecution called");
+    executionState = 'IDLE';
+    return Promise.resolve();
+}
+
+export function GetExecutionState() {
+    console.log("[Mock] GetExecutionState called");
+    return Promise.resolve(executionState);
+}
+
+// Backlog
+export function GetBacklogItems() {
+    console.log("[Mock] GetBacklogItems called");
+    const items = JSON.parse(window.localStorage.getItem('mock_backlog') || '[]');
+    return Promise.resolve(items);
+}
+
+export function ResolveBacklogItem(id, resolution) {
+    console.log("[Mock] ResolveBacklogItem called", id, resolution);
+    const items = JSON.parse(window.localStorage.getItem('mock_backlog') || '[]');
+    const index = items.findIndex(i => i.id === id);
+    if (index >= 0) {
+        items[index].resolvedAt = new Date().toISOString();
+        items[index].resolution = resolution;
+        window.localStorage.setItem('mock_backlog', JSON.stringify(items));
+    }
+    return Promise.resolve();
+}
+
+export function DeleteBacklogItem(id) {
+    console.log("[Mock] DeleteBacklogItem called", id);
+    const items = JSON.parse(window.localStorage.getItem('mock_backlog') || '[]');
+    const filtered = items.filter(i => i.id !== id);
+    window.localStorage.setItem('mock_backlog', JSON.stringify(filtered));
+    return Promise.resolve();
+}

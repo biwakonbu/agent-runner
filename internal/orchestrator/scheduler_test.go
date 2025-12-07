@@ -331,7 +331,7 @@ func TestScheduler_AllDependenciesSatisfied(t *testing.T) {
 
 	t.Run("all dependencies succeeded", func(t *testing.T) {
 		dep1 := &Task{ID: "dep1", Title: "Dep 1", Status: TaskStatusSucceeded, PoolID: "default", CreatedAt: now}
-		dep2 := &Task{ID: "dep2", Title: "Dep 2", Status: TaskStatusCanceled, PoolID: "default", CreatedAt: now}
+		dep2 := &Task{ID: "dep2", Title: "Dep 2", Status: TaskStatusSucceeded, PoolID: "default", CreatedAt: now}
 		task := &Task{
 			ID:           "task-with-deps",
 			Title:        "With Dependencies",

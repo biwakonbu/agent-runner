@@ -5,24 +5,31 @@ import (
 	"fmt"
 	"log/slog"
 	"os/exec"
-	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/biwakonbu/agent-runner/internal/logging"
 	"github.com/google/uuid"
 )
 
+// TaskExecutor defines the interface for executing tasks
+type TaskExecutor interface {
+	ExecuteTask(ctx context.Context, task *Task) (*Attempt, error)
+}
+
 // Executor wraps AgentRunner Core execution.
 type Executor struct {
 	AgentRunnerPath string // Path to agent-runner binary
+	ProjectRoot     string // Root directory of the project
 	TaskStore       *TaskStore
 	logger          *slog.Logger
 }
 
 // NewExecutor creates a new Executor.
-func NewExecutor(agentRunnerPath string, ts *TaskStore) *Executor {
+func NewExecutor(agentRunnerPath string, projectRoot string, ts *TaskStore) *Executor {
 	return &Executor{
 		AgentRunnerPath: agentRunnerPath,
+		ProjectRoot:     projectRoot,
 		TaskStore:       ts,
 		logger:          logging.WithComponent(slog.Default(), "orchestrator-executor"),
 	}
@@ -75,7 +82,7 @@ func (e *Executor) ExecuteTask(ctx context.Context, task *Task) (*Attempt, error
 	// Execute agent-runner
 	logger.Info("executing agent-runner", slog.String("binary_path", e.AgentRunnerPath))
 	cmd := exec.CommandContext(ctx, e.AgentRunnerPath)
-	cmd.Dir = filepath.Dir(e.TaskStore.WorkspaceDir)
+	cmd.Dir = e.ProjectRoot
 
 	// Pass task YAML via stdin
 	stdin, err := cmd.StdinPipe()
@@ -86,7 +93,13 @@ func (e *Executor) ExecuteTask(ctx context.Context, task *Task) (*Attempt, error
 
 	go func() {
 		defer func() { _ = stdin.Close() }()
-		_, _ = stdin.Write([]byte(taskYAML))
+		select {
+		case <-ctx.Done():
+			return // Context canceled, close stdin (via defer) and exit
+		default:
+			// Write task YAML
+			_, _ = stdin.Write([]byte(taskYAML))
+		}
 	}()
 
 	output, err := cmd.CombinedOutput()
@@ -129,7 +142,7 @@ func (e *Executor) ExecuteTask(ctx context.Context, task *Task) (*Attempt, error
 		slog.String("final_status", string(attempt.Status)),
 		logging.LogDuration(start),
 	)
-	return attempt, nil
+	return attempt, err
 }
 
 func (e *Executor) handleExecutionError(attempt *Attempt, task *Task, err error) (*Attempt, error) {
@@ -148,17 +161,36 @@ func (e *Executor) handleExecutionError(attempt *Attempt, task *Task, err error)
 }
 
 func (e *Executor) generateTaskYAML(task *Task) string {
+	// Construct the prompt text with Description and AcceptanceCriteria
+	promptText := fmt.Sprintf("Execute task: %s", task.Title)
+	if task.Description != "" {
+		promptText += fmt.Sprintf("\n\nDescription:\n%s", task.Description)
+	}
+	if len(task.AcceptanceCriteria) > 0 {
+		promptText += "\n\nAcceptance Criteria:"
+		for _, ac := range task.AcceptanceCriteria {
+			promptText += fmt.Sprintf("\n- %s", ac)
+		}
+	}
+
 	// Simple task YAML for agent-runner
+	// Using literal style Block Scalar (|) for prd.text to handle multi-line strings safely
+	// Indentation must be correct (4 spaces for the text content)
+	promptTextIndented := ""
+	for _, line := range strings.Split(promptText, "\n") {
+		promptTextIndented += fmt.Sprintf("    %s\n", line)
+	}
+
 	return fmt.Sprintf(`version: "1"
 task:
   id: %s
   title: %s
   repo: "."
   prd:
-    text: "Execute task: %s"
-runner:
+    text: |
+%srunner:
   max_loops: 5
   worker:
     cli: "codex"
-`, task.ID, task.Title, task.Title)
+`, task.ID, task.Title, promptTextIndented)
 }

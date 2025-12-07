@@ -14,6 +14,14 @@ export default defineConfig(({ mode }) => {
         {
           find: /.*wailsjs\/go\/main\/App/,
           replacement: path.resolve(__dirname, './src/mocks/wails.js'),
+        },
+        {
+          find: /.*wailsjs\/runtime\/runtime/,
+          replacement: path.resolve(__dirname, './src/mocks/runtime.js'),
+        },
+        {
+          find: /.*wailsjs\/go\/models/,
+          replacement: path.resolve(__dirname, './src/mocks/models.js'),
         }
       ] : {}
     }
