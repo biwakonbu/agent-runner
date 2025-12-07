@@ -23,7 +23,7 @@
 
   let position = $state({ ...initialPosition });
   let isDragging = false;
-  let windowEl: HTMLElement = $state();
+  let windowEl: HTMLElement | undefined = $state();
   let isMinimized = $state(false);
 
   const dispatch = createEventDispatcher<{

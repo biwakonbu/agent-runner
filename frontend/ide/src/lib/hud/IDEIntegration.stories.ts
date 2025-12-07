@@ -1,5 +1,5 @@
 
-import type { Meta, StoryObj } from '@storybook/svelte-vite';
+import type { Meta, StoryObj } from '@storybook/svelte';
 import IDEMockLayout from './IDEMockLayout.svelte';
 
 const meta = {

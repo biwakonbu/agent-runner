@@ -18,7 +18,7 @@
 
   const MAX_DISPLAY_MESSAGES = 10000;
 
-  let contentEl: HTMLElement = $state();
+  let contentEl: HTMLElement | undefined = $state();
   let showScrollToBottom = $state(false);
   let hasNewMessages = $state(false);
   let lastSeenMessageCount = $state(0);

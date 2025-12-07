@@ -1,4 +1,4 @@
-import type { Meta, StoryObj } from '@storybook/svelte-vite';
+import type { Meta, StoryObj } from '@storybook/svelte';
 import WBSViewPreview from './WBSViewPreview.svelte';
 
 const meta = {

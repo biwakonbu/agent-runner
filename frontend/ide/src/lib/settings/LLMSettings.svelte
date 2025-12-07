@@ -140,10 +140,10 @@
     {/if}
 
     <div class="actions">
-      <Button variant="primary" on:click={saveConfig} disabled={saving}>
+      <Button variant="primary" onclick={saveConfig} disabled={saving}>
         {saving ? "保存中..." : "保存"}
       </Button>
-      <Button variant="secondary" on:click={testConnection} disabled={testing}>
+      <Button variant="secondary" onclick={testConnection} disabled={testing}>
         {testing ? "テスト中..." : "接続テスト"}
       </Button>
     </div>

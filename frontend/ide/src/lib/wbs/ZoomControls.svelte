@@ -19,7 +19,7 @@
   <Button
     variant="secondary"
     size="small"
-    on:click={() => dispatch("zoomOut")}
+    onclick={() => dispatch("zoomOut")}
     label="-"
     title="ズームアウト"
   />
@@ -27,14 +27,14 @@
   <Button
     variant="secondary"
     size="small"
-    on:click={() => dispatch("zoomIn")}
+    onclick={() => dispatch("zoomIn")}
     label="+"
     title="ズームイン"
   />
   <Button
     variant="ghost"
     size="small"
-    on:click={() => dispatch("reset")}
+    onclick={() => dispatch("reset")}
     label="Reset"
     title="リセット"
   />

@@ -51,7 +51,7 @@
     wheelFactor: 0.1,
   };
 
-  let containerRef: HTMLDivElement = $state();
+  let containerRef: HTMLDivElement | undefined = $state();
   let isDragging = false;
   let dragStartX = 0;
   let dragStartY = 0;
@@ -68,6 +68,7 @@
 
     if (event.ctrlKey || event.metaKey) {
       // Ctrl/Cmd + ホイールでズーム
+      if (!containerRef) return;
       const rect = containerRef.getBoundingClientRect();
       const mouseX = event.clientX - rect.left;
       const mouseY = event.clientY - rect.top;
@@ -97,6 +98,7 @@
   function handlePointerDown(event: PointerEvent) {
     if (event.button === 1 || (event.button === 0 && event.shiftKey)) {
       event.preventDefault();
+      if (!containerRef) return;
       containerRef.setPointerCapture(event.pointerId);
       isDragging = true;
       dragStartX = event.clientX;
@@ -120,6 +122,7 @@
   // ドラッグ終了
   function handlePointerUp(event: PointerEvent) {
     if (isDragging) {
+      if (!containerRef) return;
       containerRef.releasePointerCapture(event.pointerId);
       isDragging = false;
     }

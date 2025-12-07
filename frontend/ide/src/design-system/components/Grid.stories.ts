@@ -1,4 +1,4 @@
-import type { Meta, StoryObj } from '@storybook/svelte-vite';
+import type { Meta, StoryObj } from '@storybook/svelte';
 import Grid from './Grid.svelte';
 
 const meta = {

@@ -1,4 +1,4 @@
-import type { Meta, StoryObj } from '@storybook/svelte-vite';
+import type { Meta, StoryObj } from '@storybook/svelte';
 import FloatingChatWindow from './FloatingChatWindow.svelte';
 import MockMainView from './MockMainView.svelte';
 

@@ -1,4 +1,4 @@
-import type { Meta, StoryObj } from '@storybook/svelte-vite';
+import type { Meta, StoryObj } from '@storybook/svelte';
 import BrandLogo from './BrandLogo.svelte';
 import BrandText from './BrandText.svelte';
 import BrandFull from './BrandFull.svelte';

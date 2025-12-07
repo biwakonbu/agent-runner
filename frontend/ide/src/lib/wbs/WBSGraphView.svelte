@@ -105,7 +105,7 @@
   ));
 
   // --- Zoom & Pan Logic ---
-  let container: HTMLDivElement = $state();
+  let container: HTMLDivElement | undefined = $state();
   let isDragging = false;
   let scale = $state(0.5); // Default 50%
   let translateX = $state(0);
@@ -120,7 +120,7 @@
     isDragging = true;
     startX = e.clientX - translateX;
     startY = e.clientY - translateY;
-    container.style.cursor = "grabbing";
+    if (container) container.style.cursor = "grabbing";
   }
 
   function handleMouseMove(e: MouseEvent) {

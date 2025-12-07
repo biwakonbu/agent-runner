@@ -3,7 +3,7 @@
   import type { ComponentProps } from "svelte";
 
   // Badgeと同じpropsを受け取る
-  type BadgeProps = ComponentProps<Badge>;
+  type BadgeProps = ComponentProps<typeof Badge>;
   interface Props {
     status: BadgeProps["status"];
   }

@@ -1,6 +1,7 @@
 
-import type { Meta, StoryObj } from '@storybook/svelte-vite';
-import ResourceList, { type ResourceNode } from './ResourceList.svelte';
+import type { Meta, StoryObj } from '@storybook/svelte';
+import ResourceList from './ResourceList.svelte';
+import type { ResourceNode } from './types';
 
 const meta = {
   title: 'HUD/ResourceList',

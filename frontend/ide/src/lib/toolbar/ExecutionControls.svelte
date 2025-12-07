@@ -15,7 +15,7 @@
     <Button
       variant="primary"
       size="small"
-      on:click={startExecution}
+      onclick={startExecution}
       title="Start Execution"
     >
       <Play size="14" />
@@ -25,7 +25,7 @@
     <Button
       variant="secondary"
       size="small"
-      on:click={pauseExecution}
+      onclick={pauseExecution}
       title="Pause Execution"
     >
       <Pause size="14" />
@@ -33,7 +33,7 @@
     <Button
       variant="danger"
       size="small"
-      on:click={stopExecution}
+      onclick={stopExecution}
       title="Stop Execution"
     >
       <Square size="14" />
@@ -42,7 +42,7 @@
     <Button
       variant="primary"
       size="small"
-      on:click={resumeExecution}
+      onclick={resumeExecution}
       title="Resume Execution"
     >
       <Play size="14" />
@@ -50,7 +50,7 @@
     <Button
       variant="danger"
       size="small"
-      on:click={stopExecution}
+      onclick={stopExecution}
       title="Stop Execution"
     >
       <Square size="14" />

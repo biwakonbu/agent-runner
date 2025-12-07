@@ -1,4 +1,4 @@
-import type { Meta, StoryObj } from "@storybook/svelte-vite";
+import type { Meta, StoryObj } from "@storybook/svelte";
 import ToolbarPreview from "./ToolbarPreview.svelte";
 import type { PoolSummary } from "../../types";
 
