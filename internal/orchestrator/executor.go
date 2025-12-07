@@ -1,8 +1,11 @@
 package orchestrator
 
 import (
+	"bufio"
+	"bytes"
 	"context"
 	"fmt"
+	"io"
 	"log/slog"
 	"os/exec"
 	"strings"
@@ -23,6 +26,7 @@ type Executor struct {
 	ProjectRoot     string // Root directory of the project
 	TaskStore       *TaskStore
 	logger          *slog.Logger
+	events          EventEmitter // Event emitter for streaming logs
 }
 
 // NewExecutor creates a new Executor.
@@ -32,7 +36,13 @@ func NewExecutor(agentRunnerPath string, projectRoot string, ts *TaskStore) *Exe
 		ProjectRoot:     projectRoot,
 		TaskStore:       ts,
 		logger:          logging.WithComponent(slog.Default(), "orchestrator-executor"),
+		events:          nil, // Set via SetEventEmitter if needed
 	}
+}
+
+// SetEventEmitter sets the event emitter for streaming logs
+func (e *Executor) SetEventEmitter(emitter EventEmitter) {
+	e.events = emitter
 }
 
 // SetLogger sets a custom logger for the executor
@@ -91,6 +101,56 @@ func (e *Executor) ExecuteTask(ctx context.Context, task *Task) (*Attempt, error
 		return e.handleExecutionError(attempt, task, err)
 	}
 
+	// Setup stdout/stderr streaming if event emitter is available
+	var stdoutPipe, stderrPipe io.ReadCloser
+	var outputBuf bytes.Buffer
+	if e.events != nil {
+		stdoutPipe, err = cmd.StdoutPipe()
+		if err != nil {
+			logger.Error("failed to create stdout pipe", slog.Any("error", err))
+			return e.handleExecutionError(attempt, task, err)
+		}
+		stderrPipe, err = cmd.StderrPipe()
+		if err != nil {
+			logger.Error("failed to create stderr pipe", slog.Any("error", err))
+			return e.handleExecutionError(attempt, task, err)
+		}
+
+		// Stream stdout
+		go func() {
+			scanner := bufio.NewScanner(stdoutPipe)
+			for scanner.Scan() {
+				line := scanner.Text()
+				outputBuf.WriteString(line + "\n")
+				e.events.Emit(EventTaskLog, TaskLogEvent{
+					TaskID:    task.ID,
+					Stream:    "stdout",
+					Line:      line,
+					Timestamp: time.Now(),
+				})
+			}
+		}()
+
+		// Stream stderr
+		go func() {
+			scanner := bufio.NewScanner(stderrPipe)
+			for scanner.Scan() {
+				line := scanner.Text()
+				outputBuf.WriteString(line + "\n")
+				e.events.Emit(EventTaskLog, TaskLogEvent{
+					TaskID:    task.ID,
+					Stream:    "stderr",
+					Line:      line,
+					Timestamp: time.Now(),
+				})
+			}
+		}()
+	} else {
+		// Fallback: use CombinedOutput if no event emitter
+		cmd.Stdout = &outputBuf
+		cmd.Stderr = &outputBuf
+	}
+
 	go func() {
 		defer func() { _ = stdin.Close() }()
 		select {
@@ -102,9 +162,16 @@ func (e *Executor) ExecuteTask(ctx context.Context, task *Task) (*Attempt, error
 		}
 	}()
 
-	output, err := cmd.CombinedOutput()
+	err = cmd.Start()
+	if err != nil {
+		logger.Error("failed to start agent-runner", slog.Any("error", err))
+		return e.handleExecutionError(attempt, task, err)
+	}
+
+	err = cmd.Wait()
 	finishedAt := time.Now()
 	attempt.FinishedAt = &finishedAt
+	output := outputBuf.String()
 
 	if err != nil {
 		attempt.Status = AttemptStatusFailed

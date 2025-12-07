@@ -9,8 +9,8 @@ import (
 
 // LLMConfig は LLM プロバイダの設定
 type LLMConfig struct {
-	Kind         string `json:"kind"`                   // mock, openai-chat
-	Model        string `json:"model"`                  // gpt-4o, gpt-4o-mini
+	Kind         string `json:"kind"`                   // mock, codex-cli, openai-chat
+	Model        string `json:"model"`                  // gpt-4o, gpt-4o-mini (codex-cli の場合は使用されない)
 	BaseURL      string `json:"baseUrl,omitempty"`      // カスタムエンドポイント
 	SystemPrompt string `json:"systemPrompt,omitempty"` // カスタムシステムプロンプト
 }
@@ -18,7 +18,7 @@ type LLMConfig struct {
 // DefaultLLMConfig はデフォルトの LLM 設定を返す
 func DefaultLLMConfig() *LLMConfig {
 	return &LLMConfig{
-		Kind:  "mock",
+		Kind:  "codex-cli", // デフォルトで実タスクを実行
 		Model: "gpt-4o",
 	}
 }

@@ -24,13 +24,14 @@ type Client struct {
 	systemPrompt string
 	client       *http.Client
 	logger       *slog.Logger
+	cliProvider  CLIProvider // CLI プロバイダ（codex-cli 等）
 }
 
 func NewClient(kind, apiKey, model, systemPrompt string) *Client {
 	if model == "" {
 		model = "gpt-5.1-codex-max-high" // Default
 	}
-	return &Client{
+	c := &Client{
 		kind:         kind,
 		apiKey:       apiKey,
 		model:        model,
@@ -38,6 +39,15 @@ func NewClient(kind, apiKey, model, systemPrompt string) *Client {
 		client:       &http.Client{Timeout: 60 * time.Second},
 		logger:       logging.WithComponent(slog.Default(), "meta-client"),
 	}
+
+	// CLI プロバイダの初期化
+	if kind == "codex-cli" {
+		codexProvider := NewCodexCLIProvider(model, systemPrompt)
+		codexProvider.SetLogger(c.logger)
+		c.cliProvider = codexProvider
+	}
+
+	return c
 }
 
 // SetLogger sets a custom logger for the client
@@ -270,6 +280,12 @@ func (c *Client) PlanTask(ctx context.Context, prdText string) (*PlanTaskRespons
 		}, nil
 	}
 
+	// CLI プロバイダを使用する場合
+	if c.cliProvider != nil {
+		return c.cliProvider.PlanTask(ctx, prdText)
+	}
+
+	// HTTP ベースの LLM 呼び出し（後方互換性のため残す）
 	systemPrompt := c.systemPrompt
 	if systemPrompt == "" {
 		systemPrompt = `You are a Meta-agent that plans software development tasks.
@@ -332,6 +348,12 @@ func (c *Client) NextAction(ctx context.Context, taskSummary *TaskSummary) (*Nex
 		}, nil
 	}
 
+	// CLI プロバイダを使用する場合
+	if c.cliProvider != nil {
+		return c.cliProvider.NextAction(ctx, taskSummary)
+	}
+
+	// HTTP ベースの LLM 呼び出し（後方互換性のため残す）
 	systemPrompt := c.systemPrompt
 	if systemPrompt == "" {
 		systemPrompt = `You are a Meta-agent that orchestrates a coding task.
@@ -388,6 +410,12 @@ func (c *Client) CompletionAssessment(ctx context.Context, taskSummary *TaskSumm
 		}, nil
 	}
 
+	// CLI プロバイダを使用する場合
+	if c.cliProvider != nil {
+		return c.cliProvider.CompletionAssessment(ctx, taskSummary)
+	}
+
+	// HTTP ベースの LLM 呼び出し（後方互換性のため残す）
 	systemPrompt := c.systemPrompt
 	if systemPrompt == "" {
 		systemPrompt = `You are a Meta-agent evaluating task completion.
@@ -501,6 +529,12 @@ func (c *Client) Decompose(ctx context.Context, req *DecomposeRequest) (*Decompo
 		}, nil
 	}
 
+	// CLI プロバイダを使用する場合
+	if c.cliProvider != nil {
+		return c.cliProvider.Decompose(ctx, req)
+	}
+
+	// HTTP ベースの LLM 呼び出し（後方互換性のため残す）
 	systemPrompt := decomposeSystemPrompt
 	userPrompt := buildDecomposeUserPrompt(req)
 

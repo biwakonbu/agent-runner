@@ -15,7 +15,7 @@ func TestLLMConfigStore_LoadDefault(t *testing.T) {
 
 	config, err := store.Load()
 	require.NoError(t, err)
-	assert.Equal(t, "mock", config.Kind)
+	assert.Equal(t, "codex-cli", config.Kind)
 	assert.Equal(t, "gpt-4o", config.Model)
 }
 

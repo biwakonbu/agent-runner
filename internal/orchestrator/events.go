@@ -36,6 +36,7 @@ const (
 	EventTaskCreated          = "task:created"
 	EventChatProgress         = "chat:progress"
 	EventBacklogAdded         = "backlog:added"
+	EventTaskLog              = "task:log"
 )
 
 // TaskStateChangeEvent represents a task state change event
@@ -63,5 +64,13 @@ type ChatProgressEvent struct {
 	SessionID string    `json:"sessionId"`
 	Step      string    `json:"step"`    // e.g. "Decomposing", "Persisting"
 	Message   string    `json:"message"` // Human readable message
+	Timestamp time.Time `json:"timestamp"`
+}
+
+// TaskLogEvent represents a log line from task execution
+type TaskLogEvent struct {
+	TaskID    string    `json:"taskId"`
+	Stream    string    `json:"stream"` // "stdout" or "stderr"
+	Line      string    `json:"line"`   // Log line content
 	Timestamp time.Time `json:"timestamp"`
 }

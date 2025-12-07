@@ -1,27 +1,1596 @@
 
-# 完全なドキュメント
+# Complete Documentation
 
-生成日: 2025-12-05 20:17:14
+Generated: 2025-12-07 17:19:06
 
-このドキュメントは、docs/ ディレクトリ配下のすべてのドキュメントを統合したものです。
+This document consolidates all documentation from the docs/ directory for LLM context.
 
-## 目次
+---
 
-- トップレベル
-- Design
-- Guides
-- Specifications
+## Table of Contents
+
+
+### Overview
+
+- [README](#README)
+
+### Specifications
+
+- [README](#specifications-README)
+- [Core Specification](#specifications-core-specification)
+- [Meta Protocol](#specifications-meta-protocol)
+- [Worker Interface](#specifications-worker-interface)
+- [Orchestrator Spec](#specifications-orchestrator-spec)
+- [Logging Specification](#specifications-logging-specification)
+- [Testing Strategy](#specifications-testing-strategy)
+
+### Design
+
+- [README](#design-README)
+- [Architecture](#design-architecture)
+- [Data Flow](#design-data-flow)
+- [Implementation Guide](#design-implementation-guide)
+
+### Guides
+
+- [README](#guides-README)
+- [Testing](#guides-testing)
+- [Codex Integration](#guides-codex-integration)
 
 ---
 
 
+# Overview
+
+<a id="README"></a>
+
+## README
+
+**Source**: `README.md`
+
+
+このディレクトリには AgentRunner プロジェクトの設計・仕様・開発ガイドが含まれています。
+
+### ドキュメント構成
+
+#### 📋 [specifications/](specifications-) - 仕様ドキュメント
+
+確定した仕様を定義するドキュメント群です。実装の基準となります。
+
+- [core-specification.md](specifications/core-specification.md) - コア仕様（YAML、TaskContext、FSM、Task Note）
+- [meta-protocol.md](specifications/meta-protocol.md) - Meta-agent プロトコル仕様
+- [worker-interface.md](specifications/worker-interface.md) - Worker 実行仕様
+- [orchestrator-spec.md](specifications/orchestrator-spec.md) - Orchestrator 仕様（Task 永続化・スケジューリング・IPC）
+- [logging-specification.md](specifications/logging-specification.md) - ロギング仕様（Trace ID・構造化ログ）
+- [testing-strategy.md](specifications/testing-strategy.md) - テスト戦略（Backend/Frontend E2E）
+
+#### 🏗️ [design/](design-) - 設計ドキュメント
+
+システムの設計思想と実装方針を説明するドキュメント群です。
+
+- [architecture.md](design/architecture.md) - システムアーキテクチャ
+- [implementation-guide.md](design/implementation-guide.md) - 実装ガイド（Go 固有）
+- [data-flow.md](design/data-flow.md) - データフロー設計
+
+#### 📖 [guides/](guides-) - 開発ガイド
+
+開発者向けの実践的なガイドです。
+
+- [testing.md](guides/testing.md) - テスト戦略とベストプラクティス
+- [codex-integration.md](guides/codex-integration.md) - Codex 統合テスト実行ガイド
+
+#### 🔧 その他
+
+- [CLAUDE.md](CLAUDE.md) - ドキュメント整理ルールと管理方針
+
+### ドキュメントの読み方
+
+#### 初めての方
+
+1. [design/architecture.md](design/architecture.md) でシステム全体像を把握
+2. [specifications/core-specification.md](specifications/core-specification.md) でコア仕様を理解
+3. [design/implementation-guide.md](design/implementation-guide.md) で実装方針を確認
+
+#### 実装者向け
+
+1. [specifications/](specifications/) で仕様を確認
+2. [design/implementation-guide.md](design/implementation-guide.md) で実装パターンを学習
+3. [guides/testing.md](guides/testing.md) でテスト方法を確認
+
+#### アーキテクト向け
+
+1. [design/architecture.md](design/architecture.md) でシステム設計を確認
+2. [design/data-flow.md](design/data-flow.md) でデータフローを理解
+3. [specifications/](specifications/) で仕様詳細を確認
+
+### ドキュメント管理
+
+ドキュメントの整理ルールと更新方針については [CLAUDE.md](CLAUDE.md) を参照してください。
+
+
+# Specifications
+
+<a id="specifications-README"></a>
+
+## README
+
+**Source**: `specifications/README.md`
+
+
+このディレクトリには AgentRunner の確定仕様が含まれています。
+
+### ドキュメント一覧
+
+#### [core-specification.md](core-specification.md)
+
+AgentRunner のコア仕様を定義します。
+
+- **対象読者**: 実装者、レビュアー
+- **内容**:
+  - Task YAML スキーマ
+  - TaskContext 構造
+  - タスク状態機械（FSM）
+  - Task Note フォーマット
+  - CLI インターフェース
+
+#### [meta-protocol.md](meta-protocol.md)
+
+Meta-agent との通信プロトコル仕様を定義します。
+
+- **対象読者**: Meta-agent 実装者、プロトコル設計者
+- **内容**:
+  - `plan_task` プロトコル
+  - `next_action` プロトコル
+  - `completion_assessment` プロトコル
+  - YAML メッセージフォーマット
+  - エラーハンドリング
+
+#### [worker-interface.md](worker-interface.md)
+
+Worker 実行とサンドボックス環境の仕様を定義します。
+
+- **対象読者**: Worker 実装者、インフラ担当者
+- **内容**:
+  - Worker 実行インターフェース
+  - Docker サンドボックス仕様
+  - 環境変数とマウント仕様
+  - 実行結果フォーマット
+  - タイムアウトとエラーハンドリング
+
+#### [orchestrator-spec.md](orchestrator-spec.md)
+
+Orchestrator のタスク管理・永続化・IPC 仕様を定義します。
+
+- **対象読者**: Orchestrator 実装者、IDE バックエンド開発者
+- **内容**:
+  - Task Scheduler / Executor / Store
+  - IPC（ファイルベースキュー・結果）
+  - データモデル（Task, Attempt）
+  - 拡張計画
+
+#### [logging-specification.md](logging-specification.md)
+
+統一ロギングシステムの仕様を定義します。
+
+- **対象読者**: 開発者、インフラ担当者
+- **内容**:
+  - Trace ID 伝播
+  - 構造化ログ（log/slog）
+  - ログレベル定義
+  - JSON/Text フォーマット
+
+#### [testing-strategy.md](testing-strategy.md)
+
+Backend/Frontend のテスト戦略を定義します。
+
+- **対象読者**: テスター、開発者
+- **内容**:
+  - テスト配置とディレクトリ構成
+  - テスト実行方法
+  - 検証範囲と受け入れ基準
+
+### 仕様の読み方
+
+1. まず [core-specification.md](core-specification.md) でシステムの基本仕様を理解
+2. Meta-agent を実装する場合は [meta-protocol.md](meta-protocol.md) を参照
+3. Worker を実装する場合は [worker-interface.md](worker-interface.md) を参照
+
+### 仕様の更新ルール
+
+- 仕様変更は必ず設計レビューを経てから反映
+- バージョン管理は Git のタグで管理
+- 後方互換性を破る変更は明示的にマーク
+
+<a id="specifications-core-specification"></a>
+
+## Core Specification
+
+**Source**: `specifications/core-specification.md`
+
+
+最終更新: 2025-11-22
+
+### 概要
+
+本ドキュメントは AgentRunner のコア仕様を定義します。CLI インターフェース、YAML スキーマ、TaskContext、タスク状態機械（FSM）、Task Note フォーマットを含みます。
+
+### 1. CLI インターフェース
+
+#### 1.1 コマンド
+
+```bash
+agent-runner < task.yaml
+```
+
+#### 1.2 入力
+
+- **stdin**: Task YAML ファイル（1 枚）
+- **stdin**: Task YAML ファイル（1 枚）
+- **コマンドラインオプション**:
+  - `--meta-model=<model_id>`: Meta 用 LLM モデル ID を指定 (v1)
+
+#### 1.3 モデル決定の優先順位
+
+Meta 用 LLM モデル ID は以下の優先順位で決定されます：
+
+1. **CLI オプション**: `--meta-model` で指定された値
+2. **Task YAML**: `runner.meta.model` で指定された値
+3. **ビルトインデフォルト**: `gpt-5.1-codex-max-high`
+
+※ 設定ファイルによるデフォルト指定は将来拡張です。
+
+#### 1.4 出力
+
+- **stdout**: 実行ログ（人間が読む用の簡易ログ）
+- **ファイル**: Task Note (`<repo>/.agent-runner/task-<task_id>.md`)
+- **exit code**:
+  - `0`: 成功
+  - `1`: 失敗
+
+### 2. Task YAML スキーマ
+
+#### 2.1 全体構造
+
+```yaml
+version: 1
+
+task:
+  id: "TASK-123" # 任意。未指定なら自動採番
+  title: "ユーザ登録 API の実装" # 任意
+  repo: "." # 任意。作業対象リポジトリのパス
+
+  prd:
+    path: "./docs/TASK-123.md" # PRD をファイルから読む場合
+    # text: |                       # または PRD 本文を直接埋め込む場合
+    #   ここに PRD 本文...
+
+  test:
+    command: "npm test" # 任意。自動テストコマンド
+    # cwd: ".-"                     # 任意。テスト実行ディレクトリ
+
+runner:
+  meta:
+    kind: "openai-chat" # v1 は固定想定
+    model: "gpt-5.1-codex-max-high" # 任意。プロバイダのモデルIDを直接指定
+    # system_prompt: |              # 任意。Meta 用 system prompt を上書き
+    max_loops: 5 # 任意。最大ループ回数（デフォルト: 5）
+
+  worker:
+    kind: "codex-cli" # v1 は "codex-cli" 固定
+    # docker_image: ...             # 任意。デフォルトイメージを上書き
+    # max_run_time_sec: 1800        # 任意。1 回の Worker 実行タイムアウト
+    # env:
+    #   CODEX_API_KEY: "env:CODEX_API_KEY"  # "env:" 接頭辞でホスト環境変数を参照
+```
+
+#### 2.2 必須フィールド
+
+- `version`: 値は `1`
+- `task.prd`: `path` または `text` のいずれか
+
+#### 2.3 デフォルト補完ルール
+
+| フィールド                       | デフォルト値                                     |
+| -------------------------------- | ------------------------------------------------ |
+| `task.id`                        | UUID 自動生成                                    |
+| `task.title`                     | `task.id` と同じ                                 |
+| `task.repo`                      | `"."` (カレントディレクトリ)                     |
+| `task.test`                      | 未設定（テスト自動実行なし）                     |
+| `runner.meta.kind`               | `"openai-chat"`                                  |
+| `runner.meta.model`              | `gpt-5.1-codex-max-high` (プロバイダのモデル ID) |
+| `runner.meta.max_loops`          | `5`                                              |
+| `runner.worker.kind`             | `"codex-cli"`                                    |
+| `runner.worker.docker_image`     | デフォルトイメージ                               |
+| `runner.worker.max_run_time_sec` | `1800` (30 分)                                   |
+
+#### 2.4 環境変数参照
+
+`env:` プレフィックスを使用してホスト環境変数を参照できます。
+
+```yaml
+runner:
+  worker:
+    env:
+      CODEX_API_KEY: "env:CODEX_API_KEY" # ホストの $CODEX_API_KEY を参照
+      CUSTOM_VAR: "literal-value" # リテラル値
+```
+
+### 3. TaskContext
+
+#### 3.1 構造
+
+TaskContext は実行中のタスク状態を保持します。
+
+```go
+type TaskContext struct {
+    ID        string        // task.id
+    Title     string        // task.title
+    RepoPath  string        // task.repo の絶対パス
+    State     TaskState     // FSM の現状態
+
+    PRDText   string        // PRD 本文
+
+    AcceptanceCriteria []AcceptanceCriterion // Meta plan_task の結果
+    MetaCalls          []MetaCallLog         // Meta 呼び出し履歴
+    WorkerRuns         []WorkerRunResult     // Worker 実行履歴
+
+    TestConfig *TestSpec   // task.test
+    TestResult *TestResult // 実行した場合
+
+    StartedAt  time.Time
+    FinishedAt time.Time
+}
+```
+
+#### 3.2 AcceptanceCriterion
+
+```go
+type AcceptanceCriterion struct {
+    ID          string
+    Description string
+    Passed      bool
+}
+```
+
+#### 3.3 WorkerRunResult
+
+```go
+type WorkerRunResult struct {
+    ID          string
+    StartedAt   time.Time
+    FinishedAt  time.Time
+    ExitCode    int
+    RawOutput   string
+    Summary     string
+    Error       error
+}
+```
+
+### 4. タスク状態機械（FSM）
+
+#### 4.1 状態定義
+
+```go
+type TaskState string
+
+const (
+    StatePending    TaskState = "PENDING"
+    StatePlanning   TaskState = "PLANNING"
+    StateRunning    TaskState = "RUNNING"
+    StateValidating TaskState = "VALIDATING"
+    StateComplete   TaskState = "COMPLETE"
+    StateFailed     TaskState = "FAILED"
+)
+```
+
+#### 4.2 状態遷移
+
+```mermaid
+stateDiagram-v2
+    [*] --> PENDING
+    PENDING --> PLANNING
+    PLANNING --> RUNNING
+    RUNNING --> VALIDATING
+    VALIDATING --> RUNNING: 追加作業が必要
+    VALIDATING --> COMPLETE: 完了
+    VALIDATING --> FAILED: 失敗
+    COMPLETE --> [*]
+    FAILED --> [*]
+```
+
+#### 4.3 遷移ルール
+
+| 現在の状態 | 次の状態   | 条件                              |
+| ---------- | ---------- | --------------------------------- |
+| PENDING    | PLANNING   | タスク開始                        |
+| PLANNING   | RUNNING    | Meta が plan_task を完了          |
+| RUNNING    | VALIDATING | Worker 実行完了                   |
+| VALIDATING | RUNNING    | Meta が追加作業を指示             |
+| VALIDATING | COMPLETE   | Meta が完了を判定                 |
+| VALIDATING | FAILED     | 致命的エラーまたは max_loops 到達 |
+
+#### 4.4 ループ制御
+
+`runner.meta.max_loops` で最大ループ回数を制御します。
+
+- デフォルト: 5 回
+- VALIDATING → RUNNING の遷移回数がこの値を超えると FAILED に遷移
+
+### 5. Task Note フォーマット
+
+#### 5.1 出力パス
+
+```
+<repo>/.agent-runner/task-<task_id>.md
+```
+
+#### 5.2 テンプレート
+
+```markdown
+# Task Note - {{ .ID }} {{ if .Title }}- {{ .Title }}{{ end }}
+
+- Task ID: {{ .ID }}
+- Title: {{ .Title }}
+- Started At: {{ .StartedAt }}
+- Finished At: {{ .FinishedAt }}
+- State: {{ .State }}
+
+---
+
+## 1. 概要
+
+{{ .Summary }}
+
+---
+
+## 2. PRD 概要
+
+{{ .PRDSummary }}
+
+<details>
+<summary>PRD 原文</summary>
+
+\`\`\`text
+{{ .PRDText }}
+\`\`\`
+
+</details>
+
+---
+
+## 3. 受け入れ条件 (Acceptance Criteria)
+
+{{ range .AcceptanceCriteria }}
+
+- [{{ if .Passed }}x{{ else }} {{ end }}] {{ .ID }}: {{ .Description }}
+  {{ end }}
+
+---
+
+## 4. 実行ログ (Meta - Worker)
+
+### 4.1 Meta Calls
+
+{{ range .MetaCalls }}
+
+#### {{ .Type }} at {{ .Timestamp }}
+
+\`\`\`yaml
+{{ .RequestYAML }}
+\`\`\`
+
+\`\`\`yaml
+{{ .ResponseYAML }}
+\`\`\`
+{{ end }}
+
+### 4.2 Worker Runs
+
+{{ range .WorkerRuns }}
+
+#### Run {{ .ID }} (ExitCode={{ .ExitCode }}) at {{ .StartedAt }} - {{ .FinishedAt }}
+
+\`\`\`text
+{{ .RawOutput }}
+\`\`\`
+{{ end }}
+
+---
+
+## 5. テスト結果
+
+{{ if .TestResult }}
+
+- Command: \`{{ .TestResult.Command }}\`
+- ExitCode: {{ .TestResult.ExitCode }}
+- Summary: {{ .TestResult.Summary }}
+
+\`\`\`text
+{{ .TestResult.RawOutput }}
+\`\`\`
+{{ else }}
+テストは自動実行されませんでした。
+{{ end }}
+
+---
+
+## 6. メモ - 残課題
+
+{{ .Notes }}
+```
+
+#### 5.3 実装
+
+Go の `text/template` を使用してテンプレートを展開します。
+
+### 6. 実装状況
+
+#### 6.1 実装済み機能
+
+- ✅ CLI インターフェース（stdin YAML 読み込み）
+- ✅ Task YAML パース
+- ✅ デフォルト補完ロジック
+- ✅ TaskContext 構築
+- ✅ FSM 実装
+- ✅ ループ制御（max_loops）
+- ✅ Task Note 生成
+- ✅ 環境変数参照（`env:` プレフィックス）
+
+#### 6.2 制約事項
+
+- v1 ではコマンドラインオプションは未サポート
+- Worker 種別は `codex-cli` のみ
+- Meta 種別は `openai-chat` のみ
+
+<a id="specifications-meta-protocol"></a>
+
+## Meta Protocol
+
+**Source**: `specifications/meta-protocol.md`
+
+
+最終更新: 2025-11-22
+
+### 概要
+
+本ドキュメントは Meta-agent と AgentRunner Core 間の通信プロトコルを定義します。Meta-agent は LLM ベースのエージェントで、YAML メッセージを介して Core とやり取りします。
+
+### 1. Meta-agent の役割
+
+Meta-agent は以下の責務を持ちます：
+
+1. **計画**: PRD から Acceptance Criteria（受け入れ条件）を設計
+2. **判断**: 次のアクション（Worker 実行 or 完了）を決定
+3. **評価**: タスク完了状況を評価
+
+### 2. プロトコル概要
+
+#### 2.1 呼び出し単位
+
+Meta とのやり取りは 3 種類のリクエスト/レスポンスで構成されます：
+
+| プロトコル              | 入力         | 出力                | 用途       |
+| ----------------------- | ------------ | ------------------- | ---------- |
+| `plan_task`             | PRD テキスト | Acceptance Criteria | タスク計画 |
+| `next_action`           | TaskContext  | 次のアクション      | 実行判断   |
+| `completion_assessment` | TaskContext  | 完了評価            | 完了判定   |
+
+#### 2.2 YAML フォーマット
+
+すべてのメッセージは YAML 形式です。
+
+**共通ルール**:
+
+- 単一ドキュメント（`---` は 1 つまで）
+- インデント: 半角スペース 2 個
+- トップレベルに `type` フィールド必須
+
+### 3. plan_task プロトコル
+
+#### 3.1 目的
+
+PRD を解析し、タスクの受け入れ条件（Acceptance Criteria）を定義します。
+
+#### 3.2 入力
+
+Core は以下の情報を Meta に渡します：
+
+- Task YAML（タスク設定）
+- PRD テキスト（要件定義）
+
+#### 3.3 出力 YAML
+
+```yaml
+type: plan_task
+acceptance_criteria:
+  - id: "AC-1"
+    description: "ユーザー登録APIが正常系で 201 を返すこと"
+  - id: "AC-2"
+    description: "必須項目のバリデーションエラー時に 400 を返すこと"
+```
+
+#### 3.4 フィールド定義
+
+| フィールド                          | 型     | 必須 | 説明                            |
+| ----------------------------------- | ------ | ---- | ------------------------------- |
+| `type`                              | string | ✅   | 固定値: `"plan_task"`           |
+| `acceptance_criteria`               | array  | ✅   | 受け入れ条件のリスト            |
+| `acceptance_criteria[].id`          | string | 推奨 | 受け入れ条件の ID（例: "AC-1"） |
+| `acceptance_criteria[].description` | string | ✅   | 受け入れ条件の説明              |
+
+#### 3.5 実装例
+
+```go
+type PlanTaskResponse struct {
+    Type               string                  `yaml:"type"`
+    AcceptanceCriteria []AcceptanceCriterion   `yaml:"acceptance_criteria"`
+}
+
+type AcceptanceCriterion struct {
+    ID          string `yaml:"id"`
+    Description string `yaml:"description"`
+}
+```
+
+### 4. next_action プロトコル
+
+#### 4.1 目的
+
+現在のタスク状態を評価し、次のアクション（Worker 実行 or 完了）を決定します。
+
+#### 4.2 入力
+
+Core は TaskContext の要約を Meta に渡します：
+
+```yaml
+task:
+  id: "TASK-123"
+  title: "Implement API endpoint X"
+  prd_summary: "..."
+acceptance_criteria:
+  - id: "AC-1"
+    description: "..."
+last_worker_result:
+  exists: true
+  exit_code: 0
+  stdout_tail: "..."
+state: "RUNNING"
+```
+
+#### 4.3 出力 YAML
+
+#### 4.3.1 Worker 実行を要求する場合
+
+```yaml
+type: next_action
+decision:
+  action: "run_worker"
+  reason: "まだ実装が行われていないため"
+
+worker_call:
+  worker_type: "codex-cli"
+  mode: "exec"
+  prompt: |
+    ここに Codex に渡すべき指示文（自然言語 + 手順）が入る
+```
+
+#### 4.3.2 タスク完了と判断する場合
+
+```yaml
+type: next_action
+decision:
+  action: "mark_complete"
+  reason: "全ての受け入れ条件が満たされ、テストも成功したため"
+```
+
+#### 4.4 フィールド定義
+
+| フィールド                | 型     | 必須     | 説明                                    |
+| ------------------------- | ------ | -------- | --------------------------------------- |
+| `type`                    | string | ✅       | 固定値: `"next_action"`                 |
+| `decision.action`         | string | ✅       | `"run_worker"` または `"mark_complete"` |
+| `decision.reason`         | string | ✅       | 判断理由                                |
+| `worker_call`             | object | 条件付き | `action` が `"run_worker"` の場合必須   |
+| `worker_call.worker_type` | string | ✅       | Worker 種別（v1: `"codex-cli"`）        |
+| `worker_call.mode`        | string | ✅       | 実行モード（v1: `"exec"`）              |
+| `worker_call.prompt`      | string | ✅       | Worker への指示文                       |
+
+#### 4.5 実装例
+
+```go
+type NextActionResponse struct {
+    Type       string              `yaml:"type"`
+    Decision   Decision            `yaml:"decision"`
+    WorkerCall *WorkerCall         `yaml:"worker_call,omitempty"`
+}
+
+type Decision struct {
+    Action string `yaml:"action"`
+    Reason string `yaml:"reason"`
+}
+
+type WorkerCall struct {
+    WorkerType string `yaml:"worker_type"`
+    Mode       string `yaml:"mode"`
+    Prompt     string `yaml:"prompt"`
+}
+```
+
+### 5. completion_assessment プロトコル
+
+#### 5.1 目的
+
+タスク完了時に、Acceptance Criteria の達成状況を評価します。
+
+#### 5.2 入力
+
+Core は最終状態の TaskContext を Meta に渡します。
+
+#### 5.3 出力 YAML
+
+```yaml
+type: completion_assessment
+summary: |
+  ユーザー登録APIの実装は完了しており、以下の受け入れ条件を満たしています。
+details:
+  passed_criteria:
+    - "AC-1"
+    - "AC-2"
+  remaining_risks:
+    - "性能テストは未実施"
+```
+
+#### 5.4 フィールド定義
+
+| フィールド                | 型     | 必須 | 説明                               |
+| ------------------------- | ------ | ---- | ---------------------------------- |
+| `type`                    | string | ✅   | 固定値: `"completion_assessment"`  |
+| `summary`                 | string | ✅   | 完了評価のサマリ                   |
+| `details.passed_criteria` | array  | 推奨 | 満たされた受け入れ条件の ID リスト |
+| `details.remaining_risks` | array  | 推奨 | 残存リスクのリスト                 |
+
+#### 5.5 実装例
+
+```go
+type CompletionAssessmentResponse struct {
+    Type    string                       `yaml:"type"`
+    Summary string                       `yaml:"summary"`
+    Details CompletionAssessmentDetails  `yaml:"details"`
+}
+
+type CompletionAssessmentDetails struct {
+    PassedCriteria  []string `yaml:"passed_criteria"`
+    RemainingRisks  []string `yaml:"remaining_risks"`
+}
+```
+
+### 6. エラーハンドリング
+
+#### 6.1 LLM エラー再試行ロジック
+
+v1 実装では、LLM API 呼び出しの信頼性を向上させるため、以下の再試行ロジックを実装しています：
+
+| 項目                    | 設定                                      |
+| ----------------------- | ----------------------------------------- |
+| **再試行対象エラー**    | HTTP 5xx、タイムアウト、Rate Limit（429） |
+| **再試行回数**          | 最大 3 回                                 |
+| **Exponential Backoff** | 1 秒 → 2 秒 → 4 秒                        |
+| **非再試行エラー**      | HTTP 4xx（400, 401, 403 など）            |
+
+#### 6.2 YAML パースエラー
+
+Meta が不正な YAML を返した場合：
+
+1. エラーログを出力
+2. Meta に再試行を要求（最大 3 回）
+3. 3 回失敗した場合、タスクを FAILED に遷移
+
+#### 6.3 タイムアウト
+
+Meta 呼び出しのタイムアウト設定：
+
+- デフォルト: 60 秒
+- 環境変数 `META_TIMEOUT_SEC` で変更可能
+
+### 7. プロンプト設計
+
+#### 7.1 System Prompt
+
+Meta には以下の System Prompt が設定されます：
+
+````text
+あなたはソフトウェア開発タスクを管理するテックリード兼オーケストレータです。
+
+- 与えられたタスクコンテキスト（TaskContext）にもとづき、
+  次に何をすべきかを決定する役割を担います。
+- 出力は必ず 1 つの YAML ドキュメントのみとします。
+- コードブロック（```）や解説文は一切書かないでください。
+````
+
+#### 7.2 System Prompt のカスタマイズ
+
+Task YAML で `runner.meta.system_prompt` を指定することで、System Prompt を上書きできます：
+
+```yaml
+runner:
+  meta:
+    system_prompt: |
+      カスタム System Prompt
+```
+
+### 8. 実装状況
+
+#### 8.1 実装済み機能
+
+- ✅ `plan_task` プロトコル
+- ✅ `next_action` プロトコル
+- ✅ `completion_assessment` プロトコル
+- ✅ LLM エラー再試行ロジック（Exponential Backoff）
+- ✅ System Prompt カスタマイズ
+- ✅ YAML パースエラーハンドリング
+
+#### 8.2 制約事項
+
+- v1 では OpenAI Chat API のみサポート
+- プロトコルバージョニングは未実装（将来拡張予定）
+
+<a id="specifications-worker-interface"></a>
+
+## Worker Interface
+
+**Source**: `specifications/worker-interface.md`
+
+
+最終更新: 2025-11-22
+
+### 概要
+
+本ドキュメントは Worker 実行と Docker サンドボックス環境の仕様を定義します。Worker は Meta-agent の指示に従って実際の開発作業を行います。
+
+### 1. Worker の役割
+
+Worker Executor は以下の責務を持ちます：
+
+1. **実行**: Meta の `worker_call` に従い、Worker CLI を実行
+2. **隔離**: Docker サンドボックス内で安全に実行
+3. **結果収集**: 実行結果（exit code, stdout/stderr）を Core に返す
+
+### 2. Worker 種別
+
+#### 2.1 v1 サポート Worker
+
+v1 では `codex-cli` のみをサポートします。
+
+| Worker 種別 | 説明                               | Docker イメージ             |
+| ----------- | ---------------------------------- | --------------------------- |
+| `codex-cli` | Codex CLI コーディングエージェント | `agent-runner-codex:latest` |
+
+#### 2.2 将来拡張
+
+将来的に以下の Worker をサポート予定：
+
+- `cursor-cli`
+- `claude-code-cli`
+
+### 3. Worker 実行インターフェース
+
+#### 3.1 実行フロー
+
+```mermaid
+sequenceDiagram
+    participant Core
+    participant Executor
+    participant Docker
+    participant Worker
+
+    Core->>Executor: Start()
+    Executor->>Docker: コンテナ起動
+    Docker-->>Executor: コンテナ ID
+
+    Core->>Executor: RunWorker(prompt)
+    Executor->>Docker: docker exec
+    Docker->>Worker: Worker CLI 実行
+    Worker-->>Docker: stdout/stderr
+    Docker-->>Executor: exit code, output
+    Executor-->>Core: WorkerRunResult
+
+    Core->>Executor: Stop()
+    Executor->>Docker: コンテナ停止
+```
+
+#### 3.2 コンテナライフサイクル最適化
+
+v1 実装では、パフォーマンス最適化のため、以下のライフサイクル管理を採用しています：
+
+| フェーズ          | 処理                                  | メソッド                     |
+| ----------------- | ------------------------------------- | ---------------------------- |
+| **タスク開始時**  | 1 回だけコンテナを起動                | `WorkerExecutor.Start()`     |
+| **Worker 実行時** | 既存コンテナ内で `docker exec` を実行 | `WorkerExecutor.RunWorker()` |
+| **タスク完了時**  | コンテナを停止                        | `WorkerExecutor.Stop()`      |
+
+**効果**: Worker 実行ごとにコンテナを起動・停止する場合と比較して、5-10 倍の高速化を実現。
+
+#### 3.3 実行結果フォーマット
+
+```go
+type WorkerRunResult struct {
+    ID          string    // ラン毎の ID（UUID）
+    StartedAt   time.Time // 実行開始時刻
+    FinishedAt  time.Time // 実行終了時刻
+    ExitCode    int       // 終了コード
+    RawOutput   string    // stdout/stderr の結合
+    Summary     string    // 実行サマリ（オプション）
+    Error       error     // 実行エラー（起動失敗など）
+}
+```
+
+### 4. Docker サンドボックス仕様
+
+#### 4.1 Docker イメージ
+
+| 項目                   | 設定                                                    |
+| ---------------------- | ------------------------------------------------------- |
+| **デフォルトイメージ** | `agent-runner-codex:latest`                             |
+| **カスタマイズ**       | Task YAML の `runner.worker.docker_image` で上書き可能  |
+| **自動 Pull**          | イメージが存在しない場合、自動的に `docker pull` を実行 |
+
+#### 4.2 コンテナ内パス
+
+| パス                     | 用途               | マウント元                    |
+| ------------------------ | ------------------ | ----------------------------- |
+| `/workspace/project`     | プロジェクトルート | ホストの `task.repo`          |
+| `/root/.codex/auth.json` | Codex 認証情報     | ホストの `~/.codex/auth.json` |
+
+#### 4.3 マウント仕様
+
+#### 4.3.1 プロジェクトマウント
+
+```bash
+-v <host_repo_path>:/workspace/project
+```
+
+- **モード**: read-write
+- **WorkingDir**: `/workspace/project`
+
+#### 4.3.2 Codex 認証マウント（自動）
+
+v1 実装では、以下の順序で Codex 認証情報を自動的に検出・設定します：
+
+1. `~/.codex/auth.json` が存在する場合:
+
+   ```bash
+   -v ~/.codex/auth.json:/root/.codex/auth.json:ro
+   ```
+
+2. `~/.codex/auth.json` が存在しない場合:
+   ```bash
+   -e CODEX_API_KEY=$CODEX_API_KEY
+   ```
+
+#### 4.4 環境変数
+
+#### 4.4.1 環境変数の注入
+
+Task YAML で環境変数を指定できます：
+
+```yaml
+runner:
+  worker:
+    env:
+      CODEX_API_KEY: "env:CODEX_API_KEY" # ホスト環境変数を参照
+      CUSTOM_VAR: "literal-value" # リテラル値
+```
+
+#### 4.4.2 `env:` プレフィックス
+
+`env:` プレフィックスを使用すると、ホストの環境変数を参照できます：
+
+| Task YAML の値        | 実際の値                       |
+| --------------------- | ------------------------------ |
+| `"env:CODEX_API_KEY"` | ホストの `$CODEX_API_KEY` の値 |
+| `"literal-value"`     | `"literal-value"` そのまま     |
+
+#### 4.5 コンテナ起動オプション
+
+```bash
+docker run \
+  --name agent-runner-<task_id> \
+  -v <repo_path>:/workspace/project \
+  -v ~/.codex/auth.json:/root/.codex/auth.json:ro \
+  -e CODEX_API_KEY=<value> \
+  -w /workspace/project \
+  --rm \
+  agent-runner-codex:latest \
+  tail -f /dev/null
+```
+
+**オプション説明**:
+
+- `--name`: コンテナ名（タスク ID ベース）
+- `-v`: ボリュームマウント
+- `-e`: 環境変数
+- `-w`: 作業ディレクトリ
+- `--rm`: 停止時に自動削除
+- `tail -f /dev/null`: Keep Alive コマンド
+
+### 5. Worker 実行
+
+#### 5.1 Codex CLI 実行
+
+```bash
+docker exec <container_id> codex exec \
+  --sandbox workspace-write \
+  --json \
+  --cwd /workspace/project \
+  "<Meta から渡された prompt>"
+```
+
+#### 5.2 タイムアウト
+
+| 項目                        | デフォルト       | カスタマイズ                                  |
+| --------------------------- | ---------------- | --------------------------------------------- |
+| **Worker 実行タイムアウト** | 1800 秒（30 分） | Task YAML の `runner.worker.max_run_time_sec` |
+
+タイムアウトに達した場合、Worker 実行は強制終了され、エラーとして扱われます。
+
+#### 5.3 エラーハンドリング
+
+| エラー種別                | 処理                                           |
+| ------------------------- | ---------------------------------------------- |
+| **コンテナ起動失敗**      | タスクを FAILED に遷移                         |
+| **Worker 実行失敗**       | WorkerRunResult に記録、Meta に報告            |
+| **タイムアウト**          | Worker を強制終了、エラーとして記録            |
+| **Docker デーモン未起動** | エラーメッセージを表示、タスクを FAILED に遷移 |
+
+### 6. 実装インターフェース
+
+#### 6.1 WorkerExecutor インターフェース
+
+```go
+type WorkerExecutor interface {
+    // タスク開始時にコンテナを起動
+    Start(ctx context.Context) error
+
+    // Worker を実行
+    RunWorker(ctx context.Context, prompt string) (*WorkerRunResult, error)
+
+    // タスク完了時にコンテナを停止
+    Stop(ctx context.Context) error
+}
+```
+
+#### 6.2 SandboxManager インターフェース
+
+```go
+type SandboxManager interface {
+    // コンテナを起動し、ID を返す
+    StartContainer(ctx context.Context, image string, repoPath string, env map[string]string) (string, error)
+
+    // コンテナ内でコマンドを実行
+    Exec(ctx context.Context, containerID string, cmd []string) (int, string, error)
+
+    // コンテナを停止・削除
+    StopContainer(ctx context.Context, containerID string) error
+}
+```
+
+### 7. 実装状況
+
+#### 7.1 実装済み機能
+
+- ✅ Codex CLI Worker
+- ✅ Docker サンドボックス管理
+- ✅ コンテナライフサイクル最適化
+- ✅ ImagePull 自動実行
+- ✅ Codex 認証自動マウント
+- ✅ 環境変数注入（`env:` プレフィックス）
+- ✅ タイムアウト制御
+- ✅ エラーハンドリング
+
+#### 7.2 制約事項
+
+- v1 では `codex-cli` のみサポート
+- Docker が必須（他のコンテナランタイムは未サポート）
+- Windows での動作は未検証
+
+#### 7.3 パフォーマンス
+
+| 項目                 | 測定値                      |
+| -------------------- | --------------------------- |
+| **コンテナ起動時間** | 約 2-3 秒                   |
+| **Worker 実行時間**  | タスク依存（通常 10-60 秒） |
+| **コンテナ停止時間** | 約 1 秒                     |
+
+**最適化効果**: コンテナ再利用により、複数回の Worker 実行で 5-10 倍の高速化を実現。
+
+<a id="specifications-orchestrator-spec"></a>
+
+## Orchestrator Spec
+
+**Source**: `specifications/orchestrator-spec.md`
+
+
+### 概要
+
+Multiverse Orchestrator は、`multiverse` エコシステムにおけるタスク実行の中枢を担うコンポーネントです。ユーザー（IDE）からのタスク実行リクエストを受け付け、適切な Worker プールと AgentRunner Core を使用してタスクを自律的に実行します。
+
+### アーキテクチャ
+
+Orchestrator は以下の要素で構成されます。
+
+1.  **Task Scheduler**: タスクの優先順位と Worker プールの空き状況を管理し、実行キューを処理します。
+2.  **Task Executor**: 実際にタスクを実行するためのサブプロセス（`agent-runner`）を管理します。
+3.  **Task Store**: タスクのメタデータ、実行履歴（Attempt）、ログを永続化・管理します。
+4.  **IPC Interface**: IDE や他のツールとの通信を行うためのファイルベースのインターフェースです。
+
+```mermaid
+flowchart TD
+    IDE[Multiverse IDE] -->|Place Task| IPC_QUEUE[IPC Queue]
+    IPC_QUEUE --> SCHED[Scheduler]
+    SCHED -->|Dispatch| EXECUTOR[Executor]
+    EXECUTOR -->|Spawn| RUNNER[AgentRunner Core]
+    RUNNER -->|Exec| DOCKER[Docker Sandbox]
+
+    RUNNER -->|Log/Status| STORE[Task Store]
+    STORE -->|Update| IPC_RESULT[IPC Results]
+    IDE <-->|Poll| IPC_RESULT
+```
+
+### コンポーネント詳細
+
+#### 1. Executor (`internal/orchestrator-executor.go`)
+
+`Executor` は、単一のタスク実行（Attempt）を管理する責任を持ちます。
+
+- **役割**:
+
+  - 新しい Attempt ID (UUID) の発行
+  - `agent-runner` プロセスの起動 (`os/exec`)
+  - Task YAML の動的生成と標準入力への流し込み
+  - プロセスの終了待機と終了ステータス（成功/失敗）の判定
+  - 実行結果（Attempt Status, Error Summary）の `TaskStore` への保存
+
+- **動作フロー**:
+  1.  `ExecuteTask(ctx, task)` が呼ばれる。
+  2.  `PENDING` -> `RUNNING` へステータス更新。
+  3.  `agent-runner` 向けの設定 YAML をメモリ上で生成。
+  4.  `agent-runner` プロセスを起動。
+  5.  プロセス終了後、Exit Code と出力に基づき `SUCCEEDED` / `FAILED` を判定。
+  6.  Task と Attempt の最終状態を保存。
+
+#### 2. Task Store (`internal/orchestrator-task_store.go`)
+
+ファイルシステムベースのデータストアです。
+
+- **パス**: `$HOME/.multiverse/workspaces/<workspace-id>/`
+- **保存データ**:
+  - `tasks/<task-id>.jsonl`: タスクのメタデータ履歴
+  - `attempts/<attempt-id>.json`: 実行試行の詳細
+
+### IPC (Inter-Process Communication)
+
+v0.1 ではファイルシステムベースの単純な IPC を採用しています。
+
+#### Queue (IDE -> Orchestrator)
+
+- パス: `ipc/queue/<pool-id>/<job-id>.json`
+- Orchestrator はこのディレクトリを監視（ポーリング）し、新規ファイルを検知してタスクを開始します。
+
+#### Results (Orchestrator -> IDE)
+
+- パス: `ipc/results/<job-id>.json`
+- タスク完了時、Orchestrator はここに結果を出力します。IDE はこれを読み取って完了通知などを行います。
+- **注意**: 実際の詳細なステータスは `Task Store` （`tasks/` ディレクトリ）を参照するのが正とされます。
+
+### 今後の拡張
+
+- **WebSocket**: リアルタイムなログストリーミングと状態通知のために導入予定。
+- **Database**: タスク履歴の検索性向上のため、SQLite などの埋め込み DB への移行を検討。
+- **Multi-Node**: リモートの強力なマシンで Worker を動かすための分散実行プロトコル。
+
+### 実装詳細 (v0.x Current)
+
+現在の `internal/orchestrator` 実装における詳細仕様です。
+
+#### 1. Execution State Machine
+
+`ExecutionOrchestrator` は以下の状態を持ちます。
+
+- **IDLE**: 停止状態。タスク処理を行いません。
+- **RUNNING**: 稼働状態。キューをポーリングし、タスクを実行します。
+- **PAUSED**: 一時停止状態。実行中のタスクは継続しますが、新規タスクの開始を保留します。
+
+#### 2. Reliability & Recovery
+
+タスク失敗時、`RetryPolicy` に基づき以下の判断を行います。
+
+- **Retry**: 一時的なエラーと判断した場合、Exponential Backoff を適用してタスクを `RETRY_WAIT` 状態にし、将来の再実行をスケジュールします。
+- **Backlog**: リトライ上限到達や致命的なエラーの場合、タスクをバックログ (`BacklogStore`) に移動し、人間の介入を待ちます。
+
+#### 3. Force Stop
+
+`Stop()` メソッドにより、オーケストレーターを即座に停止できます。
+
+- 実行中のタスクがある場合、Context Cancellation により `agent-runner` プロセスを強制終了します。
+- Docker コンテナなどのリソースは `agent-runner` のクリーンアップ処理により停止されます。
+
+#### 4. Executor の制約
+
+現在の `Executor` は簡易実装であり、以下の制限があります。
+
+- `agent-runner` への入力 YAML はコード内で生成されており、`max_loops: 5`, `worker.cli: "codex"` 等の値がハードコードされています。
+
+<a id="specifications-logging-specification"></a>
+
+## Logging Specification
+
+**Source**: `specifications/logging-specification.md`
+
+
+最終更新: 2025-12-06
+
+### 概要
+
+Multiverse サービス全体で統一的なロギングを実現するための仕様書です。IDE、バックエンド、AI 処理フローを通じてデバッグとトレースを可能にします。
+
+### 設計原則
+
+#### 1. Trace ID (相関 ID)
+
+- 各タスク実行に一意の **Trace ID** (UUID) を付与
+- IDE → Orchestrator → AgentRunner → Worker の全フローで同一 ID を伝播
+- ログ検索・フィルタリングで処理フロー全体を追跡可能
+
+#### 2. 構造化ログ
+
+- **Go バックエンド**: `log/slog` を使用
+- **フロントエンド**: カスタム `Logger` クラスを使用
+- JSON フォーマット（本番環境）/ Text フォーマット（開発環境）対応
+
+#### 3. ログレベル
+
+| レベル  | 用途                                                      |
+| ------- | --------------------------------------------------------- |
+| `DEBUG` | 詳細なデバッグ情報（変数値、リクエスト/レスポンス全文等） |
+| `INFO`  | 重要なイベント（タスク開始/終了、状態遷移等）             |
+| `WARN`  | 警告（リトライ、軽微なエラー等）                          |
+| `ERROR` | エラー（処理失敗、例外等）                                |
+
+### Go バックエンド
+
+#### ロギングパッケージ
+
+`internal/logging/logging.go`
+
+```go
+package logging
+
+// Trace ID をコンテキストに設定
+func ContextWithTraceID(ctx context.Context, traceID string) context.Context
+
+// コンテキストから Trace ID を取得
+func TraceIDFromContext(ctx context.Context) string
+
+// 新しいロガーを作成
+func NewLogger(cfg Config) *slog.Logger
+
+// Trace ID 付きロガーを返す
+func WithTraceID(logger *slog.Logger, ctx context.Context) *slog.Logger
+
+// コンポーネント名付きロガーを返す
+func WithComponent(logger *slog.Logger, component string) *slog.Logger
+```
+
+#### 設定
+
+```go
+type Config struct {
+    Level      slog.Level  // 最小ログレベル
+    JSONFormat bool        // JSON 形式で出力
+    AddSource  bool        // ソースファイル情報を追加
+}
+
+// プリセット設定
+DefaultConfig()    // 開発用（INFO、Text）
+ProductionConfig() // 本番用（INFO、JSON、ソース付き）
+DebugConfig()      // デバッグ用（DEBUG、Text、ソース付き）
+```
+
+#### 使用例
+
+```go
+import "github.com/biwakonbu/agent-runner/internal/logging"
+
+// タスク実行開始時に Trace ID を生成
+traceID := uuid.New().String()
+ctx := logging.ContextWithTraceID(ctx, traceID)
+
+// ロガーに Trace ID とコンポーネント名を付与
+logger := logging.WithTraceID(slog.Default(), ctx)
+logger = logging.WithComponent(logger, "runner")
+
+// ログ出力
+logger.Info("starting task execution",
+    slog.String("task_id", taskID),
+    slog.String("state", "PENDING"),
+)
+```
+
+#### 出力例
+
+```
+2025/12/06 00:48:28 INFO starting task execution component=runner trace_id=abc123 task_id=test-task state=PENDING
+2025/12/06 00:48:28 INFO state transition component=runner trace_id=abc123 from=PENDING to=PLANNING
+2025/12/06 00:48:28 INFO calling Meta.PlanTask component=runner trace_id=abc123
+2025/12/06 00:48:28 INFO PlanTask completed component=runner trace_id=abc123 criteria_count=2 duration_ms=1234
+```
+
+### フロントエンド
+
+#### ロガークラス
+
+`frontend/ide/src/services/logger.ts`
+
+```typescript
+type LogLevel = "debug" | "info" | "warn" | "error";
+
+class Logger {
+  static setLevel(level: LogLevel): void;
+  static setTraceId(id: string | null): void;
+  static withComponent(component: string): ComponentLogger;
+
+  static debug(message: string, context?: Record<string, unknown>): void;
+  static info(message: string, context?: Record<string, unknown>): void;
+  static warn(message: string, context?: Record<string, unknown>): void;
+  static error(message: string, context?: Record<string, unknown>): void;
+}
+```
+
+#### 使用例
+
+```typescript
+import { Logger } from './services/logger';
+
+// コンポーネント別ロガーを作成
+const log = Logger.withComponent('TaskCreate');
+
+// ログ出力
+log.info('creating task', { title: 'タスク名', poolId: 'default' });
+log.debug('task details', { data: {...} });
+log.error('task creation failed', { error: e });
+```
+
+#### 出力例
+
+```
+[00:48:28.123] INFO  [TaskCreate] creating task { title: 'タスク名', poolId: 'default' }
+[00:48:28.456] ERROR [TaskCreate] task creation failed { error: Error(...) }
+```
+
+### ログポイント
+
+#### Core Runner (`internal/core-runner.go`)
+
+| ログポイント           | レベル | 内容                                                          |
+| ---------------------- | ------ | ------------------------------------------------------------- |
+| タスク開始             | INFO   | task_id, title, state                                         |
+| 状態遷移               | INFO   | from, to                                                      |
+| Meta.PlanTask 呼び出し | INFO   | -                                                             |
+| PlanTask 完了          | INFO   | criteria_count, duration_ms                                   |
+| Worker 実行開始        | INFO   | prompt_length                                                 |
+| Worker 実行完了        | INFO   | exit_code, output_length, duration_ms                         |
+| Worker 出力            | DEBUG  | output (全文)                                                 |
+| タスク完了             | INFO   | final_state, worker_runs_count, meta_calls_count, duration_ms |
+
+#### Meta Client (`internal/meta-client.go`)
+
+| ログポイント     | レベル | 内容                                       |
+| ---------------- | ------ | ------------------------------------------ |
+| LLM 呼び出し開始 | INFO   | model, request_size                        |
+| リクエスト内容   | DEBUG  | system_prompt, user_prompt                 |
+| リトライ         | WARN   | attempt, max_retries, delay_seconds, error |
+| LLM 呼び出し完了 | INFO   | response_size, duration_ms                 |
+| レスポンス内容   | DEBUG  | content (全文)                             |
+
+#### Worker Executor (`internal/worker-executor.go`)
+
+| ログポイント        | レベル | 内容                                     |
+| ------------------- | ------ | ---------------------------------------- |
+| コンテナ起動開始    | INFO   | image, repo_path                         |
+| コンテナ起動完了    | INFO   | container_id, duration_ms                |
+| Worker コマンド実行 | INFO   | container_id, prompt_length, timeout_sec |
+| Worker 実行完了     | INFO   | exit_code, output_length, duration_ms    |
+| コンテナ停止        | INFO   | container_id, duration_ms                |
+
+#### IDE App (`app.go`)
+
+| ログポイント           | レベル     | 内容                    |
+| ---------------------- | ---------- | ----------------------- |
+| アプリ起動             | INFO       | -                       |
+| ワークスペース選択     | INFO       | path                    |
+| ワークスペース読み込み | INFO       | id, workspace_dir       |
+| タスク作成             | INFO       | title, pool_id, task_id |
+| タスク実行開始         | INFO       | task_id, trace_id       |
+| タスク実行完了/失敗    | INFO/ERROR | task_id                 |
+
+### デバッグ手順
+
+#### 1. Trace ID でログを検索
+
+```bash
+# 特定の Trace ID のログを抽出
+grep "trace_id=abc123" app.log
+```
+
+#### 2. DEBUG レベルで詳細ログを出力
+
+```go
+// Go バックエンド
+logger := logging.NewLogger(logging.DebugConfig())
+slog.SetDefault(logger)
+```
+
+```typescript
+// フロントエンド
+Logger.setLevel("debug");
+```
+
+#### 3. 問題の特定
+
+1. エラーログから問題発生箇所を特定
+2. Trace ID を取得
+3. 同一 Trace ID のログを時系列で追跡
+4. DEBUG レベルで詳細情報を確認
+
+<a id="specifications-testing-strategy"></a>
+
+## Testing Strategy
+
+**Source**: `specifications/testing-strategy.md`
+
+
+### 概要
+
+Multiverse プロジェクトでは、システム全体の信頼性を確保し、開発効率を向上させるために、**包括的な自動テスト環境**を構築しています。
+特に、以下の 2 つの層で End-to-End (E2E) テストを実施することで、バックエンドのロジックとフロントエンドの UI 動作を独立して、かつ確実に検証します。
+
+### アーキテクチャ
+
+テストアーキテクチャは以下の 2 層で構成されます。
+
+1.  **Backend Integration E2E**: IDE バックエンドからオーケストレーター、エージェント実行までのフローを検証。
+2.  **Frontend UI E2E**: Wails フロントエンドの UI ロジックとユーザー操作を検証。
+
+| 層           | 範囲                                           | 技術スタック               | 目的                                          |
+| ------------ | ---------------------------------------------- | -------------------------- | --------------------------------------------- |
+| **Backend**  | `ide` (Go) -> `orchestrator` -> `agent-runner` | Go Test, Shell Script Mock | プロセス連携、タスクキュー、状態遷移の検証    |
+| **Frontend** | `frontend/ide` (Svelte)                        | Playwright, Wails JS Mock  | UI 描画、イベントハンドリング、画面遷移の検証 |
+
+---
+
+### 1. Backend Integration E2E
+
+#### 配置場所
+
+`test/e2e/orchestrator_flow_test.go`
+
+#### 設計方針
+
+実際の IDE アプリケーション (`app.go`) と同様のコンポーネント構成（WorkspaceStore, Scheduler, Executor）をテスト内で再現し、**外部プロセスとの連携**を含めた統合テストを行います。
+
+- **モック化**: 実際の `agent-runner` は実行に時間がかかるため、標準入力を消費して即座に成功を返す `mock_runner.sh` を使用します。
+- **検証範囲**:
+  - タスクの作成とスケジューリング
+  - オーケストレータープロセスによるジョブのピックアップ
+  - タスクステータスの遷移 (PENDING -> RUNNING -> SUCCEEDED)
+  - 成果物ファイルの生成確認
+
+#### 実行方法
+
+```bash
+go test -v ./test/e2e/...
+```
+
+---
+
+### 2. Frontend UI E2E
+
+#### 配置場所
+
+`frontend/ide/tests/`
+
+#### 設計方針
+
+Wails アプリケーションのフロントエンド部分はブラウザ技術で動作しますが、バックエンド（Go）に依存しています。この依存を**モック**することで、バックエンドを起動せずに高速な UI テストを実現します。
+
+- **Playwright**: ブラウザ自動操作ツールとして採用。
+- **Wails API Mock**: `frontend/ide/src/mocks/wails.js` に `window.runtime` およびバックエンドメソッド（`CreateTask` 等）のモックを実装。
+- **Vite Alias**: E2E テスト実行時のみ、Wails 自動生成ファイルへのパスをモックファイルに向けるように `vite.config.ts` を構成。
+
+#### 検証範囲
+
+- タスク一覧の描画
+- クリエイト・リード・アップデート・デリート (CRUD) の UI 操作フロー
+- コンポーネントの状態変化（ローディング、エラー表示等）
+
+#### 実行方法
+
+```bash
+cd frontend/ide
+npm run test:e2e
+```
+
+### 今後の展望
+
+- **CI 連携**: GitHub Actions 上でこれらのテストをプルリクエストごとに実行する。
+- **カバレッジ拡大**: 異常系（タスク失敗、ネットワークエラー）のテストケースを追加する。
+
+
 # Design
+
+<a id="design-README"></a>
+
+## README
+
+**Source**: `design/README.md`
+
+
+このディレクトリには AgentRunner の設計思想と実装方針が含まれています。
+
+### ドキュメント一覧
+
+#### [architecture.md](architecture.md)
+
+システム全体のアーキテクチャを説明します。
+
+- **対象読者**: アーキテクト、技術リード
+- **内容**:
+  - システム構成
+  - コンポーネント設計
+  - 役割分担
+  - 設計思想と原則
+
+#### [implementation-guide.md](implementation-guide.md)
+
+Go 言語での実装ガイドを提供します。
+
+- **対象読者**: 実装者、コントリビューター
+- **内容**:
+  - パッケージ構成
+  - 依存性注入パターン
+  - インターフェース設計
+  - 実装パターン
+  - テスト戦略
+
+#### [data-flow.md](data-flow.md)
+
+データフローと状態遷移を説明します。
+
+- **対象読者**: 実装者、デバッガー
+- **内容**:
+  - タスク実行フロー
+  - 状態遷移図
+  - データ変換
+  - エラーフロー
+
+### 設計の読み方
+
+1. [architecture.md](architecture.md) でシステム全体像を把握
+2. [data-flow.md](data-flow.md) で実行フローを理解
+3. [implementation-guide.md](implementation-guide.md) で実装方針を確認
+
+### 設計の更新ルール
+
+- 設計変更は実装前に文書化
+- 設計判断の理由を明記
+- 代替案と選択理由を記録
+
+<a id="design-architecture"></a>
 
 ## Architecture
 
-**ソース**: `design/architecture.md`
+**Source**: `design/architecture.md`
 
-## AgentRunner システムアーキテクチャ
 
 最終更新: 2025-11-22  
 バージョン: 1.0
@@ -108,14 +1677,14 @@ flowchart TB
 
 #### コンポーネント詳細
 
-##### 1. Client
+#### 1. Client
 
 | コンポーネント | 説明                           |
 | -------------- | ------------------------------ |
 | **開発者**     | Task YAML を作成し、CLI を実行 |
 | **CI**         | 自動化されたタスク実行         |
 
-##### 2. AgentRunner Core
+#### 2. AgentRunner Core
 
 | コンポーネント       | 責務                                                                      |
 | -------------------- | ------------------------------------------------------------------------- |
@@ -126,7 +1695,7 @@ flowchart TB
 | **Sandbox Manager**  | Docker サンドボックスの管理                                               |
 | **Task Note Writer** | Markdown ノートの生成                                                     |
 
-##### 3. Meta-agent (LLM)
+#### 3. Meta-agent (LLM)
 
 | コンポーネント | 責務                                               |
 | -------------- | -------------------------------------------------- |
@@ -134,14 +1703,14 @@ flowchart TB
 | **Controller** | 次のアクション（run_worker / mark_complete）を決定 |
 | **Evaluator**  | Worker の結果と AC を比較して完了可否を判断        |
 
-##### 4. Execution Sandbox (Docker)
+#### 4. Execution Sandbox (Docker)
 
 | コンポーネント | 責務                                 |
 | -------------- | ------------------------------------ |
 | **Container**  | タスク単位の隔離環境                 |
 | **Worker CLI** | 実際の開発作業（coding, git, tests） |
 
-##### 5. External Outputs
+#### 5. External Outputs
 
 | コンポーネント | 説明                   |
 | -------------- | ---------------------- |
@@ -150,7 +1719,7 @@ flowchart TB
 
 ### 役割分担
 
-#### Meta-agent（オーケストレータ / 頭脳）
+#### Meta-agent（オーケストレータ - 頭脳）
 
 **責務**:
 
@@ -161,7 +1730,7 @@ flowchart TB
 **入力**: PRD、TaskContext  
 **出力**: Acceptance Criteria、Worker 指示、完了評価
 
-#### AgentRunner Core（実行基盤 / 手足）
+#### AgentRunner Core（実行基盤 - 手足）
 
 **責務**:
 
@@ -310,7 +1879,7 @@ payload:
 
 #### 将来拡張
 
-##### 複数 Worker サポート
+#### 複数 Worker サポート
 
 ```yaml
 runner:
@@ -318,13 +1887,13 @@ runner:
     kind: "cursor-cli" # または "claude-code-cli"
 ```
 
-##### 永続化レイヤー
+#### 永続化レイヤー
 
 - TaskContext を DB（PostgreSQL）に永続化
 - タスクの resume 機能
 - 複数ノードでの分散実行
 
-##### Web UI
+#### Web UI
 
 - タスクの起動・モニタリング
 - 実行履歴の可視化
@@ -353,11 +1922,12 @@ runner:
 - [実装ガイド](implementation-guide.md)
 - [データフロー設計](data-flow.md)
 
-## Data-flow
+<a id="design-data-flow"></a>
 
-**ソース**: `design/data-flow.md`
+## Data Flow
 
-## AgentRunner データフロー設計
+**Source**: `design/data-flow.md`
+
 
 最終更新: 2025-11-22
 
@@ -533,7 +2103,7 @@ func (r *Runner) Run(ctx context.Context) error {
 
 #### 入力データ
 
-##### Task YAML
+#### Task YAML
 
 ```yaml
 version: 1
@@ -554,7 +2124,7 @@ runner:
 
 #### 中間データ
 
-##### TaskContext
+#### TaskContext
 
 ```go
 type TaskContext struct {
@@ -573,7 +2143,7 @@ type TaskContext struct {
 }
 ```
 
-##### Meta プロトコル
+#### Meta プロトコル
 
 **plan_task レスポンス**:
 
@@ -597,7 +2167,7 @@ worker_call:
   prompt: "API を実装してください"
 ```
 
-##### Worker 実行結果
+#### Worker 実行結果
 
 ```go
 type WorkerRunResult struct {
@@ -613,10 +2183,10 @@ type WorkerRunResult struct {
 
 #### 出力データ
 
-##### Task Note (Markdown)
+#### Task Note (Markdown)
 
 ```markdown
-## Task Note - TASK-123 - Implement API
+# Task Note - TASK-123 - Implement API
 
 - Task ID: TASK-123
 - Title: Implement API
@@ -626,31 +2196,31 @@ type WorkerRunResult struct {
 
 ---
 
-### 1. 概要
+## 1. 概要
 
 API 実装タスクが完了しました。
 
 ---
 
-### 2. PRD 概要
+## 2. PRD 概要
 
 ...
 
 ---
 
-### 3. 受け入れ条件 (Acceptance Criteria)
+## 3. 受け入れ条件 (Acceptance Criteria)
 
 - [x] AC-1: API が 200 を返すこと
 
 ---
 
-### 4. 実行ログ (Meta / Worker)
+## 4. 実行ログ (Meta - Worker)
 
-#### 4.1 Meta Calls
+### 4.1 Meta Calls
 
 ...
 
-#### 4.2 Worker Runs
+### 4.2 Worker Runs
 
 ...
 ```
@@ -734,11 +2304,12 @@ Worker 実行 2: 実行 (30s)
 - [Meta プロトコル仕様](../specifications/meta-protocol.md)
 - [Worker インターフェース仕様](../specifications/worker-interface.md)
 
-## Implementation-guide
+<a id="design-implementation-guide"></a>
 
-**ソース**: `design/implementation-guide.md`
+## Implementation Guide
 
-## AgentRunner 実装ガイド
+**Source**: `design/implementation-guide.md`
+
 
 最終更新: 2025-11-22
 
@@ -810,7 +2381,7 @@ type Runner struct {
 
 #### インターフェース定義
 
-##### MetaClient
+#### MetaClient
 
 ```go
 type MetaClient interface {
@@ -820,7 +2391,7 @@ type MetaClient interface {
 }
 ```
 
-##### WorkerExecutor
+#### WorkerExecutor
 
 ```go
 type WorkerExecutor interface {
@@ -830,7 +2401,7 @@ type WorkerExecutor interface {
 }
 ```
 
-##### NoteWriter
+#### NoteWriter
 
 ```go
 type NoteWriter interface {
@@ -917,7 +2488,7 @@ func (r *Runner) Run(ctx context.Context) error {
 
 #### 3. エラーハンドリング
 
-##### Exponential Backoff
+#### Exponential Backoff
 
 ```go
 func (c *Client) callWithRetry(ctx context.Context, fn func() error) error {
@@ -942,7 +2513,7 @@ func (c *Client) callWithRetry(ctx context.Context, fn func() error) error {
 }
 ```
 
-##### コンテキストキャンセル
+#### コンテキストキャンセル
 
 ```go
 func (w *WorkerExecutor) RunWorker(ctx context.Context, prompt string) (*WorkerRunResult, error) {
@@ -1009,13 +2580,13 @@ func (w *Writer) WriteTaskNote(ctx context.Context, tc *TaskContext) error {
 #### テスト実行コマンド
 
 ```bash
-## ユニットテスト（依存なし、高速）
+# ユニットテスト（依存なし、高速）
 go test ./...
 
-## 全テスト実行（推奨、Docker + Codex CLI 必須）
+# 全テスト実行（推奨、Docker + Codex CLI 必須）
 go test -tags=docker,codex -timeout=15m ./...
 
-## カバレッジレポート生成
+# カバレッジレポート生成
 go test -coverprofile=coverage.out ./... && go tool cover -html=coverage.out
 ```
 
@@ -1150,182 +2721,14 @@ func (c *Client) Chat(ctx context.Context, req ChatRequest) (ChatResponse, error
 - [テストガイド](../guides/testing.md)
 - [コア仕様](../specifications/core-specification.md)
 
-## README
-
-**ソース**: `design/README.md`
-
-
-このディレクトリには AgentRunner の設計思想と実装方針が含まれています。
-
-### ドキュメント一覧
-
-#### [architecture.md](architecture.md)
-
-システム全体のアーキテクチャを説明します。
-
-- **対象読者**: アーキテクト、技術リード
-- **内容**:
-  - システム構成
-  - コンポーネント設計
-  - 役割分担
-  - 設計思想と原則
-
-#### [implementation-guide.md](implementation-guide.md)
-
-Go 言語での実装ガイドを提供します。
-
-- **対象読者**: 実装者、コントリビューター
-- **内容**:
-  - パッケージ構成
-  - 依存性注入パターン
-  - インターフェース設計
-  - 実装パターン
-  - テスト戦略
-
-#### [data-flow.md](data-flow.md)
-
-データフローと状態遷移を説明します。
-
-- **対象読者**: 実装者、デバッガー
-- **内容**:
-  - タスク実行フロー
-  - 状態遷移図
-  - データ変換
-  - エラーフロー
-
-### 設計の読み方
-
-1. [architecture.md](architecture.md) でシステム全体像を把握
-2. [data-flow.md](data-flow.md) で実行フローを理解
-3. [implementation-guide.md](implementation-guide.md) で実装方針を確認
-
-### 設計の更新ルール
-
-- 設計変更は実装前に文書化
-- 設計判断の理由を明記
-- 代替案と選択理由を記録
-
-
-# トップレベル
-
-## GEMINI
-
-**ソース**: `GEMINI.md`
-
-## docs/GEMINI.md
-
-このディレクトリには、プロジェクトの仕様書、設計書、ガイドが含まれています。
-
-### ドキュメント構成
-
-#### 1. `specifications/` (仕様書)
-
-システムの振る舞い、インターフェース、データ構造の定義。
-
-- `core-specification.md`: AgentRunner Core の詳細仕様。
-- `meta-protocol.md`: LLM との通信プロトコル (YAML) 定義。
-- `orchestrator-spec.md`: **[新規]** Orchestrator のアーキテクチャと IPC 仕様。
-
-#### 2. `design/` (設計書)
-
-アーキテクチャの決定理由、データフロー、実装指針。
-
-- `architecture.md`: システム全体の構成図。
-- `data-flow.md`: データと状態遷移の流れ。
-
-#### 3. `guides/` (ガイド)
-
-開発者向けの手順書。
-
-### ドキュメントの読み方
-
-1. **全体像**: ルートの `GEMINI.md` と `PRD.md` を参照。
-2. **詳細仕様**: 作成・修正するコンポーネントに対応する `specifications/` 内のファイルを参照。
-3. **実装詳細**: `internal/` 以下のコードと `GEMINI.md` を参照。
-
 
 # Guides
 
-## Codex-integration
-
-**ソース**: `guides/codex-integration.md`
-
-## Codex Integration Test
-
-このディレクトリには、実際の Codex CLI を使用した統合テストが含まれています。
-
-### 前提条件
-
-1. **Codex 認証の設定**
-
-   - ホストマシンに `~/.codex/auth.json` が存在する必要があります
-   - Codex CLI は認証情報を Docker コンテナにマウントして使用します
-
-2. **Docker イメージのビルド**
-   ```bash
-   docker build -t agent-runner-codex:latest sandbox/
-   ```
-
-### テストの実行
-
-#### 方法 1: go test で実行（推奨）
-
-```bash
-## Codex テストのみ
-go test -tags=codex -timeout=10m ./test/codex/...
-
-## 詳細表示
-go test -v -tags=codex -timeout=10m ./test/codex/...
-```
-
-#### 方法 2: テストスクリプトを使用
-
-```bash
-./run_codex_test.sh
-```
-
-#### 方法 3: 直接実行
-
-```bash
-go run cmd/agent-runner/main.go < test_codex_task.yaml
-```
-
-### テスト内容
-
-`test_codex_task.yaml` は以下をテストします：
-
-- 簡単な電卓プログラム（calculator.py）の作成
-- Codex CLI が Docker サンドボックス内で正しく動作すること
-- ファイルがリポジトリに正しく保存されること
-
-### 結果の確認
-
-テスト実行後、以下を確認してください：
-
-1. `.agent-runner/task-TASK-CODEX-TEST.md` - タスクノート
-2. `calculator.py` - Codex が生成したファイル（リポジトリルートに作成されるはず）
-
-### トラブルシューティング
-
-#### Codex 認証エラー
-
-```
-Error: Codex authentication failed
-```
-
-→ `~/.codex/auth.json` が存在し、有効な認証情報が含まれていることを確認してください。
-
-#### Docker コンテナ起動エラー
-
-```
-Error: failed to start sandbox
-```
-
-→ Docker デーモンが起動していることを確認してください。
+<a id="guides-README"></a>
 
 ## README
 
-**ソース**: `guides/README.md`
+**Source**: `guides/README.md`
 
 
 このディレクトリには開発者向けの実践的なガイドが含まれています。
@@ -1367,11 +2770,12 @@ Codex 統合テストを実行する場合は [codex-integration.md](codex-integ
 - トラブルシューティング情報を充実
 - 実行例とコマンドを最新化
 
+<a id="guides-testing"></a>
+
 ## Testing
 
-**ソース**: `guides/testing.md`
+**Source**: `guides/testing.md`
 
-## テストに関する知識とベストプラクティス
 
 ### 1. テストの種類
 
@@ -1423,1114 +2827,81 @@ Codex 統合テストを実行する場合は [codex-integration.md](codex-integ
 
 このドキュメントは `TESTING.md` としてリポジトリのルートに配置し、開発者がテストの書き方やトラブルシューティングをすぐに参照できるようにしてください。
 
+<a id="guides-codex-integration"></a>
 
-# トップレベル
+## Codex Integration
 
-## README
+**Source**: `guides/codex-integration.md`
 
-**ソース**: `README.md`
 
+このディレクトリには、実際の Codex CLI を使用した統合テストが含まれています。
 
-このディレクトリには AgentRunner プロジェクトの設計・仕様・開発ガイドが含まれています。
+### 前提条件
 
-### ドキュメント構成
+1. **Codex 認証の設定**
 
-#### 📋 [specifications/](specifications/) - 仕様ドキュメント
+   - ホストマシンに `~/.codex/auth.json` が存在する必要があります
+   - Codex CLI は認証情報を Docker コンテナにマウントして使用します
 
-確定した仕様を定義するドキュメント群です。実装の基準となります。
-
-- [core-specification.md](specifications/core-specification.md) - コア仕様（YAML、TaskContext、FSM、Task Note）
-- [meta-protocol.md](specifications/meta-protocol.md) - Meta-agent プロトコル仕様
-- [worker-interface.md](specifications/worker-interface.md) - Worker 実行仕様
-
-#### 🏗️ [design/](design/) - 設計ドキュメント
-
-システムの設計思想と実装方針を説明するドキュメント群です。
-
-- [architecture.md](design/architecture.md) - システムアーキテクチャ
-- [implementation-guide.md](design/implementation-guide.md) - 実装ガイド（Go 固有）
-- [data-flow.md](design/data-flow.md) - データフロー設計
-
-#### 📖 [guides/](guides/) - 開発ガイド
-
-開発者向けの実践的なガイドです。
-
-- [testing.md](guides/testing.md) - テスト戦略とベストプラクティス
-- [codex-integration.md](guides/codex-integration.md) - Codex 統合テスト実行ガイド
-
-#### 🔧 その他
-
-- [CLAUDE.md](CLAUDE.md) - ドキュメント整理ルールと管理方針
-
-### ドキュメントの読み方
-
-#### 初めての方
-
-1. [design/architecture.md](design/architecture.md) でシステム全体像を把握
-2. [specifications/core-specification.md](specifications/core-specification.md) でコア仕様を理解
-3. [design/implementation-guide.md](design/implementation-guide.md) で実装方針を確認
-
-#### 実装者向け
-
-1. [specifications/](specifications/) で仕様を確認
-2. [design/implementation-guide.md](design/implementation-guide.md) で実装パターンを学習
-3. [guides/testing.md](guides/testing.md) でテスト方法を確認
-
-#### アーキテクト向け
-
-1. [design/architecture.md](design/architecture.md) でシステム設計を確認
-2. [design/data-flow.md](design/data-flow.md) でデータフローを理解
-3. [specifications/](specifications/) で仕様詳細を確認
-
-### ドキュメント管理
-
-ドキュメントの整理ルールと更新方針については [CLAUDE.md](CLAUDE.md) を参照してください。
-
-
-# Specifications
-
-## Core-specification
-
-**ソース**: `specifications/core-specification.md`
-
-## AgentRunner コア仕様
-
-最終更新: 2025-11-22
-
-### 概要
-
-本ドキュメントは AgentRunner のコア仕様を定義します。CLI インターフェース、YAML スキーマ、TaskContext、タスク状態機械（FSM）、Task Note フォーマットを含みます。
-
-### 1. CLI インターフェース
-
-#### 1.1 コマンド
-
-```bash
-agent-runner < task.yaml
-```
-
-#### 1.2 入力
-
-- **stdin**: Task YAML ファイル（1 枚）
-- **stdin**: Task YAML ファイル（1 枚）
-- **コマンドラインオプション**:
-  - `--meta-model=<model_id>`: Meta 用 LLM モデル ID を指定 (v1)
-
-#### 1.3 モデル決定の優先順位
-
-Meta 用 LLM モデル ID は以下の優先順位で決定されます：
-
-1. **CLI オプション**: `--meta-model` で指定された値
-2. **Task YAML**: `runner.meta.model` で指定された値
-3. **ビルトインデフォルト**: `gpt-5.1-codex-max-high`
-
-※ 設定ファイルによるデフォルト指定は将来拡張です。
-
-#### 1.4 出力
-
-- **stdout**: 実行ログ（人間が読む用の簡易ログ）
-- **ファイル**: Task Note (`<repo>/.agent-runner/task-<task_id>.md`)
-- **exit code**:
-  - `0`: 成功
-  - `1`: 失敗
-
-### 2. Task YAML スキーマ
-
-#### 2.1 全体構造
-
-```yaml
-version: 1
-
-task:
-  id: "TASK-123" # 任意。未指定なら自動採番
-  title: "ユーザ登録 API の実装" # 任意
-  repo: "." # 任意。作業対象リポジトリのパス
-
-  prd:
-    path: "./docs/TASK-123.md" # PRD をファイルから読む場合
-    # text: |                       # または PRD 本文を直接埋め込む場合
-    #   ここに PRD 本文...
-
-  test:
-    command: "npm test" # 任意。自動テストコマンド
-    # cwd: "./"                     # 任意。テスト実行ディレクトリ
-
-runner:
-  meta:
-    kind: "openai-chat" # v1 は固定想定
-    model: "gpt-5.1-codex-max-high" # 任意。プロバイダのモデルIDを直接指定
-    # system_prompt: |              # 任意。Meta 用 system prompt を上書き
-    max_loops: 5 # 任意。最大ループ回数（デフォルト: 5）
-
-  worker:
-    kind: "codex-cli" # v1 は "codex-cli" 固定
-    # docker_image: ...             # 任意。デフォルトイメージを上書き
-    # max_run_time_sec: 1800        # 任意。1 回の Worker 実行タイムアウト
-    # env:
-    #   CODEX_API_KEY: "env:CODEX_API_KEY"  # "env:" 接頭辞でホスト環境変数を参照
-```
-
-#### 2.2 必須フィールド
-
-- `version`: 値は `1`
-- `task.prd`: `path` または `text` のいずれか
-
-#### 2.3 デフォルト補完ルール
-
-| フィールド                       | デフォルト値                                     |
-| -------------------------------- | ------------------------------------------------ |
-| `task.id`                        | UUID 自動生成                                    |
-| `task.title`                     | `task.id` と同じ                                 |
-| `task.repo`                      | `"."` (カレントディレクトリ)                     |
-| `task.test`                      | 未設定（テスト自動実行なし）                     |
-| `runner.meta.kind`               | `"openai-chat"`                                  |
-| `runner.meta.model`              | `gpt-5.1-codex-max-high` (プロバイダのモデル ID) |
-| `runner.meta.max_loops`          | `5`                                              |
-| `runner.worker.kind`             | `"codex-cli"`                                    |
-| `runner.worker.docker_image`     | デフォルトイメージ                               |
-| `runner.worker.max_run_time_sec` | `1800` (30 分)                                   |
-
-#### 2.4 環境変数参照
-
-`env:` プレフィックスを使用してホスト環境変数を参照できます。
-
-```yaml
-runner:
-  worker:
-    env:
-      CODEX_API_KEY: "env:CODEX_API_KEY" # ホストの $CODEX_API_KEY を参照
-      CUSTOM_VAR: "literal-value" # リテラル値
-```
-
-### 3. TaskContext
-
-#### 3.1 構造
-
-TaskContext は実行中のタスク状態を保持します。
-
-```go
-type TaskContext struct {
-    ID        string        // task.id
-    Title     string        // task.title
-    RepoPath  string        // task.repo の絶対パス
-    State     TaskState     // FSM の現状態
-
-    PRDText   string        // PRD 本文
-
-    AcceptanceCriteria []AcceptanceCriterion // Meta plan_task の結果
-    MetaCalls          []MetaCallLog         // Meta 呼び出し履歴
-    WorkerRuns         []WorkerRunResult     // Worker 実行履歴
-
-    TestConfig *TestSpec   // task.test
-    TestResult *TestResult // 実行した場合
-
-    StartedAt  time.Time
-    FinishedAt time.Time
-}
-```
-
-#### 3.2 AcceptanceCriterion
-
-```go
-type AcceptanceCriterion struct {
-    ID          string
-    Description string
-    Passed      bool
-}
-```
-
-#### 3.3 WorkerRunResult
-
-```go
-type WorkerRunResult struct {
-    ID          string
-    StartedAt   time.Time
-    FinishedAt  time.Time
-    ExitCode    int
-    RawOutput   string
-    Summary     string
-    Error       error
-}
-```
-
-### 4. タスク状態機械（FSM）
-
-#### 4.1 状態定義
-
-```go
-type TaskState string
-
-const (
-    StatePending    TaskState = "PENDING"
-    StatePlanning   TaskState = "PLANNING"
-    StateRunning    TaskState = "RUNNING"
-    StateValidating TaskState = "VALIDATING"
-    StateComplete   TaskState = "COMPLETE"
-    StateFailed     TaskState = "FAILED"
-)
-```
-
-#### 4.2 状態遷移
-
-```mermaid
-stateDiagram-v2
-    [*] --> PENDING
-    PENDING --> PLANNING
-    PLANNING --> RUNNING
-    RUNNING --> VALIDATING
-    VALIDATING --> RUNNING: 追加作業が必要
-    VALIDATING --> COMPLETE: 完了
-    VALIDATING --> FAILED: 失敗
-    COMPLETE --> [*]
-    FAILED --> [*]
-```
-
-#### 4.3 遷移ルール
-
-| 現在の状態 | 次の状態   | 条件                              |
-| ---------- | ---------- | --------------------------------- |
-| PENDING    | PLANNING   | タスク開始                        |
-| PLANNING   | RUNNING    | Meta が plan_task を完了          |
-| RUNNING    | VALIDATING | Worker 実行完了                   |
-| VALIDATING | RUNNING    | Meta が追加作業を指示             |
-| VALIDATING | COMPLETE   | Meta が完了を判定                 |
-| VALIDATING | FAILED     | 致命的エラーまたは max_loops 到達 |
-
-#### 4.4 ループ制御
-
-`runner.meta.max_loops` で最大ループ回数を制御します。
-
-- デフォルト: 5 回
-- VALIDATING → RUNNING の遷移回数がこの値を超えると FAILED に遷移
-
-### 5. Task Note フォーマット
-
-#### 5.1 出力パス
-
-```
-<repo>/.agent-runner/task-<task_id>.md
-```
-
-#### 5.2 テンプレート
-
-```markdown
-## Task Note - {{ .ID }} {{ if .Title }}- {{ .Title }}{{ end }}
-
-- Task ID: {{ .ID }}
-- Title: {{ .Title }}
-- Started At: {{ .StartedAt }}
-- Finished At: {{ .FinishedAt }}
-- State: {{ .State }}
-
----
-
-### 1. 概要
-
-{{ .Summary }}
-
----
-
-### 2. PRD 概要
-
-{{ .PRDSummary }}
-
-<details>
-<summary>PRD 原文</summary>
-
-\`\`\`text
-{{ .PRDText }}
-\`\`\`
-
-</details>
-
----
-
-### 3. 受け入れ条件 (Acceptance Criteria)
-
-{{ range .AcceptanceCriteria }}
-
-- [{{ if .Passed }}x{{ else }} {{ end }}] {{ .ID }}: {{ .Description }}
-  {{ end }}
-
----
-
-### 4. 実行ログ (Meta / Worker)
-
-#### 4.1 Meta Calls
-
-{{ range .MetaCalls }}
-
-##### {{ .Type }} at {{ .Timestamp }}
-
-\`\`\`yaml
-{{ .RequestYAML }}
-\`\`\`
-
-\`\`\`yaml
-{{ .ResponseYAML }}
-\`\`\`
-{{ end }}
-
-#### 4.2 Worker Runs
-
-{{ range .WorkerRuns }}
-
-##### Run {{ .ID }} (ExitCode={{ .ExitCode }}) at {{ .StartedAt }} - {{ .FinishedAt }}
-
-\`\`\`text
-{{ .RawOutput }}
-\`\`\`
-{{ end }}
-
----
-
-### 5. テスト結果
-
-{{ if .TestResult }}
-
-- Command: \`{{ .TestResult.Command }}\`
-- ExitCode: {{ .TestResult.ExitCode }}
-- Summary: {{ .TestResult.Summary }}
-
-\`\`\`text
-{{ .TestResult.RawOutput }}
-\`\`\`
-{{ else }}
-テストは自動実行されませんでした。
-{{ end }}
-
----
-
-### 6. メモ / 残課題
-
-{{ .Notes }}
-```
-
-#### 5.3 実装
-
-Go の `text/template` を使用してテンプレートを展開します。
-
-### 6. 実装状況
-
-#### 6.1 実装済み機能
-
-- ✅ CLI インターフェース（stdin YAML 読み込み）
-- ✅ Task YAML パース
-- ✅ デフォルト補完ロジック
-- ✅ TaskContext 構築
-- ✅ FSM 実装
-- ✅ ループ制御（max_loops）
-- ✅ Task Note 生成
-- ✅ 環境変数参照（`env:` プレフィックス）
-
-#### 6.2 制約事項
-
-- v1 ではコマンドラインオプションは未サポート
-- Worker 種別は `codex-cli` のみ
-- Meta 種別は `openai-chat` のみ
-
-## Meta-protocol
-
-**ソース**: `specifications/meta-protocol.md`
-
-## Meta-agent プロトコル仕様
-
-最終更新: 2025-11-22
-
-### 概要
-
-本ドキュメントは Meta-agent と AgentRunner Core 間の通信プロトコルを定義します。Meta-agent は LLM ベースのエージェントで、YAML メッセージを介して Core とやり取りします。
-
-### 1. Meta-agent の役割
-
-Meta-agent は以下の責務を持ちます：
-
-1. **計画**: PRD から Acceptance Criteria（受け入れ条件）を設計
-2. **判断**: 次のアクション（Worker 実行 or 完了）を決定
-3. **評価**: タスク完了状況を評価
-
-### 2. プロトコル概要
-
-#### 2.1 呼び出し単位
-
-Meta とのやり取りは 3 種類のリクエスト/レスポンスで構成されます：
-
-| プロトコル              | 入力         | 出力                | 用途       |
-| ----------------------- | ------------ | ------------------- | ---------- |
-| `plan_task`             | PRD テキスト | Acceptance Criteria | タスク計画 |
-| `next_action`           | TaskContext  | 次のアクション      | 実行判断   |
-| `completion_assessment` | TaskContext  | 完了評価            | 完了判定   |
-
-#### 2.2 YAML フォーマット
-
-すべてのメッセージは YAML 形式です。
-
-**共通ルール**:
-
-- 単一ドキュメント（`---` は 1 つまで）
-- インデント: 半角スペース 2 個
-- トップレベルに `type` フィールド必須
-
-### 3. plan_task プロトコル
-
-#### 3.1 目的
-
-PRD を解析し、タスクの受け入れ条件（Acceptance Criteria）を定義します。
-
-#### 3.2 入力
-
-Core は以下の情報を Meta に渡します：
-
-- Task YAML（タスク設定）
-- PRD テキスト（要件定義）
-
-#### 3.3 出力 YAML
-
-```yaml
-type: plan_task
-acceptance_criteria:
-  - id: "AC-1"
-    description: "ユーザー登録APIが正常系で 201 を返すこと"
-  - id: "AC-2"
-    description: "必須項目のバリデーションエラー時に 400 を返すこと"
-```
-
-#### 3.4 フィールド定義
-
-| フィールド                          | 型     | 必須 | 説明                            |
-| ----------------------------------- | ------ | ---- | ------------------------------- |
-| `type`                              | string | ✅   | 固定値: `"plan_task"`           |
-| `acceptance_criteria`               | array  | ✅   | 受け入れ条件のリスト            |
-| `acceptance_criteria[].id`          | string | 推奨 | 受け入れ条件の ID（例: "AC-1"） |
-| `acceptance_criteria[].description` | string | ✅   | 受け入れ条件の説明              |
-
-#### 3.5 実装例
-
-```go
-type PlanTaskResponse struct {
-    Type               string                  `yaml:"type"`
-    AcceptanceCriteria []AcceptanceCriterion   `yaml:"acceptance_criteria"`
-}
-
-type AcceptanceCriterion struct {
-    ID          string `yaml:"id"`
-    Description string `yaml:"description"`
-}
-```
-
-### 4. next_action プロトコル
-
-#### 4.1 目的
-
-現在のタスク状態を評価し、次のアクション（Worker 実行 or 完了）を決定します。
-
-#### 4.2 入力
-
-Core は TaskContext の要約を Meta に渡します：
-
-```yaml
-task:
-  id: "TASK-123"
-  title: "Implement API endpoint X"
-  prd_summary: "..."
-acceptance_criteria:
-  - id: "AC-1"
-    description: "..."
-last_worker_result:
-  exists: true
-  exit_code: 0
-  stdout_tail: "..."
-state: "RUNNING"
-```
-
-#### 4.3 出力 YAML
-
-##### 4.3.1 Worker 実行を要求する場合
-
-```yaml
-type: next_action
-decision:
-  action: "run_worker"
-  reason: "まだ実装が行われていないため"
-
-worker_call:
-  worker_type: "codex-cli"
-  mode: "exec"
-  prompt: |
-    ここに Codex に渡すべき指示文（自然言語 + 手順）が入る
-```
-
-##### 4.3.2 タスク完了と判断する場合
-
-```yaml
-type: next_action
-decision:
-  action: "mark_complete"
-  reason: "全ての受け入れ条件が満たされ、テストも成功したため"
-```
-
-#### 4.4 フィールド定義
-
-| フィールド                | 型     | 必須     | 説明                                    |
-| ------------------------- | ------ | -------- | --------------------------------------- |
-| `type`                    | string | ✅       | 固定値: `"next_action"`                 |
-| `decision.action`         | string | ✅       | `"run_worker"` または `"mark_complete"` |
-| `decision.reason`         | string | ✅       | 判断理由                                |
-| `worker_call`             | object | 条件付き | `action` が `"run_worker"` の場合必須   |
-| `worker_call.worker_type` | string | ✅       | Worker 種別（v1: `"codex-cli"`）        |
-| `worker_call.mode`        | string | ✅       | 実行モード（v1: `"exec"`）              |
-| `worker_call.prompt`      | string | ✅       | Worker への指示文                       |
-
-#### 4.5 実装例
-
-```go
-type NextActionResponse struct {
-    Type       string              `yaml:"type"`
-    Decision   Decision            `yaml:"decision"`
-    WorkerCall *WorkerCall         `yaml:"worker_call,omitempty"`
-}
-
-type Decision struct {
-    Action string `yaml:"action"`
-    Reason string `yaml:"reason"`
-}
-
-type WorkerCall struct {
-    WorkerType string `yaml:"worker_type"`
-    Mode       string `yaml:"mode"`
-    Prompt     string `yaml:"prompt"`
-}
-```
-
-### 5. completion_assessment プロトコル
-
-#### 5.1 目的
-
-タスク完了時に、Acceptance Criteria の達成状況を評価します。
-
-#### 5.2 入力
-
-Core は最終状態の TaskContext を Meta に渡します。
-
-#### 5.3 出力 YAML
-
-```yaml
-type: completion_assessment
-summary: |
-  ユーザー登録APIの実装は完了しており、以下の受け入れ条件を満たしています。
-details:
-  passed_criteria:
-    - "AC-1"
-    - "AC-2"
-  remaining_risks:
-    - "性能テストは未実施"
-```
-
-#### 5.4 フィールド定義
-
-| フィールド                | 型     | 必須 | 説明                               |
-| ------------------------- | ------ | ---- | ---------------------------------- |
-| `type`                    | string | ✅   | 固定値: `"completion_assessment"`  |
-| `summary`                 | string | ✅   | 完了評価のサマリ                   |
-| `details.passed_criteria` | array  | 推奨 | 満たされた受け入れ条件の ID リスト |
-| `details.remaining_risks` | array  | 推奨 | 残存リスクのリスト                 |
-
-#### 5.5 実装例
-
-```go
-type CompletionAssessmentResponse struct {
-    Type    string                       `yaml:"type"`
-    Summary string                       `yaml:"summary"`
-    Details CompletionAssessmentDetails  `yaml:"details"`
-}
-
-type CompletionAssessmentDetails struct {
-    PassedCriteria  []string `yaml:"passed_criteria"`
-    RemainingRisks  []string `yaml:"remaining_risks"`
-}
-```
-
-### 6. エラーハンドリング
-
-#### 6.1 LLM エラー再試行ロジック
-
-v1 実装では、LLM API 呼び出しの信頼性を向上させるため、以下の再試行ロジックを実装しています：
-
-| 項目                    | 設定                                      |
-| ----------------------- | ----------------------------------------- |
-| **再試行対象エラー**    | HTTP 5xx、タイムアウト、Rate Limit（429） |
-| **再試行回数**          | 最大 3 回                                 |
-| **Exponential Backoff** | 1 秒 → 2 秒 → 4 秒                        |
-| **非再試行エラー**      | HTTP 4xx（400, 401, 403 など）            |
-
-#### 6.2 YAML パースエラー
-
-Meta が不正な YAML を返した場合：
-
-1. エラーログを出力
-2. Meta に再試行を要求（最大 3 回）
-3. 3 回失敗した場合、タスクを FAILED に遷移
-
-#### 6.3 タイムアウト
-
-Meta 呼び出しのタイムアウト設定：
-
-- デフォルト: 60 秒
-- 環境変数 `META_TIMEOUT_SEC` で変更可能
-
-### 7. プロンプト設計
-
-#### 7.1 System Prompt
-
-Meta には以下の System Prompt が設定されます：
-
-````text
-あなたはソフトウェア開発タスクを管理するテックリード兼オーケストレータです。
-
-- 与えられたタスクコンテキスト（TaskContext）にもとづき、
-  次に何をすべきかを決定する役割を担います。
-- 出力は必ず 1 つの YAML ドキュメントのみとします。
-- コードブロック（```）や解説文は一切書かないでください。
-````
-
-#### 7.2 System Prompt のカスタマイズ
-
-Task YAML で `runner.meta.system_prompt` を指定することで、System Prompt を上書きできます：
-
-```yaml
-runner:
-  meta:
-    system_prompt: |
-      カスタム System Prompt
-```
-
-### 8. 実装状況
-
-#### 8.1 実装済み機能
-
-- ✅ `plan_task` プロトコル
-- ✅ `next_action` プロトコル
-- ✅ `completion_assessment` プロトコル
-- ✅ LLM エラー再試行ロジック（Exponential Backoff）
-- ✅ System Prompt カスタマイズ
-- ✅ YAML パースエラーハンドリング
-
-#### 8.2 制約事項
-
-- v1 では OpenAI Chat API のみサポート
-- プロトコルバージョニングは未実装（将来拡張予定）
-
-## Orchestrator-spec
-
-**ソース**: `specifications/orchestrator-spec.md`
-
-## Multiverse Orchestrator 仕様書
-
-### 概要
-
-Multiverse Orchestrator は、`multiverse` エコシステムにおけるタスク実行の中枢を担うコンポーネントです。ユーザー（IDE）からのタスク実行リクエストを受け付け、適切な Worker プールと AgentRunner Core を使用してタスクを自律的に実行します。
-
-### アーキテクチャ
-
-Orchestrator は以下の要素で構成されます。
-
-1.  **Task Scheduler**: タスクの優先順位と Worker プールの空き状況を管理し、実行キューを処理します。
-2.  **Task Executor**: 実際にタスクを実行するためのサブプロセス（`agent-runner`）を管理します。
-3.  **Task Store**: タスクのメタデータ、実行履歴（Attempt）、ログを永続化・管理します。
-4.  **IPC Interface**: IDE や他のツールとの通信を行うためのファイルベースのインターフェースです。
-
-```mermaid
-flowchart TD
-    IDE[Multiverse IDE] -->|Place Task| IPC_QUEUE[IPC Queue]
-    IPC_QUEUE --> SCHED[Scheduler]
-    SCHED -->|Dispatch| EXECUTOR[Executor]
-    EXECUTOR -->|Spawn| RUNNER[AgentRunner Core]
-    RUNNER -->|Exec| DOCKER[Docker Sandbox]
-
-    RUNNER -->|Log/Status| STORE[Task Store]
-    STORE -->|Update| IPC_RESULT[IPC Results]
-    IDE <-->|Poll| IPC_RESULT
-```
-
-### コンポーネント詳細
-
-#### 1. Executor (`internal/orchestrator/executor.go`)
-
-`Executor` は、単一のタスク実行（Attempt）を管理する責任を持ちます。
-
-- **役割**:
-
-  - 新しい Attempt ID (UUID) の発行
-  - `agent-runner` プロセスの起動 (`os/exec`)
-  - Task YAML の動的生成と標準入力への流し込み
-  - プロセスの終了待機と終了ステータス（成功/失敗）の判定
-  - 実行結果（Attempt Status, Error Summary）の `TaskStore` への保存
-
-- **動作フロー**:
-  1.  `ExecuteTask(ctx, task)` が呼ばれる。
-  2.  `PENDING` -> `RUNNING` へステータス更新。
-  3.  `agent-runner` 向けの設定 YAML をメモリ上で生成。
-  4.  `agent-runner` プロセスを起動。
-  5.  プロセス終了後、Exit Code と出力に基づき `SUCCEEDED` / `FAILED` を判定。
-  6.  Task と Attempt の最終状態を保存。
-
-#### 2. Task Store (`internal/orchestrator/task_store.go`)
-
-ファイルシステムベースのデータストアです。
-
-- **パス**: `$HOME/.multiverse/workspaces/<workspace-id>/`
-- **保存データ**:
-  - `tasks/<task-id>.jsonl`: タスクのメタデータ履歴
-  - `attempts/<attempt-id>.json`: 実行試行の詳細
-
-### IPC (Inter-Process Communication)
-
-v0.1 ではファイルシステムベースの単純な IPC を採用しています。
-
-#### Queue (IDE -> Orchestrator)
-
-- パス: `ipc/queue/<pool-id>/<job-id>.json`
-- Orchestrator はこのディレクトリを監視（ポーリング）し、新規ファイルを検知してタスクを開始します。
-
-#### Results (Orchestrator -> IDE)
-
-- パス: `ipc/results/<job-id>.json`
-- タスク完了時、Orchestrator はここに結果を出力します。IDE はこれを読み取って完了通知などを行います。
-- **注意**: 実際の詳細なステータスは `Task Store` （`tasks/` ディレクトリ）を参照するのが正とされます。
-
-### 今後の拡張
-
-- **WebSocket**: リアルタイムなログストリーミングと状態通知のために導入予定。
-- **Database**: タスク履歴の検索性向上のため、SQLite などの埋め込み DB への移行を検討。
-- **Multi-Node**: リモートの強力なマシンで Worker を動かすための分散実行プロトコル。
-
-## README
-
-**ソース**: `specifications/README.md`
-
-
-このディレクトリには AgentRunner の確定仕様が含まれています。
-
-### ドキュメント一覧
-
-#### [core-specification.md](core-specification.md)
-
-AgentRunner のコア仕様を定義します。
-
-- **対象読者**: 実装者、レビュアー
-- **内容**:
-  - Task YAML スキーマ
-  - TaskContext 構造
-  - タスク状態機械（FSM）
-  - Task Note フォーマット
-  - CLI インターフェース
-
-#### [meta-protocol.md](meta-protocol.md)
-
-Meta-agent との通信プロトコル仕様を定義します。
-
-- **対象読者**: Meta-agent 実装者、プロトコル設計者
-- **内容**:
-  - `plan_task` プロトコル
-  - `next_action` プロトコル
-  - `completion_assessment` プロトコル
-  - YAML メッセージフォーマット
-  - エラーハンドリング
-
-#### [worker-interface.md](worker-interface.md)
-
-Worker 実行とサンドボックス環境の仕様を定義します。
-
-- **対象読者**: Worker 実装者、インフラ担当者
-- **内容**:
-  - Worker 実行インターフェース
-  - Docker サンドボックス仕様
-  - 環境変数とマウント仕様
-  - 実行結果フォーマット
-  - タイムアウトとエラーハンドリング
-
-### 仕様の読み方
-
-1. まず [core-specification.md](core-specification.md) でシステムの基本仕様を理解
-2. Meta-agent を実装する場合は [meta-protocol.md](meta-protocol.md) を参照
-3. Worker を実装する場合は [worker-interface.md](worker-interface.md) を参照
-
-### 仕様の更新ルール
-
-- 仕様変更は必ず設計レビューを経てから反映
-- バージョン管理は Git のタグで管理
-- 後方互換性を破る変更は明示的にマーク
-
-## Worker-interface
-
-**ソース**: `specifications/worker-interface.md`
-
-## Worker インターフェース仕様
-
-最終更新: 2025-11-22
-
-### 概要
-
-本ドキュメントは Worker 実行と Docker サンドボックス環境の仕様を定義します。Worker は Meta-agent の指示に従って実際の開発作業を行います。
-
-### 1. Worker の役割
-
-Worker Executor は以下の責務を持ちます：
-
-1. **実行**: Meta の `worker_call` に従い、Worker CLI を実行
-2. **隔離**: Docker サンドボックス内で安全に実行
-3. **結果収集**: 実行結果（exit code, stdout/stderr）を Core に返す
-
-### 2. Worker 種別
-
-#### 2.1 v1 サポート Worker
-
-v1 では `codex-cli` のみをサポートします。
-
-| Worker 種別 | 説明                               | Docker イメージ             |
-| ----------- | ---------------------------------- | --------------------------- |
-| `codex-cli` | Codex CLI コーディングエージェント | `agent-runner-codex:latest` |
-
-#### 2.2 将来拡張
-
-将来的に以下の Worker をサポート予定：
-
-- `cursor-cli`
-- `claude-code-cli`
-
-### 3. Worker 実行インターフェース
-
-#### 3.1 実行フロー
-
-```mermaid
-sequenceDiagram
-    participant Core
-    participant Executor
-    participant Docker
-    participant Worker
-
-    Core->>Executor: Start()
-    Executor->>Docker: コンテナ起動
-    Docker-->>Executor: コンテナ ID
-
-    Core->>Executor: RunWorker(prompt)
-    Executor->>Docker: docker exec
-    Docker->>Worker: Worker CLI 実行
-    Worker-->>Docker: stdout/stderr
-    Docker-->>Executor: exit code, output
-    Executor-->>Core: WorkerRunResult
-
-    Core->>Executor: Stop()
-    Executor->>Docker: コンテナ停止
-```
-
-#### 3.2 コンテナライフサイクル最適化
-
-v1 実装では、パフォーマンス最適化のため、以下のライフサイクル管理を採用しています：
-
-| フェーズ          | 処理                                  | メソッド                     |
-| ----------------- | ------------------------------------- | ---------------------------- |
-| **タスク開始時**  | 1 回だけコンテナを起動                | `WorkerExecutor.Start()`     |
-| **Worker 実行時** | 既存コンテナ内で `docker exec` を実行 | `WorkerExecutor.RunWorker()` |
-| **タスク完了時**  | コンテナを停止                        | `WorkerExecutor.Stop()`      |
-
-**効果**: Worker 実行ごとにコンテナを起動・停止する場合と比較して、5-10 倍の高速化を実現。
-
-#### 3.3 実行結果フォーマット
-
-```go
-type WorkerRunResult struct {
-    ID          string    // ラン毎の ID（UUID）
-    StartedAt   time.Time // 実行開始時刻
-    FinishedAt  time.Time // 実行終了時刻
-    ExitCode    int       // 終了コード
-    RawOutput   string    // stdout/stderr の結合
-    Summary     string    // 実行サマリ（オプション）
-    Error       error     // 実行エラー（起動失敗など）
-}
-```
-
-### 4. Docker サンドボックス仕様
-
-#### 4.1 Docker イメージ
-
-| 項目                   | 設定                                                    |
-| ---------------------- | ------------------------------------------------------- |
-| **デフォルトイメージ** | `agent-runner-codex:latest`                             |
-| **カスタマイズ**       | Task YAML の `runner.worker.docker_image` で上書き可能  |
-| **自動 Pull**          | イメージが存在しない場合、自動的に `docker pull` を実行 |
-
-#### 4.2 コンテナ内パス
-
-| パス                     | 用途               | マウント元                    |
-| ------------------------ | ------------------ | ----------------------------- |
-| `/workspace/project`     | プロジェクトルート | ホストの `task.repo`          |
-| `/root/.codex/auth.json` | Codex 認証情報     | ホストの `~/.codex/auth.json` |
-
-#### 4.3 マウント仕様
-
-##### 4.3.1 プロジェクトマウント
-
-```bash
--v <host_repo_path>:/workspace/project
-```
-
-- **モード**: read-write
-- **WorkingDir**: `/workspace/project`
-
-##### 4.3.2 Codex 認証マウント（自動）
-
-v1 実装では、以下の順序で Codex 認証情報を自動的に検出・設定します：
-
-1. `~/.codex/auth.json` が存在する場合:
-
+2. **Docker イメージのビルド**
    ```bash
-   -v ~/.codex/auth.json:/root/.codex/auth.json:ro
+   docker build -t agent-runner-codex:latest sandbox/
    ```
 
-2. `~/.codex/auth.json` が存在しない場合:
-   ```bash
-   -e CODEX_API_KEY=$CODEX_API_KEY
-   ```
+### テストの実行
 
-#### 4.4 環境変数
-
-##### 4.4.1 環境変数の注入
-
-Task YAML で環境変数を指定できます：
-
-```yaml
-runner:
-  worker:
-    env:
-      CODEX_API_KEY: "env:CODEX_API_KEY" # ホスト環境変数を参照
-      CUSTOM_VAR: "literal-value" # リテラル値
-```
-
-##### 4.4.2 `env:` プレフィックス
-
-`env:` プレフィックスを使用すると、ホストの環境変数を参照できます：
-
-| Task YAML の値        | 実際の値                       |
-| --------------------- | ------------------------------ |
-| `"env:CODEX_API_KEY"` | ホストの `$CODEX_API_KEY` の値 |
-| `"literal-value"`     | `"literal-value"` そのまま     |
-
-#### 4.5 コンテナ起動オプション
+#### 方法 1: go test で実行（推奨）
 
 ```bash
-docker run \
-  --name agent-runner-<task_id> \
-  -v <repo_path>:/workspace/project \
-  -v ~/.codex/auth.json:/root/.codex/auth.json:ro \
-  -e CODEX_API_KEY=<value> \
-  -w /workspace/project \
-  --rm \
-  agent-runner-codex:latest \
-  tail -f /dev/null
+# Codex テストのみ
+go test -tags=codex -timeout=10m ./test/codex/...
+
+# 詳細表示
+go test -v -tags=codex -timeout=10m ./test/codex/...
 ```
 
-**オプション説明**:
-
-- `--name`: コンテナ名（タスク ID ベース）
-- `-v`: ボリュームマウント
-- `-e`: 環境変数
-- `-w`: 作業ディレクトリ
-- `--rm`: 停止時に自動削除
-- `tail -f /dev/null`: Keep Alive コマンド
-
-### 5. Worker 実行
-
-#### 5.1 Codex CLI 実行
+#### 方法 2: テストスクリプトを使用
 
 ```bash
-docker exec <container_id> codex exec \
-  --sandbox workspace-write \
-  --json \
-  --cwd /workspace/project \
-  "<Meta から渡された prompt>"
+./run_codex_test.sh
 ```
 
-#### 5.2 タイムアウト
+#### 方法 3: 直接実行
 
-| 項目                        | デフォルト       | カスタマイズ                                  |
-| --------------------------- | ---------------- | --------------------------------------------- |
-| **Worker 実行タイムアウト** | 1800 秒（30 分） | Task YAML の `runner.worker.max_run_time_sec` |
-
-タイムアウトに達した場合、Worker 実行は強制終了され、エラーとして扱われます。
-
-#### 5.3 エラーハンドリング
-
-| エラー種別                | 処理                                           |
-| ------------------------- | ---------------------------------------------- |
-| **コンテナ起動失敗**      | タスクを FAILED に遷移                         |
-| **Worker 実行失敗**       | WorkerRunResult に記録、Meta に報告            |
-| **タイムアウト**          | Worker を強制終了、エラーとして記録            |
-| **Docker デーモン未起動** | エラーメッセージを表示、タスクを FAILED に遷移 |
-
-### 6. 実装インターフェース
-
-#### 6.1 WorkerExecutor インターフェース
-
-```go
-type WorkerExecutor interface {
-    // タスク開始時にコンテナを起動
-    Start(ctx context.Context) error
-
-    // Worker を実行
-    RunWorker(ctx context.Context, prompt string) (*WorkerRunResult, error)
-
-    // タスク完了時にコンテナを停止
-    Stop(ctx context.Context) error
-}
+```bash
+go run cmd/agent-runner/main.go < test_codex_task.yaml
 ```
 
-#### 6.2 SandboxManager インターフェース
+### テスト内容
 
-```go
-type SandboxManager interface {
-    // コンテナを起動し、ID を返す
-    StartContainer(ctx context.Context, image string, repoPath string, env map[string]string) (string, error)
+`test_codex_task.yaml` は以下をテストします：
 
-    // コンテナ内でコマンドを実行
-    Exec(ctx context.Context, containerID string, cmd []string) (int, string, error)
+- 簡単な電卓プログラム（calculator.py）の作成
+- Codex CLI が Docker サンドボックス内で正しく動作すること
+- ファイルがリポジトリに正しく保存されること
 
-    // コンテナを停止・削除
-    StopContainer(ctx context.Context, containerID string) error
-}
+### 結果の確認
+
+テスト実行後、以下を確認してください：
+
+1. `.agent-runner/task-TASK-CODEX-TEST.md` - タスクノート
+2. `calculator.py` - Codex が生成したファイル（リポジトリルートに作成されるはず）
+
+### トラブルシューティング
+
+#### Codex 認証エラー
+
+```
+Error: Codex authentication failed
 ```
 
-### 7. 実装状況
+→ `~/.codex/auth.json` が存在し、有効な認証情報が含まれていることを確認してください。
 
-#### 7.1 実装済み機能
+#### Docker コンテナ起動エラー
 
-- ✅ Codex CLI Worker
-- ✅ Docker サンドボックス管理
-- ✅ コンテナライフサイクル最適化
-- ✅ ImagePull 自動実行
-- ✅ Codex 認証自動マウント
-- ✅ 環境変数注入（`env:` プレフィックス）
-- ✅ タイムアウト制御
-- ✅ エラーハンドリング
+```
+Error: failed to start sandbox
+```
 
-#### 7.2 制約事項
-
-- v1 では `codex-cli` のみサポート
-- Docker が必須（他のコンテナランタイムは未サポート）
-- Windows での動作は未検証
-
-#### 7.3 パフォーマンス
-
-| 項目                 | 測定値                      |
-| -------------------- | --------------------------- |
-| **コンテナ起動時間** | 約 2-3 秒                   |
-| **Worker 実行時間**  | タスク依存（通常 10-60 秒） |
-| **コンテナ停止時間** | 約 1 秒                     |
-
-**最適化効果**: コンテナ再利用により、複数回の Worker 実行で 5-10 倍の高速化を実現。
-
-
----
-
-# YAML サンプルファイル
+→ Docker デーモンが起動していることを確認してください。
 

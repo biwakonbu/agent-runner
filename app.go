@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"time"
 
@@ -25,8 +26,10 @@ type App struct {
 	scheduler             *orchestrator.Scheduler
 	chatHandler           *chat.Handler
 	currentWS             *ide.Workspace
+	currentWSID           string
 	executionOrchestrator *orchestrator.ExecutionOrchestrator
 	backlogStore          *orchestrator.BacklogStore
+	eventEmitter          orchestrator.EventEmitter
 }
 
 // NewApp creates a new App application struct
@@ -48,22 +51,29 @@ func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
 }
 
-// newMetaClientFromEnv は環境変数に応じて Meta クライアントを生成する
+// newMetaClientFromConfig は LLMConfigStore の設定に基づいて Meta クライアントを生成する
 // 優先度:
-// 1. MULTIVERSE_META_KIND=openai-chat なら OpenAI 接続 (OPENAI_API_KEY 必須想定)
-// 2. それ以外/未設定はモック
-func newMetaClientFromEnv() *meta.Client {
-	kind := os.Getenv("MULTIVERSE_META_KIND")
+// 1. LLMConfigStore の設定（codex-cli, mock 等）
+// 2. 環境変数でのオーバーライド（後方互換性のため）
+func (a *App) newMetaClientFromConfig() *meta.Client {
+	config, err := a.llmConfigStore.GetEffectiveConfig()
+	if err != nil {
+		// エラー時はモックを返す
+		return meta.NewMockClient()
+	}
+
+	kind := config.Kind
 	if kind == "" {
-		kind = "mock"
+		kind = "codex-cli" // デフォルトで実タスク実行
 	}
 
 	switch kind {
+	case "codex-cli":
+		return meta.NewClient("codex-cli", "", config.Model, config.SystemPrompt)
 	case "openai-chat":
+		// 後方互換性のため残す（HTTP ベース）
 		apiKey := os.Getenv("OPENAI_API_KEY")
-		model := os.Getenv("MULTIVERSE_META_MODEL")
-		systemPrompt := os.Getenv("MULTIVERSE_META_SYSTEM_PROMPT")
-		return meta.NewClient("openai-chat", apiKey, model, systemPrompt)
+		return meta.NewClient("openai-chat", apiKey, config.Model, config.SystemPrompt)
 	default:
 		return meta.NewMockClient()
 	}
@@ -104,6 +114,7 @@ func (a *App) SelectWorkspace() string {
 	}
 
 	a.currentWS = ws
+	a.currentWSID = id
 
 	// Initialize TaskStore, Scheduler, and ChatHandler for this workspace
 	wsDir := a.workspaceStore.GetWorkspaceDir(id)
@@ -116,9 +127,10 @@ func (a *App) SelectWorkspace() string {
 		agentRunnerPath, _ = filepath.Abs("agent-runner")
 	}
 	executor := orchestrator.NewExecutor(agentRunnerPath, ws.ProjectRoot, a.taskStore)
-	eventEmitter := orchestrator.NewWailsEventEmitter(a.ctx)
+	a.eventEmitter = orchestrator.NewWailsEventEmitter(a.ctx)
+	executor.SetEventEmitter(a.eventEmitter)
 
-	a.scheduler = orchestrator.NewScheduler(a.taskStore, queue, eventEmitter)
+	a.scheduler = orchestrator.NewScheduler(a.taskStore, queue, a.eventEmitter)
 
 	// Initialize BacklogStore (before ExecutionOrchestrator)
 	a.backlogStore = orchestrator.NewBacklogStore(wsDir)
@@ -128,15 +140,15 @@ func (a *App) SelectWorkspace() string {
 		executor,
 		a.taskStore,
 		queue,
-		eventEmitter,
+		a.eventEmitter,
 		a.backlogStore,
 		[]string{"default", "codegen", "test"},
 	)
 
-	// Initialize ChatHandler with mock Meta client (TODO: configurable)
+	// Initialize ChatHandler with Meta client from LLMConfigStore
 	sessionStore := chat.NewChatSessionStore(wsDir)
-	metaClient := newMetaClientFromEnv()
-	a.chatHandler = chat.NewHandler(metaClient, a.taskStore, sessionStore, id, ws.ProjectRoot, eventEmitter)
+	metaClient := a.newMetaClientFromConfig()
+	a.chatHandler = chat.NewHandler(metaClient, a.taskStore, sessionStore, id, ws.ProjectRoot, a.eventEmitter)
 
 	return id
 }
@@ -176,6 +188,7 @@ func (a *App) OpenWorkspaceByID(id string) string {
 	}
 
 	a.currentWS = ws
+	a.currentWSID = id
 
 	// Initialize TaskStore, Scheduler, and ChatHandler for this workspace
 	wsDir := a.workspaceStore.GetWorkspaceDir(id)
@@ -188,9 +201,10 @@ func (a *App) OpenWorkspaceByID(id string) string {
 		agentRunnerPath, _ = filepath.Abs("agent-runner")
 	}
 	executor := orchestrator.NewExecutor(agentRunnerPath, ws.ProjectRoot, a.taskStore)
-	eventEmitter := orchestrator.NewWailsEventEmitter(a.ctx)
+	a.eventEmitter = orchestrator.NewWailsEventEmitter(a.ctx)
+	executor.SetEventEmitter(a.eventEmitter)
 
-	a.scheduler = orchestrator.NewScheduler(a.taskStore, queue, eventEmitter)
+	a.scheduler = orchestrator.NewScheduler(a.taskStore, queue, a.eventEmitter)
 
 	// Initialize BacklogStore (ExecutionOrchestrator depends on it)
 	a.backlogStore = orchestrator.NewBacklogStore(wsDir)
@@ -200,15 +214,15 @@ func (a *App) OpenWorkspaceByID(id string) string {
 		executor,
 		a.taskStore,
 		queue,
-		eventEmitter,
+		a.eventEmitter,
 		a.backlogStore,
 		[]string{"default", "codegen", "test"},
 	)
 
-	// Initialize ChatHandler with mock Meta client (TODO: configurable)
+	// Initialize ChatHandler with Meta client from LLMConfigStore
 	sessionStore := chat.NewChatSessionStore(wsDir)
-	metaClient := newMetaClientFromEnv()
-	a.chatHandler = chat.NewHandler(metaClient, a.taskStore, sessionStore, id, ws.ProjectRoot, eventEmitter)
+	metaClient := a.newMetaClientFromConfig()
+	a.chatHandler = chat.NewHandler(metaClient, a.taskStore, sessionStore, id, ws.ProjectRoot, a.eventEmitter)
 
 	return id
 }
@@ -506,10 +520,22 @@ func (a *App) SetLLMConfig(dto LLMConfigDTO) error {
 		BaseURL:      dto.BaseURL,
 		SystemPrompt: dto.SystemPrompt,
 	}
-	return a.llmConfigStore.Save(config)
+	if err := a.llmConfigStore.Save(config); err != nil {
+		return err
+	}
+
+	// 現在のワークスペースがあれば Meta/Chat を再初期化して即時反映
+	if a.currentWS != nil && a.taskStore != nil && a.currentWSID != "" {
+		wsDir := a.workspaceStore.GetWorkspaceDir(a.currentWSID)
+		sessionStore := chat.NewChatSessionStore(wsDir)
+		metaClient := a.newMetaClientFromConfig()
+		a.chatHandler = chat.NewHandler(metaClient, a.taskStore, sessionStore, a.currentWSID, a.currentWS.ProjectRoot, a.eventEmitter)
+	}
+
+	return nil
 }
 
-// TestLLMConnection は LLM 接続をテストする
+// TestLLMConnection は LLM 接続をテストする（CLI セッション検証）
 func (a *App) TestLLMConnection() (string, error) {
 	config, err := a.llmConfigStore.GetEffectiveConfig()
 	if err != nil {
@@ -520,6 +546,24 @@ func (a *App) TestLLMConnection() (string, error) {
 		return "モックモード: 接続テストはスキップされました", nil
 	}
 
+	// Meta クライアントを作成
+	client := a.newMetaClientFromConfig()
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	// CLI プロバイダの場合は TestConnection を呼び出す
+	if config.Kind == "codex-cli" {
+		// CodexCLIProvider の TestConnection を呼び出す
+		// 内部実装では codex --version でセッション確認
+		cmd := exec.CommandContext(ctx, "codex", "--version")
+		output, err := cmd.CombinedOutput()
+		if err != nil {
+			return "", fmt.Errorf("Codex CLI セッションが見つかりません: %w (出力: %s)", err, string(output))
+		}
+		return fmt.Sprintf("接続成功 (プロバイダ: %s, モデル: %s)", config.Kind, config.Model), nil
+	}
+
+	// 後方互換性: HTTP ベースのプロバイダ（openai-chat 等）
 	apiKey, err := a.llmConfigStore.GetAPIKey()
 	if err != nil {
 		return "", fmt.Errorf("API キーの取得に失敗: %w", err)
@@ -529,10 +573,6 @@ func (a *App) TestLLMConnection() (string, error) {
 	}
 
 	// テスト用の簡単なリクエストを送信
-	client := meta.NewClient(config.Kind, apiKey, config.Model, config.SystemPrompt)
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
-	defer cancel()
-
 	_, err = client.Decompose(ctx, &meta.DecomposeRequest{
 		UserInput: "接続テスト: この文章を確認してください",
 		Context:   meta.DecomposeContext{},

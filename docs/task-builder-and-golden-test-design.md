@@ -41,14 +41,17 @@ TODO アプリの仕様・技術スタック・テスト戦略などは **一切
   - TaskConfig YAML を AgentRunner に渡して実行。
   - AgentRunner の結果を受け取り、TaskAttempt として保存し、IPC 結果を IDE に露出。
 
-### 2.3 Task Builder（LLM）
+### 2.3 Task Builder（CLI プロバイダ）
 
-- Orchestrator から呼び出される LLM ベースのコンポーネント（実装は API 経由）。
+- Orchestrator から呼び出される CLI ベースのコンポーネント（Codex CLI 等）。
 - 入力:
   - Workspace 情報（root_dir 等）
   - ユーザー入力の自然文（`raw_prompt`）
 - 出力:
   - AgentRunner に渡す **TaskConfig YAML**（本ドキュメントでフォーマットを定義）。
+- 実装:
+  - `codex chat` コマンドを実行し、JSON 形式で応答を受信
+  - CLI セッションの検証とエラーハンドリングを実装
 
 ### 2.4 AgentRunner
 
@@ -215,17 +218,17 @@ Orchestrator は、本 JSON を TaskAttempt（JSONL）に埋め込み、IDE か�
 ### 4.3 Task Builder 呼び出し
 
 1. Orchestrator は TaskStore から `task_id` に対応する Task をロード。
-2. Orchestrator は LLM（Task Builder）に以下の情報を渡して呼び出す。
+2. Orchestrator は CLI プロバイダ（Task Builder）に以下の情報を渡して呼び出す。
 
    - Workspace 情報（例）
      - `root_dir: "/path/to/workspace"`
    - `raw_prompt: "TODO アプリを作成して"`
 
-3. Task Builder（LLM）は、3.3 の TaskConfig スキーマに従う YAML を生成する。
+3. Task Builder（Codex CLI 等）は、`codex chat` コマンドを実行し、3.3 の TaskConfig スキーマに従う YAML を生成する。
 4. Orchestrator は生成された YAML を TaskConfig として検証する。
    - YAML としてパース可能か
    - 必須フィールドが存在するか
-5. 検証に失敗した場合は、その時点で TaskAttempt を `failed` として記録し、結果を IDE に返す。
+5. 検証に失敗した場合、または CLI セッションが無い場合は、その時点で TaskAttempt を `failed` として記録し、結果を IDE に返す。
 
 ### 4.4 AgentRunner 実行
 
@@ -266,11 +269,15 @@ Orchestrator は、本 JSON を TaskAttempt（JSONL）に埋め込み、IDE か�
 
 - `raw_prompt = "TODO アプリを作成して"` から **有効な TaskConfig YAML** が生成されることを確認する。
 
+前提条件:
+
+- Codex CLI がインストールされ、有効なセッションが存在すること
+
 テスト手順（ロジック）:
 
 1. テスト用 Workspace を作成（空 or ほぼ空でよい）。
 2. Task を作成し、`raw_prompt = "TODO アプリを作成して"` を設定。
-3. Orchestrator 経由で Task Builder を呼び出し、TaskConfig YAML を取得。
+3. Orchestrator 経由で Task Builder（Codex CLI）を呼び出し、TaskConfig YAML を取得。
 4. アサーション:
    - YAML としてパース可能。
    - `task.id` が TaskStore の `id` と一致。
@@ -285,10 +292,17 @@ Orchestrator は、本 JSON を TaskAttempt（JSONL）に埋め込み、IDE か�
 
 - TaskConfig YAML を AgentRunner に渡した際、実装・ファイル生成・自己検証までの処理が完了し、結果 JSON が返ることを確認する。
 
+前提条件:
+
+- Codex CLI がインストールされ、有効なセッションが存在すること
+- Docker が起動しており、Codex Worker イメージが利用可能であること
+
 テスト手順（ロジック）:
 
 1. GT-1 で取得した TaskConfig YAML をそのまま AgentRunner に入力。
 2. AgentRunner を実行し、結果 JSON（3.4）を取得。
+   - AgentRunner は Docker サンドボックス内で Codex CLI を実行
+   - Codex CLI セッションが Docker コンテナ内で利用可能であることを確認
 3. アサーション:
    - プロセスとして正常終了している（exit code = 0 が望ましいが、結果 JSON の `status` を見て判定）。
    - Workspace ディレクトリ内で 1 つ以上のファイルが新規作成 or 更新されている。
