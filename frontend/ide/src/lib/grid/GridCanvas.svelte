@@ -8,6 +8,19 @@
 
   let containerRef: HTMLDivElement;
 
+  // マウス位置追跡（ズームの起点として使用）
+  let lastMousePosition = { x: 0, y: 0 };
+
+  // マウス移動時に位置を記録
+  function handleMouseMove(event: MouseEvent) {
+    if (!containerRef) return;
+    const rect = containerRef.getBoundingClientRect();
+    lastMousePosition = {
+      x: event.clientX - rect.left,
+      y: event.clientY - rect.top,
+    };
+  }
+
   // ホイールズーム
   function handleWheel(event: WheelEvent) {
     event.preventDefault();
@@ -44,6 +57,9 @@
 
   // ドラッグ中
   function handlePointerMove(event: PointerEvent) {
+    // マウス位置を常に追跡
+    handleMouseMove(event);
+
     if (!$drag.isDragging) return;
 
     const deltaX = event.clientX - $drag.startX;
@@ -62,13 +78,13 @@
 
   // キーボードショートカット
   function handleKeydown(event: KeyboardEvent) {
-    // ズームショートカット
+    // ズームショートカット（マウス位置を起点に）
     if (event.key === "+" || event.key === "=") {
       event.preventDefault();
-      viewport.zoomIn();
+      viewport.zoomIn(lastMousePosition.x, lastMousePosition.y);
     } else if (event.key === "-") {
       event.preventDefault();
-      viewport.zoomOut();
+      viewport.zoomOut(lastMousePosition.x, lastMousePosition.y);
     } else if (event.key === "0") {
       event.preventDefault();
       viewport.reset();
@@ -89,6 +105,7 @@
   class="canvas-container"
   bind:this={containerRef}
   on:wheel={handleWheel}
+  on:mousemove={handleMouseMove}
   on:pointerdown={handlePointerDown}
   on:pointermove={handlePointerMove}
   on:pointerup={handlePointerUp}
@@ -186,14 +203,13 @@
 
   <!-- ノードレイヤー -->
   <!-- 
-    NOTE: テキストの滲みを防ぐため、transform: scale ではなく zoom プロパティを使用する。
-    SVGレイヤーは scale で問題ないが、DOMテキストは zoom でリフローさせることで鮮明に描画される。
-    Wails (WebKit/Blink) 環境では zoom が有効。
+    NOTE: transform: scale() を使用してマウス位置を起点としたズームを実現。
+    テキストの鮮明さは will-change: transform と transform-origin で最適化。
+    座標変換: スクリーン座標 = ワールド座標 * zoom + pan
   -->
   <div
     class="nodes-layer"
-    style="zoom: {$viewport.zoom}; transform: translate({$viewport.panX /
-      $viewport.zoom}px, {$viewport.panY / $viewport.zoom}px);"
+    style="transform: translate({$viewport.panX}px, {$viewport.panY}px) scale({$viewport.zoom}); transform-origin: 0 0;"
   >
     {#each $taskNodes as node (node.task.id)}
       <GridNode

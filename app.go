@@ -20,6 +20,7 @@ import (
 type App struct {
 	ctx                   context.Context
 	workspaceStore        *ide.WorkspaceStore
+	llmConfigStore        *ide.LLMConfigStore
 	taskStore             *orchestrator.TaskStore
 	scheduler             *orchestrator.Scheduler
 	chatHandler           *chat.Handler
@@ -34,9 +35,10 @@ func NewApp() *App {
 	if err != nil {
 		panic(err)
 	}
-	baseDir := fmt.Sprintf("%s/.multiverse/workspaces", homeDir)
+	multiverseDir := fmt.Sprintf("%s/.multiverse", homeDir)
 	return &App{
-		workspaceStore: ide.NewWorkspaceStore(baseDir),
+		workspaceStore: ide.NewWorkspaceStore(filepath.Join(multiverseDir, "workspaces")),
+		llmConfigStore: ide.NewLLMConfigStore(multiverseDir),
 	}
 }
 
@@ -464,4 +466,80 @@ func (a *App) DeleteBacklogItem(id string) error {
 		return fmt.Errorf("backlog store not initialized")
 	}
 	return a.backlogStore.Delete(id)
+}
+
+// ============================================================================
+// LLM Config API
+// ============================================================================
+
+// LLMConfigDTO は LLM 設定のフロントエンド向けデータ転送オブジェクト
+type LLMConfigDTO struct {
+	Kind         string `json:"kind"`
+	Model        string `json:"model"`
+	BaseURL      string `json:"baseUrl"`
+	SystemPrompt string `json:"systemPrompt"`
+	HasAPIKey    bool   `json:"hasApiKey"`
+}
+
+// GetLLMConfig は現在の LLM 設定を返す
+func (a *App) GetLLMConfig() LLMConfigDTO {
+	config, err := a.llmConfigStore.Load()
+	if err != nil {
+		runtime.LogErrorf(a.ctx, "Failed to load LLM config: %v", err)
+		return LLMConfigDTO{Kind: "mock", Model: "gpt-4o"}
+	}
+
+	return LLMConfigDTO{
+		Kind:         config.Kind,
+		Model:        config.Model,
+		BaseURL:      config.BaseURL,
+		SystemPrompt: config.SystemPrompt,
+		HasAPIKey:    a.llmConfigStore.HasAPIKey(),
+	}
+}
+
+// SetLLMConfig は LLM 設定を保存する
+func (a *App) SetLLMConfig(dto LLMConfigDTO) error {
+	config := &ide.LLMConfig{
+		Kind:         dto.Kind,
+		Model:        dto.Model,
+		BaseURL:      dto.BaseURL,
+		SystemPrompt: dto.SystemPrompt,
+	}
+	return a.llmConfigStore.Save(config)
+}
+
+// TestLLMConnection は LLM 接続をテストする
+func (a *App) TestLLMConnection() (string, error) {
+	config, err := a.llmConfigStore.GetEffectiveConfig()
+	if err != nil {
+		return "", fmt.Errorf("設定の読み込みに失敗: %w", err)
+	}
+
+	if config.Kind == "mock" {
+		return "モックモード: 接続テストはスキップされました", nil
+	}
+
+	apiKey, err := a.llmConfigStore.GetAPIKey()
+	if err != nil {
+		return "", fmt.Errorf("API キーの取得に失敗: %w", err)
+	}
+	if apiKey == "" {
+		return "", fmt.Errorf("API キーが設定されていません。環境変数 OPENAI_API_KEY を設定してください")
+	}
+
+	// テスト用の簡単なリクエストを送信
+	client := meta.NewClient(config.Kind, apiKey, config.Model, config.SystemPrompt)
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	_, err = client.Decompose(ctx, &meta.DecomposeRequest{
+		UserInput: "接続テスト: この文章を確認してください",
+		Context:   meta.DecomposeContext{},
+	})
+	if err != nil {
+		return "", fmt.Errorf("接続テスト失敗: %w", err)
+	}
+
+	return fmt.Sprintf("接続成功 (プロバイダ: %s, モデル: %s)", config.Kind, config.Model), nil
 }

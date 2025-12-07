@@ -34,6 +34,10 @@ export function GetExecutionState() {
   return window['go']['main']['App']['GetExecutionState']();
 }
 
+export function GetLLMConfig() {
+  return window['go']['main']['App']['GetLLMConfig']();
+}
+
 export function GetPoolSummaries() {
   return window['go']['main']['App']['GetPoolSummaries']();
 }
@@ -86,10 +90,18 @@ export function SendChatMessage(arg1, arg2) {
   return window['go']['main']['App']['SendChatMessage'](arg1, arg2);
 }
 
+export function SetLLMConfig(arg1) {
+  return window['go']['main']['App']['SetLLMConfig'](arg1);
+}
+
 export function StartExecution() {
   return window['go']['main']['App']['StartExecution']();
 }
 
 export function StopExecution() {
   return window['go']['main']['App']['StopExecution']();
+}
+
+export function TestLLMConnection() {
+  return window['go']['main']['App']['TestLLMConnection']();
 }

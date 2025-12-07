@@ -204,6 +204,26 @@ export namespace main {
 		    return a;
 		}
 	}
+	export class LLMConfigDTO {
+	    kind: string;
+	    model: string;
+	    baseUrl: string;
+	    systemPrompt: string;
+	    hasApiKey: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new LLMConfigDTO(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.kind = source["kind"];
+	        this.model = source["model"];
+	        this.baseUrl = source["baseUrl"];
+	        this.systemPrompt = source["systemPrompt"];
+	        this.hasApiKey = source["hasApiKey"];
+	    }
+	}
 
 }
 

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { afterUpdate } from "svelte";
+  import { onMount } from "svelte";
   import ChatMessage from "../ChatMessage.svelte";
   import {
     chatMessages,
@@ -10,61 +10,132 @@
 
   export let conflicts: NonNullable<ChatResponse["conflicts"]> = [];
 
-  let contentEl: HTMLElement;
+  const MAX_DISPLAY_MESSAGES = 10000;
 
-  // 自動スクロール
-  afterUpdate(() => {
-    if ($chatMessages.length > 0 && contentEl) {
-      // ユーザーがスクロールしていない場合のみスクロールする判定を入れるのが理想だが、
-      // 簡易的にメッセージ追加時は常に最下部へ
-      setTimeout(() => {
-        if (contentEl) contentEl.scrollTop = contentEl.scrollHeight;
-      }, 0);
+  let contentEl: HTMLElement;
+  let showScrollToBottom = false;
+  let hasNewMessages = false;
+  let lastSeenMessageCount = 0;
+
+  // スクロール位置を監視して「最新に移動」ボタンの表示を制御
+  function handleScroll() {
+    if (!contentEl) return;
+    const scrollBottom =
+      contentEl.scrollHeight - contentEl.scrollTop - contentEl.clientHeight;
+    // 最下部から100px以上離れている場合にボタンを表示
+    showScrollToBottom = scrollBottom > 100;
+    // 最下部にいる場合は新着フラグをリセット
+    if (!showScrollToBottom) {
+      hasNewMessages = false;
+      lastSeenMessageCount = $chatMessages.length;
     }
+  }
+
+  // 新しいメッセージが追加されたかチェック
+  $: if ($chatMessages.length > lastSeenMessageCount && showScrollToBottom) {
+    hasNewMessages = true;
+  }
+
+  // 表示するメッセージ（最新10000件まで）
+  $: displayMessages = $chatMessages.slice(-MAX_DISPLAY_MESSAGES);
+
+  // 最新に移動
+  function scrollToBottom() {
+    if (contentEl) {
+      contentEl.scrollTop = contentEl.scrollHeight;
+      showScrollToBottom = false;
+      hasNewMessages = false;
+      lastSeenMessageCount = $chatMessages.length;
+    }
+  }
+
+  onMount(() => {
+    lastSeenMessageCount = $chatMessages.length;
   });
 </script>
 
-<div class="chat-view" bind:this={contentEl}>
-  {#if $chatError}
-    <div class="error-banner" role="alert">
-      {$chatError}
-    </div>
-  {/if}
-  {#each $chatMessages as msg (msg.id)}
-    <ChatMessage
-      role={msg.role}
-      content={msg.content}
-      timestamp={msg.timestamp}
-    />
-  {/each}
-  {#if $isChatLoading}
-    <div class="loading-indicator">
-      <span class="dot"></span>
-      <span class="dot"></span>
-      <span class="dot"></span>
-    </div>
-  {/if}
-  {#if conflicts.length > 0}
-    <div class="conflicts-card">
-      <div class="conflicts-header">検出されたコンフリクト</div>
-      <ul>
-        {#each conflicts as conflict}
-          <li>
-            <div class="conflict-file">{conflict.file}</div>
-            <div class="conflict-warning">{conflict.warning}</div>
-            {#if conflict.tasks?.length}
-              <div class="conflict-tasks">
-                関連タスク: {conflict.tasks.join(", ")}
-              </div>
-            {/if}
-          </li>
-        {/each}
-      </ul>
-    </div>
-  {/if}
+<div class="chat-view-container">
+  <div class="chat-view" bind:this={contentEl} on:scroll={handleScroll}>
+    {#if $chatError}
+      <div class="error-banner" role="alert">
+        {$chatError}
+      </div>
+    {/if}
+    {#each displayMessages as msg (msg.id)}
+      <ChatMessage
+        role={msg.role}
+        content={msg.content}
+        timestamp={msg.timestamp}
+      />
+    {/each}
+    {#if $isChatLoading}
+      <div class="loading-indicator">
+        <span class="dot"></span>
+        <span class="dot"></span>
+        <span class="dot"></span>
+      </div>
+    {/if}
+    {#if conflicts.length > 0}
+      <div class="conflicts-card">
+        <div class="conflicts-header">検出されたコンフリクト</div>
+        <ul>
+          {#each conflicts as conflict}
+            <li>
+              <div class="conflict-file">{conflict.file}</div>
+              <div class="conflict-warning">{conflict.warning}</div>
+              {#if conflict.tasks?.length}
+                <div class="conflict-tasks">
+                  関連タスク: {conflict.tasks.join(", ")}
+                </div>
+              {/if}
+            </li>
+          {/each}
+        </ul>
+      </div>
+    {/if}
+  </div>
+
+  <!-- スクロールボタン: フェードイン/スライドアップアニメーション -->
+  <button
+    class="scroll-fab"
+    class:visible={showScrollToBottom}
+    class:has-new={hasNewMessages}
+    on:click={scrollToBottom}
+    type="button"
+    aria-label="最新のメッセージに移動"
+    aria-hidden={!showScrollToBottom}
+  >
+    <span class="fab-glow"></span>
+    <span class="fab-inner">
+      <svg
+        class="fab-icon"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      >
+        <polyline points="6 9 12 15 18 9"></polyline>
+      </svg>
+      {#if hasNewMessages}
+        <span class="fab-badge">
+          <span class="badge-dot"></span>
+        </span>
+      {/if}
+    </span>
+  </button>
 </div>
 
 <style>
+  .chat-view-container {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    position: relative;
+  }
+
   .chat-view {
     display: flex;
     flex-direction: column;
@@ -92,6 +163,177 @@
 
   .chat-view::-webkit-scrollbar-thumb:hover {
     background: var(--mv-glass-scrollbar-hover);
+  }
+
+  /* ========================================
+     Floating Action Button - Crystal HUD スタイル
+     ======================================== */
+  .scroll-fab {
+    position: absolute;
+    right: var(--mv-spacing-md);
+    bottom: var(--mv-spacing-lg);
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    z-index: 10;
+
+    /* 初期状態: 非表示 */
+    opacity: 0;
+    transform: translateY(16px) scale(0.8);
+    pointer-events: none;
+
+    /* スムーズなトランジション */
+    transition:
+      opacity var(--mv-duration-normal) var(--mv-easing-out),
+      transform var(--mv-duration-normal) var(--mv-easing-spring);
+  }
+
+  .scroll-fab.visible {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    pointer-events: auto;
+  }
+
+  /* グロー背景レイヤー */
+  .fab-glow {
+    position: absolute;
+    inset: -4px;
+    border-radius: 50%;
+    background: radial-gradient(
+      circle,
+      var(--mv-glow-frost-2-light) 0%,
+      transparent 70%
+    );
+    opacity: 0;
+    transition: opacity var(--mv-duration-fast) var(--mv-easing-out);
+  }
+
+  .scroll-fab:hover .fab-glow {
+    opacity: 1;
+  }
+
+  .scroll-fab.has-new .fab-glow {
+    background: radial-gradient(
+      circle,
+      var(--mv-glow-green-mid) 0%,
+      transparent 70%
+    );
+    opacity: 1;
+    animation: pulse-glow 2s var(--mv-easing-default) infinite;
+  }
+
+  /* メインボタン内側 */
+  .fab-inner {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+
+    /* Crystal Button スタイル */
+    background: var(--mv-btn-crystal-bg);
+    border: 1px solid var(--mv-btn-crystal-border);
+    box-shadow: var(--mv-btn-crystal-shadow);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+
+    /* トランジション */
+    transition:
+      background var(--mv-duration-fast) var(--mv-easing-out),
+      border-color var(--mv-duration-fast) var(--mv-easing-out),
+      box-shadow var(--mv-duration-fast) var(--mv-easing-out),
+      transform var(--mv-duration-instant) var(--mv-easing-out);
+  }
+
+  .scroll-fab:hover .fab-inner {
+    background: var(--mv-btn-crystal-bg-hover);
+    border-color: var(--mv-glow-frost-2-border);
+    box-shadow: var(--mv-btn-crystal-shadow-hover);
+    transform: var(--mv-transform-hover-lift);
+  }
+
+  .scroll-fab:active .fab-inner {
+    background: var(--mv-btn-crystal-bg-active);
+    transform: var(--mv-transform-press);
+  }
+
+  .scroll-fab.has-new .fab-inner {
+    border-color: var(--mv-border-glow-green);
+    box-shadow: var(--mv-shadow-glow-green-md);
+  }
+
+  /* アイコン */
+  .fab-icon {
+    width: 20px;
+    height: 20px;
+    color: var(--mv-primitive-frost-2);
+    filter: drop-shadow(0 0 4px var(--mv-glow-frost-2));
+    transition:
+      color var(--mv-duration-fast),
+      filter var(--mv-duration-fast),
+      transform var(--mv-duration-fast) var(--mv-easing-spring);
+  }
+
+  .scroll-fab:hover .fab-icon {
+    color: var(--mv-primitive-snow-0);
+    filter: drop-shadow(0 0 8px var(--mv-glow-frost-2-strong));
+    transform: translateY(2px);
+  }
+
+  .scroll-fab.has-new .fab-icon {
+    color: var(--mv-primitive-aurora-green);
+    filter: drop-shadow(0 0 6px var(--mv-glow-green));
+  }
+
+  /* 新着バッジ */
+  .fab-badge {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .badge-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--mv-primitive-aurora-green);
+    box-shadow:
+      0 0 6px var(--mv-glow-green-strong),
+      0 0 12px var(--mv-glow-green);
+    animation: badge-pulse 1.5s var(--mv-easing-default) infinite;
+  }
+
+  /* アニメーション */
+  @keyframes pulse-glow {
+    0%,
+    100% {
+      opacity: 0.6;
+      transform: scale(1);
+    }
+    50% {
+      opacity: 1;
+      transform: scale(1.1);
+    }
+  }
+
+  @keyframes badge-pulse {
+    0%,
+    100% {
+      transform: scale(1);
+      opacity: 1;
+    }
+    50% {
+      transform: scale(1.2);
+      opacity: 0.8;
+    }
   }
 
   /* ローディングインジケーター */

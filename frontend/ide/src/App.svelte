@@ -21,6 +21,7 @@
   import { initChatEvents } from "./stores/chat";
   import { initBacklogEvents, unresolvedCount } from "./stores/backlogStore";
   import BacklogPanel from "./lib/backlog/BacklogPanel.svelte";
+  import LLMSettings from "./lib/settings/LLMSettings.svelte";
 
   const log = Logger.withComponent("App");
 
@@ -33,6 +34,9 @@
 
   // Backlog State
   let isBacklogVisible = false;
+
+  // Settings State
+  let isSettingsVisible = false;
 
   onMount(() => {
     // Calculate initial position (Bottom-Right)
@@ -125,7 +129,7 @@
     <WorkspaceSelector on:selected={onWorkspaceSelected} />
   {:else}
     <!-- ツールバー -->
-    <Toolbar />
+    <Toolbar on:showSettings={() => (isSettingsVisible = true)} />
 
     <!-- メインコンテンツ -->
     <!-- メインコンテンツ -->
@@ -144,7 +148,6 @@
           <WBSListView />
         </div>
       {/if}
-
     </div>
 
     <!-- チャットウィンドウ -->
@@ -176,7 +179,8 @@
       class="backlog-fab"
       class:has-items={$unresolvedCount > 0}
       on:click={() => (isBacklogVisible = !isBacklogVisible)}
-      on:keydown={(e) => e.key === "Enter" && (isBacklogVisible = !isBacklogVisible)}
+      on:keydown={(e) =>
+        e.key === "Enter" && (isBacklogVisible = !isBacklogVisible)}
       role="button"
       tabindex="0"
       aria-label="Toggle Backlog"
@@ -192,6 +196,30 @@
     {#if isBacklogVisible}
       <div class="backlog-sidebar">
         <BacklogPanel />
+      </div>
+    {/if}
+
+    <!-- 設定モーダル -->
+    {#if isSettingsVisible}
+      <!-- svelte-ignore a11y-click-events-have-key-events -->
+      <div
+        class="settings-overlay"
+        on:click={() => (isSettingsVisible = false)}
+        role="dialog"
+        aria-modal="true"
+        aria-label="LLM Settings"
+      >
+        <!-- svelte-ignore a11y-click-events-have-key-events -->
+        <div class="settings-modal" on:click|stopPropagation role="document">
+          <button
+            class="close-btn"
+            on:click={() => (isSettingsVisible = false)}
+            aria-label="Close"
+          >
+            ×
+          </button>
+          <LLMSettings />
+        </div>
       </div>
     {/if}
   {/if}
@@ -299,5 +327,47 @@
     width: var(--mv-backlog-sidebar-width);
     z-index: 100;
     box-shadow: var(--mv-shadow-modal);
+  }
+
+  /* Settings Modal */
+  .settings-overlay {
+    position: fixed;
+    inset: 0;
+    background: var(--mv-glass-bg-overlay);
+    backdrop-filter: var(--mv-glass-blur);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2000;
+  }
+
+  .settings-modal {
+    position: relative;
+    max-width: var(--mv-content-max-width-sm);
+    max-height: 80vh;
+    overflow-y: auto;
+  }
+
+  .close-btn {
+    position: absolute;
+    top: var(--mv-spacing-sm);
+    right: var(--mv-spacing-sm);
+    width: var(--mv-size-action-btn);
+    height: var(--mv-size-action-btn);
+    border: none;
+    border-radius: var(--mv-radius-full);
+    background: transparent;
+    color: var(--mv-color-text-muted);
+    font-size: var(--mv-font-size-xl);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: var(--mv-transition-base);
+  }
+
+  .close-btn:hover {
+    color: var(--mv-color-text-primary);
+    background: var(--mv-glass-active);
   }
 </style>

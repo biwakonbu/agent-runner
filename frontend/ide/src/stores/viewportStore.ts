@@ -2,6 +2,15 @@
  * ビューポート状態管理ストア
  *
  * ズーム・パン状態をグローバルに管理
+ * 
+ * 座標変換の説明:
+ * - レンダリング: style="zoom: {zoom}; transform: translate({panX / zoom}px, {panY / zoom}px);"
+ * - スクリーン座標 = ワールド座標 * zoom + panX
+ * - ワールド座標 = (スクリーン座標 - panX) / zoom
+ * 
+ * マウス位置を起点にズームするには:
+ * 1. マウス位置のワールド座標を計算
+ * 2. ズーム後、同じワールド座標が同じスクリーン座標に留まるようにpanを調整
  */
 
 import { writable, derived } from 'svelte/store';
@@ -24,6 +33,49 @@ const initialDragState: DragState = {
   startPanY: 0,
 };
 
+/**
+ * マウス位置を起点にズームするためのパン調整を計算
+ * 
+ * @param mouseX スクリーン座標のマウスX位置
+ * @param mouseY スクリーン座標のマウスY位置
+ * @param oldZoom 変更前のズームレベル
+ * @param newZoom 変更後のズームレベル
+ * @param oldPanX 変更前のパンX
+ * @param oldPanY 変更前のパンY
+ * @returns 新しいパン位置
+ */
+function calculateZoomPan(
+  mouseX: number,
+  mouseY: number,
+  oldZoom: number,
+  newZoom: number,
+  oldPanX: number,
+  oldPanY: number
+): { panX: number; panY: number } {
+  // マウス位置のワールド座標を計算 (スクリーン座標からワールド座標へ)
+  // スクリーン座標 = ワールド座標 * zoom + panX
+  // ワールド座標 = (スクリーン座標 - panX) / zoom
+  const worldX = (mouseX - oldPanX) / oldZoom;
+  const worldY = (mouseY - oldPanY) / oldZoom;
+  
+  // ズーム後、同じワールド座標が同じスクリーン座標に留まるようにpanを計算
+  // mouseX = worldX * newZoom + newPanX
+  // newPanX = mouseX - worldX * newZoom
+  const newPanX = mouseX - worldX * newZoom;
+  const newPanY = mouseY - worldY * newZoom;
+  
+  console.log('[Zoom Debug]', {
+    mouse: { x: mouseX, y: mouseY },
+    world: { x: worldX, y: worldY },
+    oldZoom,
+    newZoom,
+    oldPan: { x: oldPanX, y: oldPanY },
+    newPan: { x: newPanX, y: newPanY },
+  });
+  
+  return { panX: newPanX, panY: newPanY };
+}
+
 // ビューポートストア
 function createViewportStore() {
   const { subscribe, set, update } = writable<Viewport>(initialViewport);
@@ -31,28 +83,54 @@ function createViewportStore() {
   return {
     subscribe,
 
-    // ズームイン
-    zoomIn: () => {
-      update((v) => ({
-        ...v,
-        zoom: Math.min(v.zoom + zoomConfig.step, zoomConfig.max),
-      }));
+    // ズームイン（オプションでマウス位置を指定）
+    zoomIn: (mouseX?: number, mouseY?: number) => {
+      update((v) => {
+        const newZoom = Math.min(v.zoom + zoomConfig.step, zoomConfig.max);
+        
+        // マウス位置が指定されている場合はそこを起点にズーム
+        if (mouseX !== undefined && mouseY !== undefined) {
+          const { panX, panY } = calculateZoomPan(
+            mouseX, mouseY, v.zoom, newZoom, v.panX, v.panY
+          );
+          return { zoom: newZoom, panX, panY };
+        }
+        
+        return { ...v, zoom: newZoom };
+      });
     },
 
-    // ズームアウト
-    zoomOut: () => {
-      update((v) => ({
-        ...v,
-        zoom: Math.max(v.zoom - zoomConfig.step, zoomConfig.min),
-      }));
+    // ズームアウト（オプションでマウス位置を指定）
+    zoomOut: (mouseX?: number, mouseY?: number) => {
+      update((v) => {
+        const newZoom = Math.max(v.zoom - zoomConfig.step, zoomConfig.min);
+        
+        // マウス位置が指定されている場合はそこを起点にズーム
+        if (mouseX !== undefined && mouseY !== undefined) {
+          const { panX, panY } = calculateZoomPan(
+            mouseX, mouseY, v.zoom, newZoom, v.panX, v.panY
+          );
+          return { zoom: newZoom, panX, panY };
+        }
+        
+        return { ...v, zoom: newZoom };
+      });
     },
 
-    // 特定のズームレベルに設定
-    setZoom: (zoom: number) => {
-      update((v) => ({
-        ...v,
-        zoom: Math.max(zoomConfig.min, Math.min(zoom, zoomConfig.max)),
-      }));
+    // 特定のズームレベルに設定（マウス位置起点オプション付き）
+    setZoom: (zoom: number, mouseX?: number, mouseY?: number) => {
+      update((v) => {
+        const newZoom = Math.max(zoomConfig.min, Math.min(zoom, zoomConfig.max));
+        
+        if (mouseX !== undefined && mouseY !== undefined) {
+          const { panX, panY } = calculateZoomPan(
+            mouseX, mouseY, v.zoom, newZoom, v.panX, v.panY
+          );
+          return { zoom: newZoom, panX, panY };
+        }
+        
+        return { ...v, zoom: newZoom };
+      });
     },
 
     // ホイールズーム（マウス位置を考慮）
@@ -64,16 +142,11 @@ function createViewportStore() {
           Math.min(v.zoom + zoomDelta, zoomConfig.max)
         );
 
-        // マウス位置を中心にズーム
-        const zoomRatio = newZoom / v.zoom;
-        const newPanX = mouseX - (mouseX - v.panX) * zoomRatio;
-        const newPanY = mouseY - (mouseY - v.panY) * zoomRatio;
+        const { panX, panY } = calculateZoomPan(
+          mouseX, mouseY, v.zoom, newZoom, v.panX, v.panY
+        );
 
-        return {
-          zoom: newZoom,
-          panX: newPanX,
-          panY: newPanY,
-        };
+        return { zoom: newZoom, panX, panY };
       });
     },
 
@@ -120,8 +193,10 @@ export const viewport = createViewportStore();
 export const drag = createDragStore();
 
 // CSS Transform用の派生ストア
+// 座標変換: スクリーン座標 = ワールド座標 * zoom + pan
+// transform の順序: 最初に translate でパン、次に scale でズーム
 export const canvasTransform = derived(viewport, ($viewport) => {
-  return `scale(${$viewport.zoom}) translate(${$viewport.panX / $viewport.zoom}px, ${$viewport.panY / $viewport.zoom}px)`;
+  return `translate(${$viewport.panX}px, ${$viewport.panY}px) scale(${$viewport.zoom})`;
 });
 
 // ズームパーセント表示用
