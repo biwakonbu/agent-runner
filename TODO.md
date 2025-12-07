@@ -22,7 +22,7 @@ Based on PRD v2.0
 
 ## PRD v2.0 実装完了 🎉
 
-主要フェーズ（Phase 1〜3）の実装は完了済み（97%）。上記レビュー結果の高優先度問題を修正すれば Production Ready です。
+主要フェーズ（Phase 1〜3）の実装は完了済み。全てのレビュー指摘事項が対応完了し Production Ready です。
 
 ---
 
@@ -48,9 +48,10 @@ Based on PRD v2.0
   - 対象: `frontend/ide/src/stores/executionStore.ts`
   - 内容: 実行開始失敗時などに `console.error` だけでなくユーザーへのフィードバック（Toast 等）を行う。
 
-- [ ] **フロント統合テストの拡充** (Frontend/E2E)
+- [x] **フロント統合テストの拡充** (Frontend/E2E)
   - 対象: `frontend/ide/tests/`
   - 内容: チャット生成タスク即時反映・依存矢印表示・イベント更新をカバーする Playwright テストを追加する。
+  - ✅ 完了: `integration_task_update.spec.ts` で UI 更新・Graph/WBS/Backlog/Execution イベントをカバー
 
 ---
 
