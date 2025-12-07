@@ -373,7 +373,161 @@ func (a *App) TestLLMConnection() (string, error) {
 
 ---
 
-## 4. Phase 5: 高度な機能【将来】
+## 4. Phase 4.5: Svelte 5 + Svelte Flow 移行【次期フェーズ】
+
+### 4.1 概要
+
+フロントエンドの基盤を Svelte 4 から Svelte 5 にアップグレードし、グラフノード管理を Svelte Flow ライブラリに移行する。
+これにより、大量ノード（2000+タスク）のパフォーマンス問題を解決し、将来の拡張性を確保する。
+
+**主な目的:**
+
+- **大量ノード対応**: 2000+ タスクでも快適に動作（Viewport Culling による仮想化）
+- **グラフ管理の安定化**: 手実装の座標計算・パン/ズームを Svelte Flow に委譲
+- **自動レイアウト**: Dagre による依存グラフの最適配置
+- **WBS 統合**: タスクグラフと WBS を同一キャンバスで表現
+- **保守性向上**: Svelte 5 Runes による明示的なリアクティビティ
+
+### 4.2 Svelte 5 移行
+
+#### 4.2.1 主な変更点
+
+| Svelte 4 | Svelte 5 | 説明 |
+|----------|----------|------|
+| `let count = 0` | `let count = $state(0)` | 明示的なリアクティブ状態 |
+| `$: double = count * 2` | `const double = $derived(count * 2)` | 派生値の宣言 |
+| `$: { console.log(x) }` | `$effect(() => { console.log(x) })` | 副作用の実行 |
+| `export let value` | `let { value } = $props()` | プロップの受け取り |
+| `createEventDispatcher()` | コールバックプロップ | イベント通知 |
+| `on:click={fn}` | `onclick={fn}` | イベントハンドラ |
+
+#### 4.2.2 移行戦略
+
+**段階的アプローチ（推奨）:**
+
+1. **Phase 1: 依存更新** - svelte@^5, @sveltejs/vite-plugin-svelte@^4
+2. **Phase 2: 自動変換** - `npx sv migrate svelte-5` 実行
+3. **Phase 3: 手動調整** - createEventDispatcher → コールバック化
+4. **Phase 4: テスト** - 全機能検証、パフォーマンス計測
+
+**互換性:**
+
+- 既存の `svelte/store` (writable/derived) は引き続きサポート
+- 新規コードは `$state`/`$derived` を使用
+- Wails v2 との互換性は完全
+
+### 4.3 Svelte Flow 移行
+
+#### 4.3.1 ライブラリ選定理由
+
+| 評価軸 | Svelte Flow | 現状（手実装） |
+|--------|------------|--------------|
+| 大量ノード | ◎ 仮想化対応 | × 全ノード描画 |
+| カスタムノード | ◎ Svelte コンポーネント | ◎ 完全制御 |
+| パン/ズーム | ◎ 組み込み | △ 手実装 |
+| 自動レイアウト | ◎ Dagre/ELK.js 統合 | × なし |
+| 保守性 | ◎ ライブラリ管理 | △ 全て自前 |
+
+#### 4.3.2 新規コンポーネント構成
+
+```
+frontend/ide/src/lib/flow/
+├── UnifiedFlowCanvas.svelte     # 統合キャンバス（Grid + WBS）
+├── nodes/
+│   ├── TaskFlowNode.svelte      # タスクノード
+│   ├── WBSFlowNode.svelte       # WBS ノード
+│   └── MilestoneFlowNode.svelte # マイルストーンノード
+├── edges/
+│   └── DependencyEdge.svelte    # 依存関係エッジ
+├── layout/
+│   ├── dagreLayout.ts           # Dagre レイアウト計算
+│   └── layoutStore.ts           # レイアウト状態管理
+└── utils/
+    ├── nodeConverter.ts         # Task → FlowNode 変換
+    └── constants.ts             # サイズ定数
+```
+
+#### 4.3.3 削除対象（移行完了後）
+
+- `frontend/ide/src/lib/grid/` - GridCanvas, GridNode, ConnectionLine, geometry.ts
+- `frontend/ide/src/lib/wbs/WBSGraphView.svelte`, `WBSGraphNode.svelte`
+- `frontend/ide/src/stores/viewportStore.ts`
+
+### 4.4 機能要件
+
+#### FR-P4.5-001: Svelte 5 アップグレード
+
+| 項目 | 内容 |
+|------|------|
+| パッケージ更新 | svelte@^5, @sveltejs/vite-plugin-svelte@^4 |
+| 自動移行ツール | `npx sv migrate svelte-5` |
+| 手動調整箇所 | createEventDispatcher（約 10 ファイル） |
+| ストア互換 | 既存 writable/derived は継続使用可 |
+
+#### FR-P4.5-002: Svelte Flow 導入
+
+| 項目 | 内容 |
+|------|------|
+| パッケージ | @xyflow/svelte@^1.5, dagre |
+| カスタムノード | 既存 GridNode/WBSGraphNode のデザインを移植 |
+| 仮想化 | onlyRenderVisibleElements による Viewport Culling |
+| レイアウト | Dagre で依存グラフを自動配置 |
+
+#### FR-P4.5-003: WBS 統合
+
+| 項目 | 内容 |
+|------|------|
+| 統合キャンバス | UnifiedFlowCanvas で Grid/WBS を切替表示 |
+| ノードタイプ | task, wbs, milestone の 3 種類 |
+| viewMode | 既存 wbsStore.viewMode と連携 |
+
+### 4.5 受け入れ条件
+
+| ID         | 条件 |
+|------------|------|
+| AC-P4.5-01 | Svelte 5 Runes ($state, $derived, $effect) が動作する |
+| AC-P4.5-02 | 既存の UI デザイン（Glassmorphism + Crystal HUD）が維持される |
+| AC-P4.5-03 | 2000 ノードでパフォーマンス劣化なく動作する |
+| AC-P4.5-04 | Dagre による自動レイアウトが機能する |
+| AC-P4.5-05 | WBS とタスクグラフが同一キャンバスで表示切替できる |
+| AC-P4.5-06 | 全既存テストがパスする |
+
+### 4.6 技術的リスクと対策
+
+| リスク | 影響度 | 対策 |
+|--------|--------|------|
+| createEventDispatcher 手動変換工数 | 中 | 約 10 ファイル、段階的に実施 |
+| $effect 過剰使用によるパフォーマンス低下 | 中 | $derived 優先、$effect 最小化 |
+| デザイン崩れ | 中 | 既存 CSS 変数維持、スタイルはコピー移植 |
+| Wails 互換性問題 | 低 | 公式サポート確認済み |
+
+### 4.7 マイルストーン
+
+**Week 1-2: Svelte 5 移行**
+
+- [ ] 依存パッケージ更新（svelte@^5, vite-plugin-svelte@^4）
+- [ ] `npx sv migrate svelte-5` 実行
+- [ ] createEventDispatcher → コールバック化（手動）
+- [ ] 全テスト実行・修正
+
+**Week 3-4: Svelte Flow 導入**
+
+- [ ] @xyflow/svelte, dagre インストール
+- [ ] UnifiedFlowCanvas 実装
+- [ ] TaskFlowNode（GridNode スタイル移植）
+- [ ] DependencyEdge（ConnectionLine スタイル移植）
+- [ ] Dagre レイアウト統合
+
+**Week 5: WBS 統合・最適化**
+
+- [ ] WBSFlowNode, MilestoneFlowNode 実装
+- [ ] viewMode 切替動作確認
+- [ ] 2000 ノードパフォーマンステスト
+- [ ] 旧コンポーネント削除
+
+---
+
+## 5. Phase 5: 高度な機能【将来】
 
 ### 4.1 マルチ LLM プロバイダ対応
 

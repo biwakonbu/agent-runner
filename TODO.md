@@ -1,17 +1,18 @@
-# TODO: multiverse v3.0 - Phase 4 Implementation
+# TODO: multiverse v3.0 - Phase 4 & 4.5 Implementation
 
-Based on PRD v3.0 - Codex CLI 統合と実タスク実行
+Based on PRD v3.0 - Codex CLI 統合と実タスク実行 + Svelte 5 移行
 
 ---
 
 ## 現在のステータス
 
-| フェーズ    | 内容                             | ステータス |
-| ----------- | -------------------------------- | ---------- |
-| Phase 1     | チャット → タスク生成            | ✅ 完了    |
-| Phase 2     | 依存関係グラフ・WBS 表示         | ✅ 完了    |
-| Phase 3     | 自律実行ループ                   | ✅ 完了    |
-| **Phase 4** | **Codex CLI 統合と実タスク実行** | 🚧 進行中  |
+| フェーズ      | 内容                             | ステータス |
+| ------------- | -------------------------------- | ---------- |
+| Phase 1       | チャット → タスク生成            | ✅ 完了    |
+| Phase 2       | 依存関係グラフ・WBS 表示         | ✅ 完了    |
+| Phase 3       | 自律実行ループ                   | ✅ 完了    |
+| **Phase 4**   | **Codex CLI 統合と実タスク実行** | 🚧 進行中  |
+| **Phase 4.5** | **Svelte 5 + Svelte Flow 移行**  | 📋 計画済  |
 
 ---
 
@@ -109,3 +110,217 @@ ExecutionOrchestrator → agent-runner → Docker Sandbox → codex CLI（既存
 ## 追加で必要な対応（漏れ防止メモ）
 - [ ] CLI サブスクリプション運用手順のドキュメント化（auth.json / env / codex login）
 - [ ] CLI 未ログイン時の IDE 通知と再試行 UX の改善（案内リンク・ボタン）
+
+---
+
+## Phase 4.5: Svelte 5 + Svelte Flow 移行
+
+### 背景・目的
+
+現在のグラフノード管理（GridCanvas/WBSGraphView）は手実装で以下の課題がある：
+
+- **大量ノード非対応**: 全ノードを常時描画、2000+ タスクでパフォーマンス劣化
+- **レイアウト最適化なし**: 単純な列配置、依存関係を考慮しない
+- **保守コスト高**: パン/ズーム/エッジ描画を全て自前実装
+
+**解決策**: Svelte 5 へアップグレードし、Svelte Flow (@xyflow/svelte v1.5+) を導入
+
+### Svelte 5 移行タスク
+
+#### Step 1: 依存パッケージ更新
+
+```bash
+cd frontend/ide
+pnpm install svelte@^5 @sveltejs/vite-plugin-svelte@^4 --save-dev
+```
+
+- [ ] svelte: ^4.2.12 → ^5.0.0
+- [ ] @sveltejs/vite-plugin-svelte: ^3.0.2 → ^4.0.0
+- [ ] vite: 維持（^5.x）
+- [ ] typescript: 維持（^5.x）
+
+#### Step 2: 自動移行ツール実行
+
+```bash
+npx sv migrate svelte-5
+```
+
+**自動変換される内容:**
+- `let` → `$state`
+- `$:` (派生) → `$derived`
+- `export let` → `$props`
+
+**手動変換が必要な内容:**
+- `createEventDispatcher` → コールバックプロップ（約 10 ファイル）
+- `beforeUpdate`/`afterUpdate` → `$effect.pre`/`$effect`
+- 複雑な `$:` の `$effect` vs `$derived` 判別
+
+#### Step 3: createEventDispatcher 置き換え
+
+**対象ファイル（要手動変換）:**
+
+| ファイル | dispatch イベント | 変換後 |
+|---------|------------------|--------|
+| `FloatingChatWindow.svelte` | close | `onClose` コールバック |
+| `ChatInput.svelte` | send | `onSend` コールバック |
+| `TaskDetail.svelte` | close | `onClose` コールバック |
+| `Modal.svelte` | close | `onClose` コールバック |
+| その他約 6 ファイル | 各種 | 各コールバック |
+
+**変換例:**
+
+```svelte
+// Before (Svelte 4)
+<script>
+  import { createEventDispatcher } from 'svelte';
+  const dispatch = createEventDispatcher();
+  function close() { dispatch('close'); }
+</script>
+
+// After (Svelte 5)
+<script>
+  let { onClose } = $props();
+  function close() { onClose?.(); }
+</script>
+```
+
+#### Step 4: テスト実行・修正
+
+- [ ] `pnpm check` パス
+- [ ] `pnpm build` パス
+- [ ] `pnpm test` パス（該当する場合）
+- [ ] 手動で全画面動作確認
+
+### Svelte Flow 移行タスク
+
+#### Step 5: パッケージインストール
+
+```bash
+cd frontend/ide
+pnpm add @xyflow/svelte dagre
+pnpm add -D @types/dagre
+```
+
+#### Step 6: 新規ファイル作成
+
+```
+frontend/ide/src/lib/flow/
+├── CLAUDE.md                        # 設計ガイド
+├── index.ts                         # エクスポート集約
+├── UnifiedFlowCanvas.svelte         # 統合キャンバス
+├── nodes/
+│   ├── TaskFlowNode.svelte          # タスクノード
+│   ├── WBSFlowNode.svelte           # WBS ノード
+│   ├── MilestoneFlowNode.svelte     # マイルストーン
+│   └── index.ts
+├── edges/
+│   ├── DependencyEdge.svelte        # 依存エッジ
+│   └── index.ts
+├── layout/
+│   ├── dagreLayout.ts               # Dagre 統合
+│   ├── layoutStore.ts               # レイアウト状態
+│   └── index.ts
+└── utils/
+    ├── nodeConverter.ts             # Task → FlowNode 変換
+    ├── edgeConverter.ts             # Edge 変換
+    └── constants.ts                 # サイズ定数
+
+frontend/ide/src/stores/
+└── flowStore.ts                     # Svelte Flow 用ストア
+```
+
+#### Step 7: カスタムノード実装
+
+- [ ] `TaskFlowNode.svelte` - GridNode.svelte のスタイルを移植
+- [ ] `DependencyEdge.svelte` - ConnectionLine.svelte のスタイルを移植
+- [ ] `WBSFlowNode.svelte` - WBSGraphNode.svelte のスタイルを移植
+- [ ] `MilestoneFlowNode.svelte` - マイルストーン表示
+
+#### Step 8: Dagre レイアウト統合
+
+- [ ] `dagreLayout.ts` - Dagre による自動レイアウト計算
+- [ ] `layoutStore.ts` - レイアウト方向（LR/TB）の状態管理
+
+#### Step 9: UnifiedFlowCanvas 実装
+
+- [ ] Svelte Flow のセットアップ
+- [ ] カスタムノード/エッジタイプ登録
+- [ ] taskStore/wbsStore との連携
+- [ ] viewMode 切替対応
+
+#### Step 10: App.svelte 統合
+
+- [ ] GridCanvas → UnifiedFlowCanvas 切替
+- [ ] WBSGraphView → UnifiedFlowCanvas 統合
+- [ ] Toolbar との連携確認
+
+#### Step 11: パフォーマンステスト
+
+- [ ] 500 ノードで動作確認
+- [ ] 2000 ノードで動作確認
+- [ ] パン/ズームの滑らかさ確認
+
+#### Step 12: クリーンアップ
+
+- [ ] `frontend/ide/src/lib/grid/` 削除
+- [ ] `frontend/ide/src/lib/wbs/WBSGraphView.svelte` 削除
+- [ ] `frontend/ide/src/lib/wbs/WBSGraphNode.svelte` 削除
+- [ ] `frontend/ide/src/stores/viewportStore.ts` 削除（flowStore に統合）
+
+### 技術メモ
+
+#### Svelte 5 Runes 早見表
+
+| Rune | 用途 | Svelte 4 相当 |
+|------|------|--------------|
+| `$state(value)` | リアクティブ状態 | `let value` |
+| `$derived(expr)` | 派生値 | `$: derived = expr` |
+| `$derived.by(fn)` | 複雑な派生 | `$: { ... }` |
+| `$effect(fn)` | 副作用 | `$: { sideEffect() }` |
+| `$props()` | プロップ受取 | `export let` |
+| `$bindable()` | bind 可能 | `export let` |
+
+#### Svelte Flow 基本構成
+
+```svelte
+<script>
+  import { SvelteFlow, Background, Controls } from '@xyflow/svelte';
+  import '@xyflow/svelte/dist/style.css';
+
+  import TaskFlowNode from './nodes/TaskFlowNode.svelte';
+
+  const nodeTypes = { task: TaskFlowNode };
+
+  let nodes = $state([...]);
+  let edges = $state([...]);
+</script>
+
+<SvelteFlow
+  {nodes}
+  {edges}
+  {nodeTypes}
+  fitView
+  onlyRenderVisibleElements={true}
+>
+  <Background />
+  <Controls />
+</SvelteFlow>
+```
+
+#### 仮想化（Viewport Culling）
+
+```svelte
+<SvelteFlow
+  onlyRenderVisibleElements={true}  <!-- 画面外ノードは非描画 -->
+  minZoom={0.1}
+  maxZoom={3}
+/>
+```
+
+### 参考リンク
+
+- [Svelte 5 Migration Guide](https://svelte.dev/docs/svelte/v5-migration-guide)
+- [sv migrate CLI](https://svelte.dev/docs/cli/sv-migrate)
+- [Svelte Flow Docs](https://svelteflow.dev/)
+- [Svelte Flow Dagre Example](https://svelteflow.dev/examples/layout/dagre)
+- [Svelte 5 Runes](https://svelte.dev/docs/svelte/runes)
