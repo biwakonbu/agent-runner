@@ -6,8 +6,9 @@
  */
 
 import { writable } from 'svelte/store';
-import { EventsOn } from '../../wailsjs/wailsjs/runtime/runtime';
+import { EventsOn } from '../../wailsjs/runtime/runtime';
 import { StartExecution, PauseExecution, ResumeExecution, StopExecution, GetExecutionState } from '../../wailsjs/go/main/App';
+import { toasts } from './toastStore';
 
 export type ExecutionState = 'IDLE' | 'RUNNING' | 'PAUSED';
 
@@ -24,8 +25,10 @@ export function initExecutionEvents(): void {
 export async function startExecution(): Promise<void> {
     try {
         await StartExecution();
+        toasts.add('Execution started', 'success');
     } catch (e) {
         console.error('Failed to start execution:', e);
+        toasts.add(`Failed to start: ${e}`, 'error');
     }
 }
 
@@ -33,8 +36,10 @@ export async function startExecution(): Promise<void> {
 export async function pauseExecution(): Promise<void> {
     try {
         await PauseExecution();
+        toasts.add('Execution paused', 'info');
     } catch (e) {
         console.error('Failed to pause execution:', e);
+        toasts.add(`Failed to pause: ${e}`, 'error');
     }
 }
 
@@ -42,8 +47,10 @@ export async function pauseExecution(): Promise<void> {
 export async function resumeExecution(): Promise<void> {
     try {
         await ResumeExecution();
+        toasts.add('Execution resumed', 'success');
     } catch (e) {
         console.error('Failed to resume execution:', e);
+        toasts.add(`Failed to resume: ${e}`, 'error');
     }
 }
 
@@ -51,8 +58,10 @@ export async function resumeExecution(): Promise<void> {
 export async function stopExecution(): Promise<void> {
     try {
         await StopExecution();
+        toasts.add('Execution stopped', 'info');
     } catch (e) {
         console.error('Failed to stop execution:', e);
+        toasts.add(`Failed to stop: ${e}`, 'error');
     }
 }
 

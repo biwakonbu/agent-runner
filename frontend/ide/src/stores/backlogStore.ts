@@ -6,7 +6,7 @@
  */
 
 import { writable, derived } from 'svelte/store';
-import { EventsOn } from '../../wailsjs/wailsjs/runtime/runtime';
+import { EventsOn } from '../../wailsjs/runtime/runtime';
 import {
     GetBacklogItems,
     ResolveBacklogItem as WailsResolveBacklogItem,
@@ -17,7 +17,7 @@ import { Logger } from '../services/logger';
 
 const log = Logger.withComponent('BacklogStore');
 
-export type BacklogType = orchestrator.BacklogType;
+export type BacklogType = 'FAILURE' | 'QUESTION' | 'BLOCKER';
 export type BacklogItem = orchestrator.BacklogItem;
 
 // バックログアイテム一覧ストア
@@ -70,7 +70,7 @@ export const countsByType = derived(backlogItems, ($items) => {
 
     for (const item of $items) {
         if (!item.resolvedAt) {
-            counts[item.type]++;
+            counts[item.type as BacklogType]++;
         }
     }
 

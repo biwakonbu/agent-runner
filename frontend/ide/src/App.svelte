@@ -26,6 +26,7 @@
   import { initChatEvents } from "./stores/chat";
   import { initBacklogEvents, unresolvedCount } from "./stores/backlogStore";
   import BacklogPanel from "./lib/backlog/BacklogPanel.svelte";
+  import ToastContainer from "./lib/components/ToastContainer.svelte";
 
   const log = Logger.withComponent("App");
 
@@ -227,6 +228,8 @@
       </div>
     {/if}
   {/if}
+
+  <ToastContainer />
 </main>
 
 <style>

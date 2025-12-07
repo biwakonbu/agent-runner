@@ -4,7 +4,7 @@
 
 import { writable, get } from 'svelte/store';
 import { GetChatHistory, SendChatMessage, CreateChatSession } from '../../wailsjs/go/main/App';
-import { EventsOn } from '../../wailsjs/wailsjs/runtime/runtime';
+import { EventsOn } from '../../wailsjs/runtime/runtime';
 import type { ChatMessage } from '../types';
 
 export interface ChatResponse {
@@ -77,7 +77,7 @@ const chatStore = {
             chatError.set(null);
 
             try {
-                const history = await GetChatHistory(session.id);
+                const history = await GetChatHistory(session.id) as unknown as ChatMessage[];
                 chatMessages.setMessages(history);
             } catch (e) {
                 console.error('Failed to load chat history:', e);
@@ -120,7 +120,7 @@ const chatStore = {
                  // Wait, ChatHandler saves user message already.
                  // We should reload history or append both manually?
                  // Let's reload history to be safe and consistent
-                 const history = await GetChatHistory(sessionId!);
+                 const history = await GetChatHistory(sessionId!) as unknown as ChatMessage[];
                  chatMessages.setMessages(history);
                  chatError.set(null);
             }

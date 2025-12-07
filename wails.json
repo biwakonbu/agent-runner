@@ -13,6 +13,6 @@
     "name": "Ryo Higasigawa",
     "email": "ryo.higasigawa@gmail.com"
   },
-  "wailsjsdir": "./frontend/ide/wailsjs",
+  "wailsjsdir": "./frontend/ide",
   "version": "2"
 }

@@ -9,7 +9,7 @@ import { writable, derived } from 'svelte/store';
 import type { Task, TaskNode, TaskStatus, PoolSummary } from '../types';
 import { grid, gridToCanvas } from '../design-system';
 import { Logger } from '../services/logger';
-import { EventsOn } from '../../wailsjs/wailsjs/runtime/runtime';
+import { EventsOn } from '../../wailsjs/runtime/runtime';
 
 const log = Logger.withComponent('TaskStore');
 

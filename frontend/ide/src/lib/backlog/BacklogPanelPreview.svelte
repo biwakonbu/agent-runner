@@ -11,6 +11,8 @@
     createdAt: string;
     resolvedAt?: string;
     resolution?: string;
+    // Wails models 互換用（Storybook プレビューでは未使用）
+    convertValues?: (a: unknown) => void;
   }
 </script>
 
