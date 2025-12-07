@@ -73,11 +73,12 @@ func (p *CodexCLIProvider) callCodexChat(ctx context.Context, systemPrompt, user
 	start := time.Now()
 
 	// codex chat コマンドを構築
-	// システムプロンプトとユーザープロンプトを結合
+	// システムプロンプトとユーザープロンプトを結合して stdin で渡す（引数解釈を避ける）
 	fullPrompt := systemPrompt + "\n\n" + userPrompt
 
-	// codex chat を実行（プレーン応答をパース）
-	cmd := exec.CommandContext(ctx, "codex", "chat", fullPrompt)
+	// Use --stdin to avoid CLI parsing issues with long/structured prompts
+	cmd := exec.CommandContext(ctx, "codex", "chat", "--stdin")
+	cmd.Stdin = strings.NewReader(fullPrompt)
 
 	logger.Info("calling codex CLI",
 		slog.Int("prompt_length", len(fullPrompt)),
