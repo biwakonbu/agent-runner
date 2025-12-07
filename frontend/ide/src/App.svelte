@@ -4,7 +4,7 @@
   import WorkspaceSelector from "./lib/WorkspaceSelector.svelte";
   import TitleBar from "./lib/TitleBar.svelte";
   import { Toolbar } from "./lib/toolbar";
-  import { WBSListView } from "./lib/wbs";
+  import { WBSListView, WBSGraphView } from "./lib/wbs";
   import GridCanvas from "./lib/grid/GridCanvas.svelte";
   import {
     tasks,
@@ -87,44 +87,8 @@
       const taskList: Task[] = (result || []).map(mapBackendTask);
       log.debug("tasks loaded", { count: taskList.length });
       tasks.setTasks(taskList);
-      // #region agent log
-      fetch(
-        "http://127.0.0.1:7242/ingest/e0c5926c-4256-4f95-83f1-ee92ab435f0c",
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            sessionId: "debug-session",
-            runId: "pre-fix",
-            hypothesisId: "F",
-            location: "App.svelte:loadTasks",
-            message: "tasks loaded",
-            data: { count: taskList.length },
-            timestamp: Date.now(),
-          }),
-        }
-      ).catch(() => {});
-      // #endregion agent log
     } catch (e) {
       log.error("failed to load tasks", { error: e });
-      // #region agent log
-      fetch(
-        "http://127.0.0.1:7242/ingest/e0c5926c-4256-4f95-83f1-ee92ab435f0c",
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            sessionId: "debug-session",
-            runId: "pre-fix",
-            hypothesisId: "F",
-            location: "App.svelte:loadTasks",
-            message: "failed to load tasks",
-            data: { error: e instanceof Error ? e.message : String(e) },
-            timestamp: Date.now(),
-          }),
-        }
-      ).catch(() => {});
-      // #endregion agent log
     }
   }
 
@@ -147,23 +111,13 @@
 
   // Workspace選択時
   function onWorkspaceSelected(event: CustomEvent<string>) {
+    // 前のワークスペースのデータをクリア
+    tasks.clear();
+    selectedTaskId.clear();
+    poolSummaries.clear();
+
     workspaceId = event.detail;
     log.info("workspace selected", { workspaceId });
-    // #region agent log
-    fetch("http://127.0.0.1:7242/ingest/e0c5926c-4256-4f95-83f1-ee92ab435f0c", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        sessionId: "debug-session",
-        runId: "pre-fix",
-        hypothesisId: "G",
-        location: "App.svelte:onWorkspaceSelected",
-        message: "workspace selected",
-        data: { workspaceId },
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {});
-    // #endregion agent log
 
     loadData();
     // 実行状態をバックエンドと同期
@@ -206,18 +160,17 @@
     <Toolbar />
 
     <!-- メインコンテンツ -->
-    <!-- メインコンテンツ -->
     <div class="main-content">
-      <!-- 常にGraphViewを描画し、canvasとして機能させる -->
-      <div
-        class="canvas-layer"
-        style:visibility={$viewMode === "graph" ? "visible" : "hidden"}
-      >
-        <GridCanvas />
-      </div>
-
-      <!-- WBSモード時はオーバーレイとして表示（あるいはcanvas上に配置） -->
-      {#if $viewMode === "wbs"}
+      {#if $viewMode === "graph"}
+        <!-- Graph モード: GridCanvas で依存グラフ表示 -->
+        <div class="canvas-layer">
+          <GridCanvas />
+        </div>
+      {:else}
+        <!-- WBS モード: WBSGraphView + WBSListView -->
+        <div class="canvas-layer">
+          <WBSGraphView />
+        </div>
         <div class="list-overlay">
           <WBSListView />
         </div>

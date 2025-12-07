@@ -8,6 +8,7 @@
   import { createEventDispatcher } from "svelte";
   import ToolbarPreview from "./toolbar/ToolbarPreview.svelte";
   import { WBSListView, WBSGraphView } from "./wbs";
+  import GridCanvas from "./grid/GridCanvas.svelte";
   import FloatingChatWindow from "./components/chat/FloatingChatWindow.svelte";
   import { tasks, selectedTaskId } from "../stores/taskStore";
   import type { Task, TaskStatus, PoolSummary } from "../types";
@@ -79,16 +80,16 @@
 
   <!-- メインコンテンツ -->
   <div class="main-content">
-    <!-- 常にGraphViewを描画し、canvasとして機能させる -->
-    <div
-      class="canvas-layer"
-      style:visibility={viewMode === "graph" ? "visible" : "hidden"}
-    >
-      <WBSGraphView />
-    </div>
-
-    <!-- Listモード時はオーバーレイとして表示 -->
-    {#if viewMode === "wbs"}
+    {#if viewMode === "graph"}
+      <!-- Graph モード: GridCanvas で依存グラフ表示 -->
+      <div class="canvas-layer">
+        <GridCanvas />
+      </div>
+    {:else}
+      <!-- WBS モード: WBSGraphView + WBSListView -->
+      <div class="canvas-layer">
+        <WBSGraphView />
+      </div>
       <div class="list-overlay">
         <WBSListView />
       </div>

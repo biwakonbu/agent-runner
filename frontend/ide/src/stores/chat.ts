@@ -70,22 +70,6 @@ const chatStore = {
             const session = await CreateChatSession();
             if (!session?.id) return;
 
-            // #region agent log
-            fetch('http://127.0.0.1:7242/ingest/e0c5926c-4256-4f95-83f1-ee92ab435f0c', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                sessionId: 'debug-session',
-                runId: 'pre-fix',
-                hypothesisId: 'D',
-                location: 'chat.ts:createSession',
-                message: 'chat session created',
-                data: { sessionId: session.id },
-                timestamp: Date.now(),
-              }),
-            }).catch(() => {});
-            // #endregion agent log
-
             currentSessionId.set(session.id);
             // セッション切替時に既存ログとメッセージをクリア
             chatMessages.clear();
@@ -100,21 +84,6 @@ const chatStore = {
             }
         } catch (e) {
             console.error('Failed to create session:', e);
-            // #region agent log
-            fetch('http://127.0.0.1:7242/ingest/e0c5926c-4256-4f95-83f1-ee92ab435f0c', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                sessionId: 'debug-session',
-                runId: 'pre-fix',
-                hypothesisId: 'D',
-                location: 'chat.ts:createSession',
-                message: 'failed to create session',
-                data: { error: e instanceof Error ? e.message : String(e) },
-                timestamp: Date.now(),
-              }),
-            }).catch(() => {});
-            // #endregion agent log
         }
     },
 
@@ -137,24 +106,8 @@ const chatStore = {
         }
 
         try {
-            // #region agent log
-            fetch('http://127.0.0.1:7242/ingest/e0c5926c-4256-4f95-83f1-ee92ab435f0c', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                sessionId: 'debug-session',
-                runId: 'pre-fix',
-                hypothesisId: 'E',
-                location: 'chat.ts:sendMessage',
-                message: 'sending chat message',
-                data: { sessionId, length: content.length },
-                timestamp: Date.now(),
-              }),
-            }).catch(() => {});
-            // #endregion agent log
-
             const response = await SendChatMessage(sessionId, content);
-            
+
             if (response.error) {
                 console.error('Chat error:', response.error);
                 chatError.set(response.error);
@@ -163,7 +116,7 @@ const chatStore = {
                  // 履歴を再取得するか、レスポンスから追加する
                  // ここではレスポンスから追加
                  // user message is implicitly added by optimistic update usually, but here simple:
-                 
+
                  // Wait, ChatHandler saves user message already.
                  // We should reload history or append both manually?
                  // Let's reload history to be safe and consistent
@@ -172,46 +125,11 @@ const chatStore = {
                  chatError.set(null);
             }
 
-            // #region agent log
-            fetch('http://127.0.0.1:7242/ingest/e0c5926c-4256-4f95-83f1-ee92ab435f0c', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                sessionId: 'debug-session',
-                runId: 'pre-fix',
-                hypothesisId: 'E',
-                location: 'chat.ts:sendMessage',
-                message: 'chat response received',
-                data: {
-                  sessionId,
-                  hasError: Boolean(response.error),
-                  generatedTasks: response.generatedTasks?.length ?? 0,
-                },
-                timestamp: Date.now(),
-              }),
-            }).catch(() => {});
-            // #endregion agent log
-
             return response as ChatResponse;
 
         } catch (e) {
             console.error('Failed to send message:', e);
             chatError.set(e instanceof Error ? e.message : 'Failed to send message');
-            // #region agent log
-            fetch('http://127.0.0.1:7242/ingest/e0c5926c-4256-4f95-83f1-ee92ab435f0c', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                sessionId: 'debug-session',
-                runId: 'pre-fix',
-                hypothesisId: 'E',
-                location: 'chat.ts:sendMessage',
-                message: 'chat send failed',
-                data: { error: e instanceof Error ? e.message : String(e) },
-                timestamp: Date.now(),
-              }),
-            }).catch(() => {});
-            // #endregion agent log
             return null;
         } finally {
             isChatLoading.set(false);

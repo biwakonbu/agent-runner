@@ -23,28 +23,6 @@
     to: { col: number; row: number } | undefined
   ): string {
     if (!from || !to) {
-      // #region agent log
-      fetch(
-        "http://127.0.0.1:7242/ingest/e0c5926c-4256-4f95-83f1-ee92ab435f0c",
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            sessionId: "debug-session",
-            runId: "pre-fix",
-            hypothesisId: "B",
-            location: "ConnectionLine.svelte:24",
-            message: "edge missing node position",
-            data: {
-              edge,
-              hasFrom: Boolean(from),
-              hasTo: Boolean(to),
-            },
-            timestamp: Date.now(),
-          }),
-        }
-      ).catch(() => {});
-      // #endregion agent log
       return "";
     }
 

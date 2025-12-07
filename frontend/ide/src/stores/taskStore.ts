@@ -167,29 +167,6 @@ export const taskEdges = derived(tasks, ($tasks): TaskEdge[] => {
     }
   }
 
-  const unsatisfiedCount = edges.filter((e) => !e.satisfied).length;
-
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/e0c5926c-4256-4f95-83f1-ee92ab435f0c', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      sessionId: 'debug-session',
-      runId: 'pre-fix',
-      hypothesisId: 'A',
-      location: 'taskStore.ts:139',
-      message: 'task edges recomputed',
-      data: {
-        taskCount: $tasks.length,
-        edgeCount: edges.length,
-        unsatisfiedCount,
-        missingDeps: missingDeps.slice(0, 5),
-      },
-      timestamp: Date.now(),
-    }),
-  }).catch(() => {});
-  // #endregion agent log
-
   return edges;
 });
 

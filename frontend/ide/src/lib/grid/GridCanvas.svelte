@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { get } from "svelte/store";
   import { onMount } from "svelte";
   import GridNode from "./GridNode.svelte";
   import ConnectionLine from "./ConnectionLine.svelte";
@@ -77,30 +76,6 @@
   }
 
   onMount(() => {
-    const snapshot = {
-      nodes: get(taskNodes).length,
-      edges: get(taskEdges).length,
-      panX: get(viewport).panX,
-      panY: get(viewport).panY,
-      zoom: get(viewport).zoom,
-    };
-
-    // #region agent log
-    fetch("http://127.0.0.1:7242/ingest/e0c5926c-4256-4f95-83f1-ee92ab435f0c", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        sessionId: "debug-session",
-        runId: "pre-fix",
-        hypothesisId: "C",
-        location: "GridCanvas.svelte:onMount",
-        message: "grid canvas mounted",
-        data: snapshot,
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {});
-    // #endregion agent log
-
     // グローバルキーボードイベント
     window.addEventListener("keydown", handleKeydown);
     return () => {
