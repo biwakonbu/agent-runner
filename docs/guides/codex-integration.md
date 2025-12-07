@@ -70,3 +70,60 @@ Error: failed to start sandbox
 ```
 
 → Docker デーモンが起動していることを確認してください。
+
+### signal: killed エラー
+
+```
+タスク分解に失敗しました: codex CLI call failed: codex CLI 呼び出し失敗: signal: killed
+```
+
+**原因**: タイムアウトによりプロセスが強制終了されました。
+
+**対策**:
+
+1. **タイムアウト設定の確認**:
+   - ChatHandler: デフォルト 15 分（`DefaultChatMetaTimeout`）
+   - Meta-agent: デフォルト 10 分（`DefaultMetaAgentTimeout`）
+
+2. **ログの確認**:
+   - プロセスがどの段階でタイムアウトしたかを確認
+   - ネットワーク遅延や API レート制限の可能性をチェック
+
+3. **タイムアウト延長**（必要な場合）:
+   ```go
+   // chat/handler.go
+   handler.SetMetaTimeout(20 * time.Minute)
+   ```
+
+### YAML パースエラー
+
+```
+failed to parse YAML response: mapping values are not allowed in this context
+```
+
+**原因**: Codex CLI の出力にヘッダー情報が含まれており、YAML パーサーがそれを解釈できませんでした。
+
+**対策**:
+
+1. `extractYAML()` 関数が正しく YAML 部分を抽出しているか確認
+2. Codex CLI の出力形式が変わっていないか確認
+
+**Codex CLI の出力形式**:
+
+```
+OpenAI Codex v0.65.0 (research preview)
+--------
+workdir: /path/to/project
+model: gpt-5.1
+provider: openai
+--------
+user
+プロンプト内容...
+codex
+type: decompose
+version: 1
+payload:
+  understanding: "..."
+```
+
+`extractYAML()` は `type:` で始まる行から YAML を抽出します。

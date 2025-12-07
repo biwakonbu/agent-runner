@@ -24,7 +24,7 @@
 
   // セッション初期化
   onMount(async () => {
-    await chatStore.createSession();
+    await chatStore.initSession(); // Use initSession to restore or create
   });
 
   function closeWindow() {

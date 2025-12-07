@@ -161,12 +161,18 @@ func (p *CodexCLIProvider) Decompose(ctx context.Context, req *DecomposeRequest)
 		return nil, fmt.Errorf("codex CLI call failed: %w", err)
 	}
 
-	// YAML を抽出してパース
-	resp = extractYAML(resp)
+	// JSON を抽出（Codex CLI は JSON を出力する）
+	jsonStr := extractJSON(resp)
+
+	// JSON を YAML に変換して既存のパースロジックを使用
+	yamlStr, err := jsonToYAML(jsonStr)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert JSON to YAML: %w\nJSON: %s", err, jsonStr)
+	}
 
 	var msg MetaMessage
-	if err := yaml.Unmarshal([]byte(resp), &msg); err != nil {
-		return nil, fmt.Errorf("failed to parse YAML: %w\nResponse: %s", err, resp)
+	if err := yaml.Unmarshal([]byte(yamlStr), &msg); err != nil {
+		return nil, fmt.Errorf("failed to parse YAML: %w\nYAML: %s", err, yamlStr)
 	}
 
 	payloadBytes, err := yaml.Marshal(msg.Payload)

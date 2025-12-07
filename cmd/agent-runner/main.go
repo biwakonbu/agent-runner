@@ -17,7 +17,8 @@ import (
 
 func main() {
 	// Initialize structured logger
-	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
+	// Use JSON handler for structured output parsing by Orchestrator
+	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
 		Level: slog.LevelInfo,
 	}))
 	slog.SetDefault(logger)

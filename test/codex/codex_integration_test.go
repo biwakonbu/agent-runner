@@ -146,8 +146,13 @@ func runTestCase(t *testing.T, casePath string) {
 	// Verify artifacts (simple check that *something* was generated if successful)
 	// Since we are using a mock meta, the "verification" step is also mocked (always passes).
 	// But the *worker* actually ran. So we can check if files exist.
-	// The "SmartMockMeta" will tell the worker to "Implement the PRD".
-	// Codex CLI should generate files.
+
+	if os.Getenv("TEST_CODEX_REAL") == "1" {
+		t.Log("Running with REAL Codex CLI execution in Docker")
+		// In real mode, we might expect actual files if the MockMeta prompt is effective.
+		// However, MockMeta prompt is just "Please implement...".
+		// We trust Codex Agent to do something.
+	}
 
 	// Check for expected files based on ACs
 	for _, ac := range tc.AcceptanceCriteria {

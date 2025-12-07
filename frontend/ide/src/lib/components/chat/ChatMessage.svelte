@@ -193,6 +193,6 @@
     font-weight: var(--mv-font-weight-semibold);
     text-shadow: var(--mv-text-shadow-purple-content);
     font-family: var(--mv-font-mono);
-    font-size: var(--mv-font-size-xs);
+    font-size: var(--mv-font-size-sm);
   }
 </style>

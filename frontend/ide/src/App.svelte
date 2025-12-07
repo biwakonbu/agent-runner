@@ -22,11 +22,18 @@
   import { initBacklogEvents, unresolvedCount } from "./stores/backlogStore";
   import BacklogPanel from "./lib/backlog/BacklogPanel.svelte";
   import LLMSettings from "./lib/settings/LLMSettings.svelte";
+  import ProcessHUD from "./lib/hud/ProcessHUD.svelte";
+  import { initLogEvents, logs } from "./stores/logStore";
+  import { executionState } from "./stores/executionStore";
+  import { initProcessEvents, processResources } from "./stores/processStore";
 
   const log = Logger.withComponent("App");
 
   let workspaceId: string | null = null;
   let interval: ReturnType<typeof setInterval> | null = null;
+
+  // 実行中のタスクを取得するリアクティブ変数
+  $: runningTask = $tasks.find((t) => t.status === "RUNNING");
 
   // Chat State
   let isChatVisible = true;
@@ -53,6 +60,8 @@
     initTaskEvents();
     initChatEvents();
     initBacklogEvents();
+    initLogEvents();
+    initProcessEvents();
   });
 
   // タスク一覧を読み込み
@@ -222,6 +231,13 @@
         </div>
       </div>
     {/if}
+
+    <!-- Process Visualization HUD -->
+    <ProcessHUD
+      executionState={$executionState}
+      resources={$processResources}
+      activeTaskTitle={runningTask?.title}
+    />
   {/if}
 </main>
 
@@ -252,6 +268,7 @@
     display: flex;
     flex-direction: column;
     background: var(--mv-color-surface-app);
+    padding-top: var(--mv-titlebar-height);
     color: var(--mv-color-text-primary);
     font-family: var(--mv-font-sans);
     overflow: hidden;

@@ -7,7 +7,7 @@ import (
 )
 
 func TestRegistry_Stubs(t *testing.T) {
-	stubKinds := []string{"gemini-cli", "claude-code", "cursor-cli"}
+	stubKinds := []string{"claude-code", "cursor-cli"}
 
 	for _, kind := range stubKinds {
 		t.Run(kind, func(t *testing.T) {
@@ -224,5 +224,83 @@ func TestCodexProvider_Build_NoOldFlags(t *testing.T) {
 	}
 	if !strings.Contains(args, "-c max_tokens=") {
 		t.Errorf("Args should contain '-c max_tokens=', got: %s", args)
+	}
+}
+
+func TestRegistry_Gemini(t *testing.T) {
+	kind := "gemini-cli"
+	p, err := New(kind, ProviderConfig{Kind: kind})
+	if err != nil {
+		t.Fatalf("New(%q) failed: %v", kind, err)
+	}
+	if p.Kind() != kind {
+		t.Errorf("Kind() = %q, want %q", p.Kind(), kind)
+	}
+}
+
+func TestGeminiProvider_Build(t *testing.T) {
+	p := NewGeminiProvider(ProviderConfig{Kind: "gemini-cli"})
+	ctx := context.Background()
+	req := Request{
+		Prompt: "hello gemini",
+	}
+	plan, err := p.Build(ctx, req)
+	if err != nil {
+		t.Fatalf("Build() failed: %v", err)
+	}
+
+	if plan.Command != "gemini" {
+		t.Errorf("Command = %q, want %q", plan.Command, "gemini")
+	}
+
+	args := strings.Join(plan.Args, " ")
+	if !strings.Contains(args, "--model gemini-1.5-pro") {
+		t.Errorf("Default model missing, got: %s", args)
+	}
+	if !strings.HasSuffix(args, "hello gemini") {
+		t.Errorf("Prompt should be last arg, got: %s", args)
+	}
+}
+
+func TestGeminiProvider_Build_Options(t *testing.T) {
+	p := NewGeminiProvider(ProviderConfig{Kind: "gemini-cli"})
+	ctx := context.Background()
+	temp := 0.7
+	maxTokens := 2048
+	req := Request{
+		Prompt:      "test",
+		Model:       "gemini-ultra",
+		Temperature: &temp,
+		MaxTokens:   &maxTokens,
+		ToolSpecific: map[string]interface{}{
+			"json_output": true,
+		},
+		UseStdin: true,
+	}
+	plan, err := p.Build(ctx, req)
+	if err != nil {
+		t.Fatalf("Build() failed: %v", err)
+	}
+
+	args := strings.Join(plan.Args, " ")
+
+	if !strings.Contains(args, "--model gemini-ultra") {
+		t.Errorf("Model override failed, got: %s", args)
+	}
+	if !strings.Contains(args, "--temperature 0.70") {
+		t.Errorf("Temperature failed, got: %s", args)
+	}
+	if !strings.Contains(args, "--max-output-tokens 2048") {
+		t.Errorf("Max tokens failed, got: %s", args)
+	}
+	if !strings.Contains(args, "--json") {
+		t.Errorf("JSON output failed, got: %s", args)
+	}
+
+	if plan.Stdin != "test" {
+		t.Errorf("Stdin content mismatch, got: %q", plan.Stdin)
+	}
+	if plan.Args[len(plan.Args)-1] != "-" {
+		t.Errorf("Last arg should be '-', got: %s", plan.Args[len(plan.Args)-1])
 	}
 }

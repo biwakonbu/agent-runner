@@ -1,0 +1,8 @@
+id: "GEMINI-001"
+title: "Basic Gemini CLI Test"
+prd: |
+  Create a file named "metaphysics.txt" with content "Consciousness is strict".
+acceptance_criteria:
+  - id: "AC-1"
+    description: "metaphysics.txt が存在する"
+    type: "file_exists"

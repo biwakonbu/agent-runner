@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"log/slog"
@@ -122,6 +123,13 @@ func (e *Executor) ExecuteTask(ctx context.Context, task *Task) (*Attempt, error
 			for scanner.Scan() {
 				line := scanner.Text()
 				outputBuf.WriteString(line + "\n")
+
+				// Try parsing as structured log/event
+				var entry map[string]interface{}
+				if err := json.Unmarshal([]byte(line), &entry); err == nil {
+					e.handleStructuredLog(task.ID, entry)
+				}
+
 				e.events.Emit(EventTaskLog, TaskLogEvent{
 					TaskID:    task.ID,
 					Stream:    "stdout",
@@ -260,4 +268,63 @@ task:
   worker:
     cli: "codex"
 `, task.ID, task.Title, promptTextIndented)
+}
+
+func (e *Executor) handleStructuredLog(taskID string, entry map[string]interface{}) {
+	eventType, ok := entry["event_type"].(string)
+	if !ok {
+		return
+	}
+
+	timestamp := time.Now()
+	if tsStr, ok := entry["time"].(string); ok {
+		if t, err := time.Parse(time.RFC3339, tsStr); err == nil {
+			timestamp = t
+		}
+	}
+
+	switch eventType {
+	case "meta:thinking":
+		detail, _ := entry["detail"].(string)
+		e.events.Emit(EventProcessMetaUpdate, ProcessMetaUpdateEvent{
+			TaskID:    taskID,
+			State:     "THINKING",
+			Detail:    detail,
+			Timestamp: timestamp,
+		})
+	case "meta:state_change":
+		// Only distinct states, maybe map "state transition" later if needed
+	case "container:starting":
+		e.events.Emit(EventProcessContainerUpdate, ProcessContainerUpdateEvent{
+			TaskID:    taskID,
+			Status:    "STARTING",
+			Image:     "unknown", // Could add to log if needed
+			Timestamp: timestamp,
+		})
+	case "container:started":
+		e.events.Emit(EventProcessContainerUpdate, ProcessContainerUpdateEvent{
+			TaskID:      taskID,
+			ContainerID: "running", // Don't have ID in log yet, but status is key
+			Status:      "RUNNING",
+			Timestamp:   timestamp,
+		})
+	case "worker:running":
+		cmd, _ := entry["command"].(string)
+		e.events.Emit(EventProcessWorkerUpdate, ProcessWorkerUpdateEvent{
+			TaskID:    taskID,
+			WorkerID:  "worker-1",
+			Status:    "RUNNING",
+			Command:   cmd,
+			Timestamp: timestamp,
+		})
+	case "worker:completed":
+		exitCode, _ := entry["exit_code"].(float64)
+		e.events.Emit(EventProcessWorkerUpdate, ProcessWorkerUpdateEvent{
+			TaskID:    taskID,
+			WorkerID:  "worker-1",
+			Status:    "IDLE", // Or FINISHED
+			ExitCode:  int(exitCode),
+			Timestamp: timestamp,
+		})
+	}
 }

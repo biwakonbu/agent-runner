@@ -64,6 +64,28 @@ export const chatError = writable<string | null>(null);
 
 // ストア
 const chatStore = {
+    // セッション初期化（起動時に呼び出す）
+    initSession: async () => {
+        const lastSessionId = localStorage.getItem('lastSessionId');
+        if (lastSessionId) {
+            currentSessionId.set(lastSessionId);
+            chatMessages.clear();
+            chatLog.clear();
+            chatError.set(null);
+
+            try {
+                const history = await GetChatHistory(lastSessionId) as unknown as ChatMessage[];
+                chatMessages.setMessages(history);
+                console.log('Restored session:', lastSessionId);
+                return;
+            } catch (e) {
+                console.error('Failed to restore chat history, creating new session:', e);
+                // 復元失敗時は新規作成へ
+            }
+        }
+        await chatStore.createSession();
+    },
+
     // セッション作成
     createSession: async () => {
         try {
@@ -71,6 +93,8 @@ const chatStore = {
             if (!session?.id) return;
 
             currentSessionId.set(session.id);
+            localStorage.setItem('lastSessionId', session.id); // Save to localStorage
+
             // セッション切替時に既存ログとメッセージをクリア
             chatMessages.clear();
             chatLog.clear();
@@ -112,14 +136,6 @@ const chatStore = {
                 console.error('Chat error:', response.error);
                 chatError.set(response.error);
             } else {
-                 // ユーザーメッセージとアシスタントメッセージは backend 側で保存済みなので
-                 // 履歴を再取得するか、レスポンスから追加する
-                 // ここではレスポンスから追加
-                 // user message is implicitly added by optimistic update usually, but here simple:
-
-                 // Wait, ChatHandler saves user message already.
-                 // We should reload history or append both manually?
-                 // Let's reload history to be safe and consistent
                  const history = await GetChatHistory(sessionId!) as unknown as ChatMessage[];
                  chatMessages.setMessages(history);
                  chatError.set(null);

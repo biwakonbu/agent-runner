@@ -31,12 +31,15 @@ func (w *WailsEventEmitter) Emit(eventName string, data any) {
 
 // Event names
 const (
-	EventTaskStateChange      = "task:stateChange"
-	EventExecutionStateChange = "execution:stateChange"
-	EventTaskCreated          = "task:created"
-	EventChatProgress         = "chat:progress"
-	EventBacklogAdded         = "backlog:added"
-	EventTaskLog              = "task:log"
+	EventTaskStateChange        = "task:stateChange"
+	EventExecutionStateChange   = "execution:stateChange"
+	EventTaskCreated            = "task:created"
+	EventChatProgress           = "chat:progress"
+	EventBacklogAdded           = "backlog:added"
+	EventTaskLog                = "task:log"
+	EventProcessMetaUpdate      = "process:metaUpdate"
+	EventProcessWorkerUpdate    = "process:workerUpdate"
+	EventProcessContainerUpdate = "process:containerUpdate"
 )
 
 // TaskStateChangeEvent represents a task state change event
@@ -73,4 +76,31 @@ type TaskLogEvent struct {
 	Stream    string    `json:"stream"` // "stdout" or "stderr"
 	Line      string    `json:"line"`   // Log line content
 	Timestamp time.Time `json:"timestamp"`
+}
+
+// ProcessMetaUpdateEvent represents a meta-agent state update
+type ProcessMetaUpdateEvent struct {
+	TaskID    string    `json:"taskId"`
+	State     string    `json:"state"`  // e.g. "THINKING", "PLANNING", "ACTING", "OBSERVING"
+	Detail    string    `json:"detail"` // e.g. "Analyzing dependencies..."
+	Timestamp time.Time `json:"timestamp"`
+}
+
+// ProcessWorkerUpdateEvent represents a worker execution update
+type ProcessWorkerUpdateEvent struct {
+	TaskID    string    `json:"taskId"`
+	WorkerID  string    `json:"workerId"`
+	Status    string    `json:"status"` // "RUNNING", "IDLE", "ERROR"
+	Command   string    `json:"command"`
+	ExitCode  int       `json:"exitCode,omitempty"`
+	Timestamp time.Time `json:"timestamp"`
+}
+
+// ProcessContainerUpdateEvent represents a container lifecycle update
+type ProcessContainerUpdateEvent struct {
+	TaskID      string    `json:"taskId"`
+	ContainerID string    `json:"containerId"`
+	Status      string    `json:"status"` // "STARTING", "RUNNING", "STOPPED"
+	Image       string    `json:"image"`
+	Timestamp   time.Time `json:"timestamp"`
 }

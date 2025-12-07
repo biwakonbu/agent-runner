@@ -15,7 +15,7 @@ AgentRunner (v1) は、ローカル環境にインストールされた各社 AI
 | プロバイダ              | 対応状況        | 備考                |
 | :---------------------- | :-------------- | :------------------ |
 | **Codex CLI** (`codex`) | ✅ **対応済み** | v1 のデフォルト推奨 |
-| **Gemini CLI**          | 🚧 準備中       | スタブのみ実装      |
+| **Gemini CLI**          | ✅ **対応済み** | `gemini-cli`        |
 | **Claude Code**         | 🚧 準備中       | スタブのみ実装      |
 | **Cursor CLI**          | 🚧 準備中       | スタブのみ実装      |
 
@@ -49,7 +49,29 @@ AgentRunner は実行時に自動的にローカルの CLI セッションを検
 agent-runner --meta-model="gpt-5.1" < task.yaml
 ```
 
-## 4. トラブルシューティング
+## 4. Gemini CLI のセットアップ
+
+### 4.1 前提条件
+
+`gemini` コマンドがパスに通っており、CLI からの実行が可能である必要があります。
+（例: Node.js ベースの CLI ツール等）
+
+### 4.2 認証
+
+使用する CLI ツールに合わせて認証を行ってください。一般的には API キーを環境変数 `GOOGLE_API_KEY` に設定するか、`gemini login` 等のコマンドを使用します。
+
+### 4.3 AgentRunner での利用
+
+Task YAML で `runner.worker.kind: "gemini-cli"` を指定します。
+
+```yaml
+runner:
+  worker:
+    kind: "gemini-cli"
+    # model: "gemini-1.5-pro" # 任意。デフォルトは gemini-1.5-pro
+```
+
+## 5. トラブルシューティング
 
 ### Q. "CLI session not found" エラーが出る
 
@@ -61,6 +83,6 @@ agent-runner --meta-model="gpt-5.1" < task.yaml
 **原因**: Docker マウントの設定不備の可能性があります。
 **対策**: AgentRunner はデフォルトで `~/.config/codex` 等の認証ディレクトリをコンテナにマウントします。ホスト側のパスが標準と異なる場合、正しく動作しない可能性があります。
 
-## 5. 今後の予定
+## 6. 今後の予定
 
-Gemini, Claude Code, Cursor などの他プロバイダについても、順次実装を進めていく予定です。現在は指定しても「未実装（Not implemented yet）」エラーが返されます。
+Claude Code, Cursor などの他プロバイダについても、順次実装を進めていく予定です。

@@ -224,8 +224,13 @@ func (e *Executor) Start(ctx context.Context) error {
 	}
 
 	e.containerID = containerID
+
+	containerLabel := containerID
+	if len(containerID) > 12 {
+		containerLabel = containerID[:12]
+	}
 	logger.Info("container started",
-		slog.String("container_id", containerID[:12]),
+		slog.String("container_id", containerLabel),
 		logging.LogDuration(start),
 	)
 	return nil
@@ -270,7 +275,12 @@ func (e *Executor) Stop(ctx context.Context) error {
 
 	// Store containerID before clearing (for error message)
 	containerID := e.containerID
-	logger.Info("stopping container", slog.String("container_id", containerID[:12]))
+
+	containerLabel := containerID
+	if len(containerID) > 12 {
+		containerLabel = containerID[:12]
+	}
+	logger.Info("stopping container", slog.String("container_id", containerLabel))
 
 	// Clear containerID first to prevent resource leak
 	// even if StopContainer fails
@@ -280,7 +290,7 @@ func (e *Executor) Stop(ctx context.Context) error {
 	err := e.Sandbox.StopContainer(ctx, containerID)
 	if err != nil {
 		logger.Error("failed to stop container",
-			slog.String("container_id", containerID[:12]),
+			slog.String("container_id", containerLabel),
 			slog.Any("error", err),
 			logging.LogDuration(start),
 		)
@@ -288,7 +298,7 @@ func (e *Executor) Stop(ctx context.Context) error {
 	}
 
 	logger.Info("container stopped",
-		slog.String("container_id", containerID[:12]),
+		slog.String("container_id", containerLabel),
 		logging.LogDuration(start),
 	)
 	return nil

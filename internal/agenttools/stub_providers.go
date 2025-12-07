@@ -35,7 +35,6 @@ func registerStub(kind string) {
 }
 
 func init() {
-	registerStub("gemini-cli")
 	registerStub("claude-code")
 	registerStub("cursor-cli")
 }

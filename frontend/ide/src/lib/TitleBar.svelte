@@ -17,6 +17,10 @@
     user-select: none;
     cursor: default;
     z-index: 9999;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
 
     /* Macの信号機ボタン（左上）を避けるためのパディング */
     padding-left: var(--mv-titlebar-padding-left);

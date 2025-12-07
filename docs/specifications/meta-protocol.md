@@ -92,6 +92,14 @@ type AcceptanceCriterion struct {
 ### 4.2 入力
 
 Core は TaskContext の要約を Meta に渡します：
+The transport format between AgentRunner and LLM is **JSON**.
+Internally, the `MetaClient` converts this JSON into YAML to maintain compatibility with legacy processing logic before unmarshaling into Go structs.
+
+- **Request**: JSON sent to LLM (via prompts).
+- **Response**: JSON string received from LLM.
+- **Conversion**: JSON string -> YAML string -> Go Struct.
+
+All structs in `internal/meta/protocol.go` are tagged with both `yaml` and `json` to support this flow.
 
 ```yaml
 task:
@@ -243,10 +251,43 @@ Meta が不正な YAML を返した場合：
 
 ### 6.3 タイムアウト
 
-Meta 呼び出しのタイムアウト設定：
+Meta 呼び出しのタイムアウト設定は、使用するプロバイダによって異なります。
+
+#### OpenAI Chat プロバイダ
 
 - デフォルト: 60 秒
 - 環境変数 `META_TIMEOUT_SEC` で変更可能
+
+#### Codex CLI プロバイダ
+
+LLM の処理は時間がかかるため、より長いタイムアウトを設定しています。
+
+| 層 | デフォルト値 | 説明 |
+|----|------------|------|
+| ChatHandler | 15 分 | `chat/handler.go` の `metaTimeout` |
+| Meta-agent | 10 分 | `meta/cli_provider.go` の `DefaultMetaAgentTimeout` |
+| agenttools | 10 分 | `ExecPlan.Timeout` で指定 |
+
+**タイムアウト階層**:
+
+```
+ChatHandler (15分)
+  └→ Meta.Decompose()
+       └→ CodexCLIProvider (10分)
+            └→ agenttools.Execute() (親コンテキストから独立)
+```
+
+`agenttools.Execute()` は `ExecPlan.Timeout` が設定されている場合、親コンテキストから独立した新しいコンテキストを作成します。これにより、外部プロセス（Codex CLI）の実行時間を正確に制御できます。
+
+#### Graceful Shutdown
+
+タイムアウト発生時、プロセスは以下の順序で終了されます：
+
+1. **SIGTERM** 送信（graceful shutdown のチャンス）
+2. **5 秒待機**（`GracefulShutdownDelay`）
+3. **SIGKILL** 送信（強制終了）
+
+これにより、Codex CLI は可能な限りクリーンに終了できます
 
 ## 7. プロンプト設計
 

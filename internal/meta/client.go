@@ -241,6 +241,7 @@ func (c *Client) callLLM(ctx context.Context, systemPrompt, userPrompt string) (
 }
 
 // extractJSON extracts JSON content from LLM response, handling markdown code blocks
+// and Codex CLI output which includes header information before the JSON
 func extractJSON(response string) string {
 	response = strings.TrimSpace(response)
 
@@ -264,6 +265,31 @@ func extractJSON(response string) string {
 		response = strings.TrimPrefix(response, "```")
 		response = strings.TrimSuffix(response, "```")
 		return strings.TrimSpace(response)
+	}
+
+	// Method 4: Extract JSON object starting with "{" from Codex CLI output
+	// Codex CLI includes header info (version, workdir, model, etc.) before the actual JSON
+	// Look for the first "{" that starts a JSON object
+	if idx := strings.Index(response, "{"); idx >= 0 {
+		// Find the matching closing brace
+		jsonStr := response[idx:]
+		// Validate it's actually JSON by finding balanced braces
+		braceCount := 0
+		endIdx := -1
+		for i, ch := range jsonStr {
+			if ch == '{' {
+				braceCount++
+			} else if ch == '}' {
+				braceCount--
+				if braceCount == 0 {
+					endIdx = i + 1
+					break
+				}
+			}
+		}
+		if endIdx > 0 {
+			return strings.TrimSpace(jsonStr[:endIdx])
+		}
 	}
 
 	return response
@@ -684,12 +710,15 @@ Your goal is to:
 4. Identify dependencies between tasks
 5. Flag potential file conflicts
 
+IMPORTANT: Output MUST be valid JSON. Do NOT use ellipsis (...) or placeholder syntax like [...].
+All arrays and values must contain actual data appropriate to the request.
+
 Output MUST be a JSON block with the following structure:
 {
   "type": "decompose",
   "version": 1,
   "payload": {
-    "understanding": "ユーザーの要求を理解した内容...",
+    "understanding": "ユーザーの要求を理解した内容を記述",
     "phases": [
       {
         "name": "概念設計",
@@ -697,11 +726,11 @@ Output MUST be a JSON block with the following structure:
         "tasks": [
           {
             "id": "temp-001",
-            "title": "タスクタイトル",
-            "description": "詳細な説明",
+            "title": "要件分析と設計ドキュメント作成",
+            "description": "ユーザー要求を分析し、設計ドキュメントを作成する",
             "acceptance_criteria": [
-              "達成条件1",
-              "達成条件2"
+              "設計ドキュメントが作成されている",
+              "要件が明確に定義されている"
             ],
             "dependencies": [],
             "wbs_level": 1,
@@ -715,9 +744,12 @@ Output MUST be a JSON block with the following structure:
         "tasks": [
           {
             "id": "temp-002",
-            "title": "...",
-            "description": "...",
-            "acceptance_criteria": [...],
+            "title": "技術設計と実装計画",
+            "description": "実装に必要な技術設計と計画を策定する",
+            "acceptance_criteria": [
+              "技術設計書が完成している",
+              "実装計画が明確である"
+            ],
             "dependencies": ["temp-001"],
             "wbs_level": 2,
             "estimated_effort": "medium"
@@ -730,9 +762,12 @@ Output MUST be a JSON block with the following structure:
         "tasks": [
           {
             "id": "temp-003",
-            "title": "...",
-            "description": "...",
-            "acceptance_criteria": [...],
+            "title": "機能実装",
+            "description": "設計に基づいて機能を実装する",
+            "acceptance_criteria": [
+              "機能が実装されている",
+              "テストが通過している"
+            ],
             "dependencies": ["temp-002"],
             "wbs_level": 3,
             "estimated_effort": "large"
@@ -757,6 +792,7 @@ Guidelines:
 - Dependencies can reference other temp IDs from the same batch
 - Be specific about acceptance criteria - they should be verifiable
 - Consider existing tasks to avoid duplication
+- NEVER use [...] or ellipsis in your output - always provide complete, valid JSON
 `
 
 // buildDecomposeUserPrompt はユーザープロンプトを構築する

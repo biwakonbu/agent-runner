@@ -108,7 +108,7 @@ func (r *Runner) Run(ctx context.Context) (*TaskContext, error) {
 	// Record PlanTask request
 	planRequestYAML := fmt.Sprintf("type: plan_task\nversion: 1\npayload:\n  prd: %q", taskCtx.PRDText)
 
-	logger.Info("calling Meta.PlanTask")
+	logger.Info("calling Meta.PlanTask", slog.String("event_type", "meta:thinking"), slog.String("detail", "Planning task..."))
 	logger.Debug("PlanTask request", slog.Int("prd_length", len(taskCtx.PRDText)))
 	planStart := time.Now()
 	plan, err := r.Meta.PlanTask(ctx, taskCtx.PRDText)
@@ -152,14 +152,14 @@ func (r *Runner) Run(ctx context.Context) (*TaskContext, error) {
 	logger.Info("state transition", slog.String("from", string(StatePlanning)), slog.String("to", string(StateRunning)))
 
 	// Start persistent container
-	logger.Info("starting worker container")
+	logger.Info("starting worker container", slog.String("event_type", "container:starting"))
 	containerStart := time.Now()
 	if err := r.Worker.Start(ctx); err != nil {
 		logger.Error("failed to start container", slog.Any("error", err), logging.LogDuration(containerStart))
 		taskCtx.State = StateFailed
 		return taskCtx, fmt.Errorf("failed to start container: %w", err)
 	}
-	logger.Info("worker container started", logging.LogDuration(containerStart))
+	logger.Info("worker container started", slog.String("event_type", "container:started"), logging.LogDuration(containerStart))
 
 	// Ensure container is stopped at the end
 	defer func() {
@@ -199,7 +199,7 @@ func (r *Runner) Run(ctx context.Context) (*TaskContext, error) {
 		summaryBytes, _ := yaml.Marshal(summary)
 		nextActionReqYAML := string(summaryBytes)
 
-		logger.Info("calling Meta.NextAction", slog.Int("worker_runs_count", len(taskCtx.WorkerRuns)))
+		logger.Info("calling Meta.NextAction", slog.String("event_type", "meta:thinking"), slog.String("detail", "Analyzing..."), slog.Int("worker_runs_count", len(taskCtx.WorkerRuns)))
 		actionStart := time.Now()
 		action, err := r.Meta.NextAction(ctx, summary)
 		if err != nil {
@@ -295,7 +295,7 @@ func (r *Runner) Run(ctx context.Context) (*TaskContext, error) {
 			break
 		} else if action.Decision.Action == "run_worker" {
 			// Execute Worker
-			logger.Info("executing worker", slog.Int("prompt_length", len(action.WorkerCall.Prompt)))
+			logger.Info("executing worker", slog.String("event_type", "worker:running"), slog.String("command", action.WorkerCall.Prompt), slog.Int("prompt_length", len(action.WorkerCall.Prompt)))
 			logger.Debug("worker prompt", slog.String("prompt", action.WorkerCall.Prompt))
 			workerStart := time.Now()
 			res, err := r.Worker.RunWorker(ctx, action.WorkerCall, r.Config.Runner.Worker.Env)
@@ -311,6 +311,7 @@ func (r *Runner) Run(ctx context.Context) (*TaskContext, error) {
 				}
 			} else {
 				logger.Info("worker execution completed",
+					slog.String("event_type", "worker:completed"),
 					slog.Int("exit_code", res.ExitCode),
 					slog.Int("output_length", len(res.RawOutput)),
 					logging.LogDuration(workerStart),

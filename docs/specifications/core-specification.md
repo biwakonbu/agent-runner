@@ -82,18 +82,18 @@ runner:
 
 ### 2.3 デフォルト補完ルール
 
-| フィールド                       | デフォルト値                                     |
-| -------------------------------- | ------------------------------------------------ |
-| `task.id`                        | UUID 自動生成                                    |
-| `task.title`                     | `task.id` と同じ                                 |
-| `task.repo`                      | `"."` (カレントディレクトリ)                     |
-| `task.test`                      | 未設定（テスト自動実行なし）                     |
-| `runner.meta.kind`               | `"openai-chat"`                                  |
+| フィールド                       | デフォルト値                      |
+| -------------------------------- | --------------------------------- |
+| `task.id`                        | UUID 自動生成                     |
+| `task.title`                     | `task.id` と同じ                  |
+| `task.repo`                      | `"."` (カレントディレクトリ)      |
+| `task.test`                      | 未設定（テスト自動実行なし）      |
+| `runner.meta.kind`               | `"openai-chat"`                   |
 | `runner.meta.model`              | `gpt-5.1` (プロバイダのモデル ID) |
-| `runner.meta.max_loops`          | `5`                                              |
-| `runner.worker.kind`             | `"codex-cli"`                                    |
-| `runner.worker.docker_image`     | デフォルトイメージ                               |
-| `runner.worker.max_run_time_sec` | `1800` (30 分)                                   |
+| `runner.meta.max_loops`          | `5`                               |
+| `runner.worker.kind`             | `"codex-cli"`                     |
+| `runner.worker.docker_image`     | デフォルトイメージ                |
+| `runner.worker.max_run_time_sec` | `1800` (30 分)                    |
 
 ### 2.4 環境変数参照
 
@@ -331,5 +331,5 @@ Go の `text/template` を使用してテンプレートを展開します。
 ### 6.2 制約事項
 
 - v1 ではコマンドラインオプションは未サポート
-- Worker 種別は `codex-cli` のみ
+- Worker 種別は `codex-cli`, `gemini-cli` をサポート
 - Meta 種別は `openai-chat` のみ
