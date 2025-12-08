@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { stopPropagation } from 'svelte/legacy';
+  import { stopPropagation } from "svelte/legacy";
 
   import { onMount } from "svelte";
   import ChatInput from "./ChatInput.svelte";
@@ -40,24 +40,24 @@
   });
 
   function closeWindow() {
-    windowStore.close('chat');
+    windowStore.close("chat");
     onclose?.();
   }
 
   function handleMinimize(data: { minimized: boolean }) {
-    windowStore.minimize('chat', data.minimized);
+    windowStore.minimize("chat", data.minimized);
   }
 
   function handleDragEnd(data: { x: number; y: number }) {
-    windowStore.updatePosition('chat', data.x, data.y);
+    windowStore.updatePosition("chat", data.x, data.y);
   }
 
   function handleResizeEnd(data: { width: number; height: number }) {
-    windowStore.updateSize('chat', data.width, data.height);
+    windowStore.updateSize("chat", data.width, data.height);
   }
 
   function handleClick() {
-    windowStore.bringToFront('chat');
+    windowStore.bringToFront("chat");
   }
 
   // チャット送信処理
@@ -145,45 +145,45 @@
 <style>
   .tabs {
     display: flex;
-    gap: 4px; /* Tighter gap */
-    height: 100%;
+    gap: var(--mv-space-1);
+    height: var(--mv-size-full);
     align-items: center;
   }
 
   /* Sophisticated Tab Style */
   .tab {
     position: relative;
-    padding: 6px 12px;
-    font-size: 13px;
-    font-weight: 500;
+    padding: var(--mv-space-1-5) var(--mv-space-3);
+    font-size: var(--mv-font-size-md);
+    font-weight: var(--mv-font-weight-medium);
     color: var(--mv-color-text-muted);
     background: transparent;
     border: none;
-    border-radius: 6px;
+    border-radius: var(--mv-radius-sm);
     cursor: pointer;
     transition: all 0.2s ease;
   }
 
   .tab:hover {
     color: var(--mv-color-text-primary);
-    background: rgba(255, 255, 255, 0.05);
+    background: var(--mv-glass-active);
   }
 
   .tab.active {
     color: var(--mv-color-text-primary);
-    font-weight: 600;
+    font-weight: var(--mv-font-weight-semibold);
   }
 
   /* Animated bottom indicator inside the tab */
   .tab-indicator {
     position: absolute;
-    bottom: -8px; /* Push to bottom of header */
-    left: 0;
-    right: 0;
-    height: 2px;
-    background: var(--mv-primitive-frost-2); /* Accent color */
-    box-shadow: 0 -2px 10px rgba(136, 192, 208, 0.5);
-    border-top-left-radius: 2px;
-    border-top-right-radius: 2px;
+    bottom: calc(-1 * var(--mv-spacing-xs));
+    left: var(--mv-space-0);
+    right: var(--mv-space-0);
+    height: var(--mv-border-width-md);
+    background: var(--mv-primitive-frost-2);
+    box-shadow: var(--mv-shadow-tab-glow);
+    border-top-left-radius: var(--mv-border-width-md);
+    border-top-right-radius: var(--mv-border-width-md);
   }
 </style>

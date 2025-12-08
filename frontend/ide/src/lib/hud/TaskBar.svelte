@@ -67,53 +67,46 @@
   .taskbar-container {
     position: fixed;
     bottom: var(--mv-spacing-lg);
-    left: 50%; /* Center horizontally */
-    transform: translateX(-50%);
-    z-index: 2000;
+    left: var(--mv-position-center);
+    transform: translateX(var(--mv-transform-center-x));
+    z-index: var(--mv-z-toast);
   }
 
   .taskbar {
     display: flex;
     align-items: center;
-    gap: var(--mv-spacing-sm); /* Increased gap */
+    gap: var(--mv-spacing-sm);
     padding: var(--mv-spacing-xs) var(--mv-spacing-md);
 
     /* Sophisticated Glassmorphism */
-    background: rgba(15, 23, 42, 0.6); /* Darker base for contrast */
+    background: var(--mv-taskbar-bg);
     backdrop-filter: blur(20px) saturate(180%);
-    -webkit-backdrop-filter: blur(20px) saturate(180%);
 
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    border-top: 1px solid rgba(255, 255, 255, 0.15); /* Highlight top edge */
-    border-radius: 9999px; /* Full pill shape */
+    border: var(--mv-border-width-thin) solid var(--mv-taskbar-border);
+    border-top: var(--mv-border-width-thin) solid var(--mv-taskbar-border-top);
+    border-radius: var(--mv-space-hidden);
 
-    box-shadow:
-      0 4px 6px -1px rgba(0, 0, 0, 0.1),
-      0 2px 4px -1px rgba(0, 0, 0, 0.06),
-      0 0 0 1px rgba(255, 255, 255, 0.05) inset; /* Inner ring */
+    box-shadow: var(--mv-taskbar-shadow);
 
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
   .taskbar:hover {
-    background: rgba(30, 41, 59, 0.7);
-    box-shadow:
-      0 10px 15px -3px rgba(0, 0, 0, 0.1),
-      0 4px 6px -2px rgba(0, 0, 0, 0.05),
-      0 0 0 1px rgba(255, 255, 255, 0.1) inset;
-    transform: translateY(-2px);
+    background: var(--mv-taskbar-bg-hover);
+    box-shadow: var(--mv-taskbar-shadow-hover);
+    transform: translateY(calc(-1 * var(--mv-space-0-5)));
   }
 
   .taskbar-item {
     position: relative;
-    width: 44px; /* Fixed touch target size */
-    height: 44px;
+    width: var(--mv-input-height-lg);
+    height: var(--mv-input-height-lg);
     display: flex;
     align-items: center;
     justify-content: center;
     border: none;
     background: transparent;
-    border-radius: 50%; /* Circular buttons */
+    border-radius: var(--mv-radius-full);
     cursor: pointer;
     transition: all 0.2s ease;
 
@@ -121,7 +114,7 @@
   }
 
   .taskbar-item:hover {
-    background: rgba(255, 255, 255, 0.1);
+    background: var(--mv-btn-hover-bg);
     color: var(--mv-color-text-primary);
   }
 
@@ -130,21 +123,21 @@
   }
 
   .taskbar-item.active {
-    color: var(--mv-primitive-frost-2); /* Bright accent color */
-    background: rgba(136, 192, 208, 0.15); /* Subtle tint of accent */
-    box-shadow: 0 0 0 1px rgba(136, 192, 208, 0.2) inset;
+    color: var(--mv-primitive-frost-2);
+    background: var(--mv-taskbar-item-active-bg);
+    box-shadow: var(--mv-taskbar-item-active-shadow);
   }
 
   .active-glow {
     position: absolute;
-    bottom: -6px;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 4px;
-    height: 4px;
+    bottom: calc(-1 * var(--mv-indicator-size-xs));
+    left: var(--mv-position-center);
+    transform: translateX(var(--mv-transform-center-x));
+    width: var(--mv-space-1);
+    height: var(--mv-space-1);
     background-color: var(--mv-primitive-frost-2);
-    border-radius: 50%;
-    box-shadow: 0 0 8px 2px rgba(136, 192, 208, 0.6);
+    border-radius: var(--mv-radius-full);
+    box-shadow: var(--mv-taskbar-glow);
   }
 
   .icon-wrapper {
@@ -156,35 +149,35 @@
 
   /* Icon styling handled by Lucide component classes via global CSS or simpler: */
   :global(.icon) {
-    stroke-width: 2px;
-    opacity: 0.8;
+    stroke-width: var(--mv-border-width-md);
+    opacity: var(--mv-opacity-80);
     transition: opacity 0.2s;
   }
 
   .taskbar-item:hover :global(.icon),
   .taskbar-item.active :global(.icon) {
-    opacity: 1;
+    opacity: var(--mv-opacity-100);
   }
 
   /* Badge styling */
   .badge {
     position: absolute;
-    top: -6px;
-    right: -8px;
+    top: calc(-1 * var(--mv-indicator-size-xs));
+    right: calc(-1 * var(--mv-spacing-xs));
 
     background: var(--mv-primitive-aurora-red);
-    color: white;
+    color: var(--mv-color-text-on-accent);
 
-    font-size: 10px;
-    font-weight: 700;
-    line-height: 1;
+    font-size: var(--mv-font-size-2xs);
+    font-weight: var(--mv-font-weight-bold);
+    line-height: var(--mv-line-height-tight);
 
-    padding: 3px 5px;
-    border-radius: 10px;
-    border: 2px solid rgba(15, 23, 42, 0.8); /* Match backdrop to cut out */
+    padding: var(--mv-space-0-75) var(--mv-space-1-5);
+    border-radius: var(--mv-radius-md);
+    border: var(--mv-border-width-md) solid var(--mv-badge-border);
 
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-    min-width: 16px;
+    box-shadow: var(--mv-badge-shadow);
+    min-width: var(--mv-icon-size-sm);
     text-align: center;
   }
 </style>

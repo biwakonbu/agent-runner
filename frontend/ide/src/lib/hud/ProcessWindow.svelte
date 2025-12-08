@@ -17,23 +17,23 @@
   let zIndex = $derived($windowStore.process.zIndex);
 
   function handleClose() {
-    windowStore.close('process');
+    windowStore.close("process");
   }
 
   function handleMinimize(data: { minimized: boolean }) {
-    windowStore.minimize('process', data.minimized);
+    windowStore.minimize("process", data.minimized);
   }
 
   function handleDragEnd(data: { x: number; y: number }) {
-    windowStore.updatePosition('process', data.x, data.y);
+    windowStore.updatePosition("process", data.x, data.y);
   }
 
   function handleResizeEnd(data: { width: number; height: number }) {
-    windowStore.updateSize('process', data.width, data.height);
+    windowStore.updateSize("process", data.width, data.height);
   }
 
   function handleClick() {
-    windowStore.bringToFront('process');
+    windowStore.bringToFront("process");
   }
 </script>
 
@@ -57,38 +57,38 @@
     {/snippet}
 
     {#snippet children()}
-        <div class="resource-window-content">
-            <ResourceList {resources} />
-        </div>
+      <div class="resource-window-content">
+        <ResourceList {resources} />
+      </div>
     {/snippet}
   </DraggableWindow>
 {/if}
 
 <style>
-    /* Header Styling matching other windows */
-    .window-header {
-      display: flex;
-      align-items: center;
-      gap: var(--mv-spacing-sm);
-      color: var(--mv-color-text-secondary);
-    }
-    
-    :global(.header-icon) {
-      opacity: 0.7;
-    }
-    
-    .header-title {
-      font-size: var(--mv-font-size-sm);
-      font-weight: 600;
-      color: var(--mv-color-text-primary);
-      letter-spacing: 0.01em;
-    }
+  /* Header Styling matching other windows */
+  .window-header {
+    display: flex;
+    align-items: center;
+    gap: var(--mv-spacing-sm);
+    color: var(--mv-color-text-secondary);
+  }
 
-    .resource-window-content {
-        flex: 1;
-        overflow-y: auto;
-        padding: var(--mv-spacing-xs); /* Add some padding */
+  :global(.header-icon) {
+    opacity: var(--mv-opacity-70);
+  }
 
-        /* Matches ResourceList usage in ProcessHUD but adapted for window */
-    }
+  .header-title {
+    font-size: var(--mv-font-size-sm);
+    font-weight: var(--mv-font-weight-semibold);
+    color: var(--mv-color-text-primary);
+    letter-spacing: var(--mv-letter-spacing-widest);
+  }
+
+  .resource-window-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: var(--mv-spacing-xs);
+
+    /* Matches ResourceList usage in ProcessHUD but adapted for window */
+  }
 </style>

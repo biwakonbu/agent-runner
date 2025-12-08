@@ -82,18 +82,17 @@
   .backlog-panel {
     display: flex;
     flex-direction: column;
-    height: 100%;
+    height: var(--mv-size-full);
 
     /* Glassmorphism Background - Darker for sidebar */
-    background: rgba(11, 15, 23, 0.65);
+    background: var(--mv-glass-bg);
     backdrop-filter: blur(24px) saturate(140%);
-    -webkit-backdrop-filter: blur(24px) saturate(140%);
 
     /* Subtle glass border */
-    border-left: 1px solid rgba(255, 255, 255, 0.08);
+    border-left: var(--mv-border-width-thin) solid var(--mv-window-border);
 
     /* Soft ambient glow */
-    box-shadow: -10px 0 30px rgba(0, 0, 0, 0.3);
+    box-shadow: var(--mv-shadow-backlog-panel);
   }
 
   /* === Header with HUD styling === */
@@ -102,14 +101,15 @@
     align-items: center;
     justify-content: space-between;
     height: var(--mv-size-floating-header);
-    padding: 0 var(--mv-spacing-md);
+    padding: var(--mv-space-0) var(--mv-spacing-md);
 
     background: linear-gradient(
       to bottom,
-      rgba(255, 255, 255, 0.03),
+      var(--mv-window-header-gradient-start),
       transparent
     );
-    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    border-bottom: var(--mv-border-width-thin) solid
+      var(--mv-window-border-bottom);
   }
 
   .header-title {
@@ -121,16 +121,16 @@
 
   /* Icon handled by Lucide classes global or via :global */
   :global(.header-icon) {
-    opacity: 0.7;
-    margin-top: -1px; /* Visual alignment */
+    opacity: var(--mv-opacity-70);
+    margin-top: calc(-1 * var(--mv-space-px));
   }
 
   .panel-header h3 {
-    margin: 0;
+    margin: var(--mv-space-0);
     font-size: var(--mv-font-size-sm);
-    font-weight: 600;
+    font-weight: var(--mv-font-weight-semibold);
     text-transform: uppercase;
-    letter-spacing: 0.05em;
+    letter-spacing: var(--mv-letter-spacing-count);
     color: var(--mv-color-text-primary);
   }
 
@@ -142,11 +142,11 @@
 
     /* Smooth scrollbar */
     scrollbar-width: thin;
-    scrollbar-color: rgba(255, 255, 255, 0.1) transparent;
+    scrollbar-color: var(--mv-glass-scrollbar) transparent;
   }
 
   .panel-content::-webkit-scrollbar {
-    width: 4px;
+    width: var(--mv-size-scrollbar);
   }
 
   .panel-content::-webkit-scrollbar-track {
@@ -154,19 +154,19 @@
   }
 
   .panel-content::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.1);
-    border-radius: 4px;
+    background: var(--mv-glass-scrollbar);
+    border-radius: var(--mv-radius-sm);
   }
 
   .panel-content::-webkit-scrollbar-thumb:hover {
-    background: rgba(255, 255, 255, 0.2);
+    background: var(--mv-glass-scrollbar-hover);
   }
 
   /* === Backlog List === */
   .backlog-list {
     list-style: none;
-    margin: 0;
-    padding: 0;
+    margin: var(--mv-space-0);
+    padding: var(--mv-space-0);
     display: flex;
     flex-direction: column;
     gap: var(--mv-spacing-md);

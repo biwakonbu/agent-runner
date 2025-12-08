@@ -263,6 +263,57 @@
   --mv-color-connection-satisfied: rgba(136, 192, 208, 0.4);
   --mv-color-connection-unsatisfied: var(--mv-glow-black-mid);
 
+  /* ========================================
+     Window/Panel コンポーネント用
+     ======================================== */
+  --mv-window-bg: rgba(10, 10, 12, 0.8);
+  --mv-window-bg-minimized: rgba(15, 23, 42, 0.9);
+  --mv-window-border: rgba(255, 255, 255, 0.08);
+  --mv-window-border-top: rgba(255, 255, 255, 0.12);
+  --mv-window-border-focus: rgba(255, 255, 255, 0.15);
+  --mv-window-border-bottom: rgba(255, 255, 255, 0.05);
+  --mv-window-header-gradient-start: rgba(255, 255, 255, 0.03);
+  --mv-window-header-gradient-active: rgba(255, 255, 255, 0.05);
+  --mv-window-header-gradient-active-end: rgba(255, 255, 255, 0.01);
+  --mv-window-content-bg: rgba(0, 0, 0, 0.1);
+  --mv-window-footer-bg: rgba(0, 0, 0, 0.2);
+  --mv-btn-hover-bg: rgba(255, 255, 255, 0.1);
+  --mv-btn-close-hover-bg: rgba(239, 68, 68, 0.2);
+  --mv-resize-handle-border: rgba(255, 255, 255, 0.1);
+  --mv-shadow-window: 0 20px 25px -5px rgba(0, 0, 0, 0.3),
+    0 8px 10px -6px rgba(0, 0, 0, 0.2),
+    0 0 0 1px rgba(0, 0, 0, 0.4);
+  --mv-shadow-window-focus: 0 25px 50px -12px rgba(0, 0, 0, 0.4),
+    0 0 0 1px rgba(136, 192, 208, 0.3);
+  --mv-glow-focus-blue: rgba(136, 192, 208, 0.3);
+
+  /* ========================================
+     TaskBar コンポーネント用
+     ======================================== */
+  --mv-taskbar-bg: rgba(15, 23, 42, 0.6);
+  --mv-taskbar-bg-hover: rgba(30, 41, 59, 0.7);
+  --mv-taskbar-border: rgba(255, 255, 255, 0.08);
+  --mv-taskbar-border-top: rgba(255, 255, 255, 0.15);
+  --mv-taskbar-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1),
+    0 2px 4px -1px rgba(0, 0, 0, 0.06),
+    0 0 0 1px rgba(255, 255, 255, 0.05) inset;
+  --mv-taskbar-shadow-hover: 0 10px 15px -3px rgba(0, 0, 0, 0.1),
+    0 4px 6px -2px rgba(0, 0, 0, 0.05),
+    0 0 0 1px rgba(255, 255, 255, 0.1) inset;
+  --mv-taskbar-item-active-bg: rgba(136, 192, 208, 0.15);
+  --mv-taskbar-item-active-shadow: 0 0 0 1px rgba(136, 192, 208, 0.2) inset;
+  --mv-taskbar-glow: 0 0 8px 2px rgba(136, 192, 208, 0.6);
+  --mv-badge-border: rgba(15, 23, 42, 0.8);
+  --mv-badge-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+
+  /* ========================================
+     ResourceList コンポーネント用
+     ======================================== */
+  --mv-resource-item-bg: rgba(15, 23, 42, 0.5);
+  --mv-resource-item-border: rgba(255, 255, 255, 0.03);
+  --mv-resource-item-hover-bg: rgba(30, 41, 59, 0.6);
+  --mv-resource-item-hover-border: rgba(255, 255, 255, 0.08);
+
   /* BacklogPanel 用 */
   --mv-shadow-backlog-item: 0 0 8px var(--mv-glow-black-mid);
   --mv-shadow-backlog-item-hover: 0 0 12px var(--mv-glow-black);
