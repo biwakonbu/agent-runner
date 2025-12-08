@@ -3,6 +3,7 @@
   import ResourceList from "./ResourceList.svelte";
   import type { ResourceNode } from "./types";
   import { windowStore } from "../../stores/windowStore";
+  import { Cpu } from "lucide-svelte";
 
   interface Props {
     resources?: ResourceNode[];
@@ -27,6 +28,10 @@
     windowStore.updatePosition('process', data.x, data.y);
   }
 
+  function handleResizeEnd(data: { width: number; height: number }) {
+    windowStore.updateSize('process', data.width, data.height);
+  }
+
   function handleClick() {
     windowStore.bringToFront('process');
   }
@@ -35,15 +40,22 @@
 {#if isOpen}
   <DraggableWindow
     id="process"
-    title="Process & Resources"
     initialPosition={position}
     initialSize={size}
     {zIndex}
     onclose={handleClose}
     onminimize={handleMinimize}
     ondragend={handleDragEnd}
+    onresizeend={handleResizeEnd}
     onclick={handleClick}
   >
+    {#snippet header()}
+      <div class="window-header">
+        <Cpu size={16} class="header-icon" />
+        <span class="header-title">Process & Resources</span>
+      </div>
+    {/snippet}
+
     {#snippet children()}
         <div class="resource-window-content">
             <ResourceList {resources} />
@@ -53,9 +65,29 @@
 {/if}
 
 <style>
+    /* Header Styling matching other windows */
+    .window-header {
+      display: flex;
+      align-items: center;
+      gap: var(--mv-spacing-sm);
+      color: var(--mv-color-text-secondary);
+    }
+    
+    :global(.header-icon) {
+      opacity: 0.7;
+    }
+    
+    .header-title {
+      font-size: var(--mv-font-size-sm);
+      font-weight: 600;
+      color: var(--mv-color-text-primary);
+      letter-spacing: 0.01em;
+    }
+
     .resource-window-content {
         flex: 1;
         overflow-y: auto;
+        padding: var(--mv-spacing-xs); /* Add some padding */
 
         /* Matches ResourceList usage in ProcessHUD but adapted for window */
     }

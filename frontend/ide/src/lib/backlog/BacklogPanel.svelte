@@ -9,6 +9,7 @@
   import BacklogItemComponent from "./components/BacklogItem.svelte";
   import ResolveDialog from "./components/ResolveDialog.svelte";
   import EmptyBacklog from "./components/EmptyBacklog.svelte";
+  import { ClipboardList } from "lucide-svelte";
 
   // 解決ダイアログ
   let resolvingItem: BacklogItem | null = $state(null);
@@ -44,7 +45,10 @@
 
 <aside class="backlog-panel">
   <header class="panel-header">
-    <h3>バックログ ({$unresolvedCount})</h3>
+    <div class="header-title">
+      <ClipboardList size={16} class="header-icon" />
+      <h3>Backlog ({$unresolvedCount})</h3>
+    </div>
   </header>
 
   <div class="panel-content">
@@ -80,15 +84,16 @@
     flex-direction: column;
     height: 100%;
 
-    /* Glassmorphism Background */
-    background: var(--mv-glass-bg);
-    backdrop-filter: blur(16px);
+    /* Glassmorphism Background - Darker for sidebar */
+    background: rgba(11, 15, 23, 0.65);
+    backdrop-filter: blur(24px) saturate(140%);
+    -webkit-backdrop-filter: blur(24px) saturate(140%);
 
     /* Subtle glass border */
-    border-left: var(--mv-border-width-thin) solid var(--mv-glass-border-strong);
+    border-left: 1px solid rgba(255, 255, 255, 0.08);
 
     /* Soft ambient glow */
-    box-shadow: var(--mv-shadow-backlog-panel);
+    box-shadow: -10px 0 30px rgba(0, 0, 0, 0.3);
   }
 
   /* === Header with HUD styling === */
@@ -96,24 +101,37 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: var(--mv-spacing-sm) var(--mv-spacing-md);
-    background: var(--mv-glass-bg);
-    border-bottom: var(--mv-border-width-thin) solid var(--mv-glass-border);
+    height: var(--mv-size-floating-header);
+    padding: 0 var(--mv-spacing-md);
 
-    /* Inner glow effect */
-    box-shadow: var(--mv-shadow-backlog-header);
+    background: linear-gradient(
+      to bottom,
+      rgba(255, 255, 255, 0.03),
+      transparent
+    );
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  }
+
+  .header-title {
+    display: flex;
+    align-items: center;
+    gap: var(--mv-spacing-sm);
+    color: var(--mv-color-text-secondary);
+  }
+
+  /* Icon handled by Lucide classes global or via :global */
+  :global(.header-icon) {
+    opacity: 0.7;
+    margin-top: -1px; /* Visual alignment */
   }
 
   .panel-header h3 {
     margin: 0;
-    font-size: var(--mv-font-size-xs);
-    font-weight: var(--mv-font-weight-bold);
+    font-size: var(--mv-font-size-sm);
+    font-weight: 600;
     text-transform: uppercase;
-    letter-spacing: var(--mv-letter-spacing-header);
-    color: var(--mv-color-text-secondary);
-
-    /* Glow text effect */
-    text-shadow: var(--mv-text-shadow-frost);
+    letter-spacing: 0.05em;
+    color: var(--mv-color-text-primary);
   }
 
   /* === Scrollable Content === */
@@ -124,11 +142,11 @@
 
     /* Smooth scrollbar */
     scrollbar-width: thin;
-    scrollbar-color: var(--mv-glass-border) transparent;
+    scrollbar-color: rgba(255, 255, 255, 0.1) transparent;
   }
 
   .panel-content::-webkit-scrollbar {
-    width: var(--mv-scrollbar-width);
+    width: 4px;
   }
 
   .panel-content::-webkit-scrollbar-track {
@@ -136,12 +154,12 @@
   }
 
   .panel-content::-webkit-scrollbar-thumb {
-    background: var(--mv-glass-border);
-    border-radius: var(--mv-scrollbar-radius);
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
   }
 
   .panel-content::-webkit-scrollbar-thumb:hover {
-    background: var(--mv-glass-border-strong);
+    background: rgba(255, 255, 255, 0.2);
   }
 
   /* === Backlog List === */

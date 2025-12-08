@@ -1,8 +1,5 @@
 <script lang="ts">
-  import { createBubbler } from 'svelte/legacy';
-
-  const bubble = createBubbler();
-  import { createEventDispatcher } from "svelte";
+  import { onMount } from "svelte";
   import { fade } from "svelte/transition";
 
   interface Props {
@@ -14,6 +11,12 @@
     disabled?: boolean;
     autofocus?: boolean;
     id?: string;
+    oninput?: (e: Event & { currentTarget: HTMLInputElement }) => void;
+    onchange?: (e: Event & { currentTarget: HTMLInputElement }) => void;
+    onkeydown?: (e: KeyboardEvent) => void;
+    onsubmit?: () => void;
+    onfocus?: (e: FocusEvent) => void;
+    onblur?: (e: FocusEvent) => void;
   }
 
   let {
@@ -24,25 +27,36 @@
     error = "",
     disabled = false,
     autofocus = false,
-    id = ""
+    id = "",
+    oninput,
+    onchange,
+    onkeydown,
+    onsubmit,
+    onfocus,
+    onblur,
   }: Props = $props();
 
-  const dispatch = createEventDispatcher();
+  let inputRef: HTMLInputElement | undefined = $state(undefined);
 
-  function handleInput(event: Event) {
-    const target = event.target as HTMLInputElement;
-    value = target.value;
-    dispatch("input", event);
+  onMount(() => {
+    if (autofocus && inputRef) {
+      inputRef.focus();
+    }
+  });
+
+  function handleInput(event: Event & { currentTarget: HTMLInputElement }) {
+    value = event.currentTarget.value;
+    oninput?.(event);
   }
 
-  function handleChange(event: Event) {
-    dispatch("change", event);
+  function handleChange(event: Event & { currentTarget: HTMLInputElement }) {
+    onchange?.(event);
   }
 
   function handleKeydown(event: KeyboardEvent) {
-    dispatch("keydown", event);
+    onkeydown?.(event);
     if (event.key === "Enter") {
-      dispatch("submit");
+      onsubmit?.();
     }
   }
 </script>
@@ -53,20 +67,19 @@
   {/if}
 
   <div class="input-container">
-    <!-- svelte-ignore a11y_autofocus -->
     <input
+      bind:this={inputRef}
       {id}
       {type}
       {value}
       {placeholder}
       {disabled}
-      {autofocus}
       class="input"
       oninput={handleInput}
       onchange={handleChange}
       onkeydown={handleKeydown}
-      onfocus={bubble('focus')}
-      onblur={bubble('blur')}
+      {onfocus}
+      {onblur}
     />
   </div>
 

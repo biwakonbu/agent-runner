@@ -5,19 +5,10 @@
    */
   import Box from "./Box.svelte";
 
-
-  
-
   interface Props {
     direction?: "row" | "column" | "row-reverse" | "column-reverse";
     align?: "start" | "center" | "end" | "stretch" | "baseline";
-    justify?: 
-    | "start"
-    | "center"
-    | "end"
-    | "between"
-    | "around"
-    | "evenly";
+    justify?: "start" | "center" | "end" | "between" | "around" | "evenly";
     wrap?: "nowrap" | "wrap" | "wrap-reverse";
     gap?: string;
     // Box props
@@ -28,7 +19,7 @@
     width?: string;
     grow?: boolean;
     class?: string;
-    children?: import('svelte').Snippet;
+    children?: import("svelte").Snippet;
     onclick?: (event: MouseEvent) => void;
     onkeydown?: (event: KeyboardEvent) => void;
   }
@@ -48,9 +39,8 @@
     class: className = "",
     children,
     onclick,
-    onkeydown
+    onkeydown,
   }: Props = $props();
-  
 
   const justifyMap = {
     start: "flex-start",
@@ -70,25 +60,45 @@
   };
 </script>
 
-<div
-  class="flex {className}"
-  class:grow
-  style:--flex-dir={direction}
-  style:--flex-align={alignMap[align]}
-  style:--flex-justify={justifyMap[justify]}
-  style:--flex-wrap={wrap}
-  style:--flex-gap={gap}
-  style:--box-p={p}
-  style:--box-m={m}
-  style:--box-bg={bg}
-  style:--box-h={height}
-  style:--box-w={width}
-  {onclick}
-  {onkeydown}
-  role="group"
->
-  {@render children?.()}
-</div>
+{#if onclick || onkeydown}
+  <div
+    class="flex {className}"
+    class:grow
+    style:--flex-dir={direction}
+    style:--flex-align={alignMap[align]}
+    style:--flex-justify={justifyMap[justify]}
+    style:--flex-wrap={wrap}
+    style:--flex-gap={gap}
+    style:--box-p={p}
+    style:--box-m={m}
+    style:--box-bg={bg}
+    style:--box-h={height}
+    style:--box-w={width}
+    {onclick}
+    {onkeydown}
+    role="button"
+    tabindex="0"
+  >
+    {@render children?.()}
+  </div>
+{:else}
+  <div
+    class="flex {className}"
+    class:grow
+    style:--flex-dir={direction}
+    style:--flex-align={alignMap[align]}
+    style:--flex-justify={justifyMap[justify]}
+    style:--flex-wrap={wrap}
+    style:--flex-gap={gap}
+    style:--box-p={p}
+    style:--box-m={m}
+    style:--box-bg={bg}
+    style:--box-h={height}
+    style:--box-w={width}
+  >
+    {@render children?.()}
+  </div>
+{/if}
 
 <style>
   .flex {

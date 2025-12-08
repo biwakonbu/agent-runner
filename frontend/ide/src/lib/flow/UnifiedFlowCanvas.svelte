@@ -6,6 +6,8 @@
     type Node,
     type Edge,
     Panel,
+    Background,
+    BackgroundVariant,
   } from "@xyflow/svelte";
   import "@xyflow/svelte/dist/style.css";
   import { tasks } from "../../stores/taskStore";
@@ -55,28 +57,6 @@
 </script>
 
 <div class="flow-container" class:wbs-mode={isWBSMode}>
-  <!-- Custom Grid Background (below Svelte Flow) -->
-  <div class="grid-background">
-    <svg class="grid-pattern" width="100%" height="100%">
-      <defs>
-        <pattern
-          id="grid-cross"
-          width="200"
-          height="140"
-          patternUnits="userSpaceOnUse"
-        >
-          <path
-            d="M96 70H104M100 66V74"
-            stroke="var(--mv-primitive-aurora-yellow)"
-            stroke-width="1"
-            opacity="0.15"
-          />
-        </pattern>
-      </defs>
-      <rect width="100%" height="100%" fill="url(#grid-cross)" />
-    </svg>
-  </div>
-
   <!-- SVG Markers for edges (must be in DOM for marker-end references) -->
   <svg class="markers-defs" width="0" height="0">
     <defs>
@@ -149,7 +129,17 @@
     nodesDraggable={!isWBSMode}
     nodesConnectable={!isWBSMode}
     elementsSelectable={!isWBSMode}
+    panOnDrag={true}
+    zoomOnScroll={true}
+    zoomOnPinch={true}
   >
+    <Background
+      variant={BackgroundVariant.Dots}
+      gap={24}
+      size={1.2}
+      patternColor="var(--mv-primitive-aurora-yellow)"
+      class="gold-grid"
+    />
     <Controls showZoom={true} />
     <MiniMap />
 
@@ -167,19 +157,6 @@
     height: 100%;
     background: var(--mv-color-surface-app);
     overflow: hidden;
-  }
-
-  /* Grid background - fixed behind Svelte Flow */
-  .grid-background {
-    position: absolute;
-    inset: 0;
-    pointer-events: none;
-    z-index: 0;
-  }
-
-  .grid-pattern {
-    width: 100%;
-    height: 100%;
   }
 
   .markers-defs {
@@ -248,7 +225,8 @@
   /* Graph Layer Control */
   .flow-container.wbs-mode :global(.svelte-flow__viewport),
   .flow-container.wbs-mode :global(.svelte-flow__controls),
-  .flow-container.wbs-mode :global(.svelte-flow__minimap) {
+  .flow-container.wbs-mode :global(.svelte-flow__minimap),
+  .flow-container.wbs-mode :global(.svelte-flow__background) {
     opacity: 0.15;
     filter: blur(2px) grayscale(0.5);
     transition: all 0.3s ease;
@@ -259,6 +237,11 @@
     opacity: 1;
     filter: none;
     transition: all 0.3s ease;
+  }
+
+  /* Apply opacity to the background dots in normal mode too, to make them subtle */
+  .flow-container :global(.svelte-flow__background.gold-grid) {
+    opacity: 0.15;
   }
 
   /* WBS Panel Control */

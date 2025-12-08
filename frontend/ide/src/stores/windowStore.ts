@@ -27,7 +27,7 @@ const DEFAULT_WINDOWS: Record<WindowId, Omit<WindowState, 'zIndex'>> = {
     isOpen: false,
     isMinimized: false,
     position: { x: 20, y: 20 },
-    size: { width: 400, height: 500 }
+    size: { width: 1000, height: 600 }
   },
   wbs: {
     id: 'wbs',

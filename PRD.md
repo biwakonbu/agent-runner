@@ -37,13 +37,15 @@ Meta-agent が自律的にタスクを分解・実行・評価する AI 開発�
 
 ## 2. 実装フェーズ概要
 
-### Phase 1-3: 完了済み ✅
+### Phase 1-4.5: 完了済み ✅
 
-| フェーズ | 内容                         | ステータス |
-| -------- | ---------------------------- | ---------- |
-| Phase 1  | チャット → タスク生成（MVP） | ✅ 完了    |
-| Phase 2  | 依存関係グラフ・WBS 表示     | ✅ 完了    |
-| Phase 3  | 自律実行ループ               | ✅ 完了    |
+| フェーズ  | 内容                             | ステータス |
+| --------- | -------------------------------- | ---------- |
+| Phase 1   | チャット → タスク生成（MVP）     | ✅ 完了    |
+| Phase 2   | 依存関係グラフ・WBS 表示         | ✅ 完了    |
+| Phase 3   | 自律実行ループ                   | ✅ 完了    |
+| Phase 4   | CLI セッション統合・実タスク実行 | ✅ 完了    |
+| Phase 4.5 | Svelte 5 + Svelte Flow 移行      | ✅ 完了    |
 
 **Phase 1-3 で実装済みの機能:**
 
@@ -62,7 +64,7 @@ Meta-agent が自律的にタスクを分解・実行・評価する AI 開発�
 
 ---
 
-## 3. Phase 4: CLI セッション統合と実タスク実行【現在のフェーズ】
+## 3. Phase 4: CLI セッション統合と実タスク実行 ✅ 完了
 
 ### 3.1 概要
 
@@ -70,6 +72,7 @@ Phase 1-3 で構築した基盤を活用し、モック LLM から CLI セッシ
 チャットメッセージから生成されたタスクを、実際に agent-runner で実行できるようにする。
 
 **重要方針:**
+
 - API キーは不要。Codex / Claude Code / Gemini / Cursor など **CLI サブスクリプションセッションを優先利用**する
 - Meta 層も CLI セッション前提に置き換え、API キー依存を排除する
 
@@ -85,15 +88,15 @@ Phase 1-3 で構築した基盤を活用し、モック LLM から CLI セッシ
 
 **実装方針（最新版反映）:**
 
-| 項目                    | 内容                                                                                  |
-| ----------------------- | ------------------------------------------------------------------------------------- |
-| CLI プロバイダ基盤       | `internal/agenttools` に ProviderConfig/Request/ExecPlan/registry を実装               |
-| Codex プロバイダ         | `internal/agenttools/codex.go`（exec/chat、model/temperature/max-tokens/flags/env）   |
-| 他プロバイダ             | Gemini / Claude Code / Cursor は stub 登録のみ（未実装エラーを明示）                  |
-| Worker 実行              | `internal/worker/executor.go` が WorkerCall→ExecPlan 変換後に Sandbox.Exec で実行     |
-| WorkerCall 拡張          | model/flags/env/tool_specific/use_stdin/workdir 等を許容（Meta/Orchestrator から指定可） |
-| stdin サポート           | まだ Sandbox.Exec では未対応。UseStdin 指定時はエラーで弾く                          |
-| セッション検証           | Codex CLI セッションは既存の `verifyCodexSession`（auth.json or CODEX_API_KEY）を利用 |
+| 項目               | 内容                                                                                     |
+| ------------------ | ---------------------------------------------------------------------------------------- |
+| CLI プロバイダ基盤 | `internal/agenttools` に ProviderConfig/Request/ExecPlan/registry を実装                 |
+| Codex プロバイダ   | `internal/agenttools/codex.go`（exec/chat、model/temperature/max-tokens/flags/env）      |
+| 他プロバイダ       | Gemini / Claude Code / Cursor は stub 登録のみ（未実装エラーを明示）                     |
+| Worker 実行        | `internal/worker/executor.go` が WorkerCall→ExecPlan 変換後に Sandbox.Exec で実行        |
+| WorkerCall 拡張    | model/flags/env/tool_specific/use_stdin/workdir 等を許容（Meta/Orchestrator から指定可） |
+| stdin サポート     | まだ Sandbox.Exec では未対応。UseStdin 指定時はエラーで弾く                              |
+| セッション検証     | Codex CLI セッションは既存の `verifyCodexSession`（auth.json or CODEX_API_KEY）を利用    |
 
 ```go
 // internal/agenttools/types.go
@@ -361,19 +364,19 @@ func (a *App) TestLLMConnection() (string, error) {
 
 ### 3.3 受け入れ条件
 
-| ID       | 条件                                                  |
-| -------- | ----------------------------------------------------- |
+| ID       | 条件                                                         |
+| -------- | ------------------------------------------------------------ |
 | AC-P4-01 | CLI プロバイダ（Codex CLI 等）を設定画面から選択・保存できる |
-| AC-P4-02 | 設定画面から CLI セッション検証を実行できる               |
-| AC-P4-03 | チャットメッセージが CLI プロバイダで処理される             |
-| AC-P4-04 | 生成されたタスクが実際に agent-runner で実行される    |
-| AC-P4-05 | タスク実行ログがリアルタイムで表示される              |
-| AC-P4-06 | 実行コントロール（開始/一時停止/再開/停止）が機能する |
-| AC-P4-07 | Docker サンドボックスで Codex CLI セッションが引き継がれる |
+| AC-P4-02 | 設定画面から CLI セッション検証を実行できる                  |
+| AC-P4-03 | チャットメッセージが CLI プロバイダで処理される              |
+| AC-P4-04 | 生成されたタスクが実際に agent-runner で実行される           |
+| AC-P4-05 | タスク実行ログがリアルタイムで表示される                     |
+| AC-P4-06 | 実行コントロール（開始/一時停止/再開/停止）が機能する        |
+| AC-P4-07 | Docker サンドボックスで Codex CLI セッションが引き継がれる   |
 
 ---
 
-## 4. Phase 4.5: Svelte 5 + Svelte Flow 移行【次期フェーズ】
+## 4. Phase 4.5: Svelte 5 + Svelte Flow 移行 ✅ 完了
 
 ### 4.1 概要
 
@@ -392,14 +395,14 @@ func (a *App) TestLLMConnection() (string, error) {
 
 #### 4.2.1 主な変更点
 
-| Svelte 4 | Svelte 5 | 説明 |
-|----------|----------|------|
-| `let count = 0` | `let count = $state(0)` | 明示的なリアクティブ状態 |
-| `$: double = count * 2` | `const double = $derived(count * 2)` | 派生値の宣言 |
-| `$: { console.log(x) }` | `$effect(() => { console.log(x) })` | 副作用の実行 |
-| `export let value` | `let { value } = $props()` | プロップの受け取り |
-| `createEventDispatcher()` | コールバックプロップ | イベント通知 |
-| `on:click={fn}` | `onclick={fn}` | イベントハンドラ |
+| Svelte 4                  | Svelte 5                             | 説明                     |
+| ------------------------- | ------------------------------------ | ------------------------ |
+| `let count = 0`           | `let count = $state(0)`              | 明示的なリアクティブ状態 |
+| `$: double = count * 2`   | `const double = $derived(count * 2)` | 派生値の宣言             |
+| `$: { console.log(x) }`   | `$effect(() => { console.log(x) })`  | 副作用の実行             |
+| `export let value`        | `let { value } = $props()`           | プロップの受け取り       |
+| `createEventDispatcher()` | コールバックプロップ                 | イベント通知             |
+| `on:click={fn}`           | `onclick={fn}`                       | イベントハンドラ         |
 
 #### 4.2.2 移行戦略
 
@@ -420,13 +423,13 @@ func (a *App) TestLLMConnection() (string, error) {
 
 #### 4.3.1 ライブラリ選定理由
 
-| 評価軸 | Svelte Flow | 現状（手実装） |
-|--------|------------|--------------|
-| 大量ノード | ◎ 仮想化対応 | × 全ノード描画 |
-| カスタムノード | ◎ Svelte コンポーネント | ◎ 完全制御 |
-| パン/ズーム | ◎ 組み込み | △ 手実装 |
-| 自動レイアウト | ◎ Dagre/ELK.js 統合 | × なし |
-| 保守性 | ◎ ライブラリ管理 | △ 全て自前 |
+| 評価軸         | Svelte Flow             | 現状（手実装） |
+| -------------- | ----------------------- | -------------- |
+| 大量ノード     | ◎ 仮想化対応            | × 全ノード描画 |
+| カスタムノード | ◎ Svelte コンポーネント | ◎ 完全制御     |
+| パン/ズーム    | ◎ 組み込み              | △ 手実装       |
+| 自動レイアウト | ◎ Dagre/ELK.js 統合     | × なし         |
+| 保守性         | ◎ ライブラリ管理        | △ 全て自前     |
 
 #### 4.3.2 新規コンポーネント構成
 
@@ -457,49 +460,49 @@ frontend/ide/src/lib/flow/
 
 #### FR-P4.5-001: Svelte 5 アップグレード
 
-| 項目 | 内容 |
-|------|------|
+| 項目           | 内容                                       |
+| -------------- | ------------------------------------------ |
 | パッケージ更新 | svelte@^5, @sveltejs/vite-plugin-svelte@^4 |
-| 自動移行ツール | `npx sv migrate svelte-5` |
-| 手動調整箇所 | createEventDispatcher（約 10 ファイル） |
-| ストア互換 | 既存 writable/derived は継続使用可 |
+| 自動移行ツール | `npx sv migrate svelte-5`                  |
+| 手動調整箇所   | createEventDispatcher（約 10 ファイル）    |
+| ストア互換     | 既存 writable/derived は継続使用可         |
 
 #### FR-P4.5-002: Svelte Flow 導入
 
-| 項目 | 内容 |
-|------|------|
-| パッケージ | @xyflow/svelte@^1.5, dagre |
-| カスタムノード | 既存 GridNode/WBSGraphNode のデザインを移植 |
-| 仮想化 | onlyRenderVisibleElements による Viewport Culling |
-| レイアウト | Dagre で依存グラフを自動配置 |
+| 項目           | 内容                                              |
+| -------------- | ------------------------------------------------- |
+| パッケージ     | @xyflow/svelte@^1.5, dagre                        |
+| カスタムノード | 既存 GridNode/WBSGraphNode のデザインを移植       |
+| 仮想化         | onlyRenderVisibleElements による Viewport Culling |
+| レイアウト     | Dagre で依存グラフを自動配置                      |
 
 #### FR-P4.5-003: WBS 統合
 
-| 項目 | 内容 |
-|------|------|
+| 項目           | 内容                                     |
+| -------------- | ---------------------------------------- |
 | 統合キャンバス | UnifiedFlowCanvas で Grid/WBS を切替表示 |
-| ノードタイプ | task, wbs, milestone の 3 種類 |
-| viewMode | 既存 wbsStore.viewMode と連携 |
+| ノードタイプ   | task, wbs, milestone の 3 種類           |
+| viewMode       | 既存 wbsStore.viewMode と連携            |
 
 ### 4.5 受け入れ条件
 
-| ID         | 条件 |
-|------------|------|
-| AC-P4.5-01 | Svelte 5 Runes ($state, $derived, $effect) が動作する |
+| ID         | 条件                                                          |
+| ---------- | ------------------------------------------------------------- |
+| AC-P4.5-01 | Svelte 5 Runes ($state, $derived, $effect) が動作する         |
 | AC-P4.5-02 | 既存の UI デザイン（Glassmorphism + Crystal HUD）が維持される |
-| AC-P4.5-03 | 2000 ノードでパフォーマンス劣化なく動作する |
-| AC-P4.5-04 | Dagre による自動レイアウトが機能する |
-| AC-P4.5-05 | WBS とタスクグラフが同一キャンバスで表示切替できる |
-| AC-P4.5-06 | 全既存テストがパスする |
+| AC-P4.5-03 | 2000 ノードでパフォーマンス劣化なく動作する                   |
+| AC-P4.5-04 | Dagre による自動レイアウトが機能する                          |
+| AC-P4.5-05 | WBS とタスクグラフが同一キャンバスで表示切替できる            |
+| AC-P4.5-06 | 全既存テストがパスする                                        |
 
 ### 4.6 技術的リスクと対策
 
-| リスク | 影響度 | 対策 |
-|--------|--------|------|
-| createEventDispatcher 手動変換工数 | 中 | 約 10 ファイル、段階的に実施 |
-| $effect 過剰使用によるパフォーマンス低下 | 中 | $derived 優先、$effect 最小化 |
-| デザイン崩れ | 中 | 既存 CSS 変数維持、スタイルはコピー移植 |
-| Wails 互換性問題 | 低 | 公式サポート確認済み |
+| リスク                                   | 影響度 | 対策                                    |
+| ---------------------------------------- | ------ | --------------------------------------- |
+| createEventDispatcher 手動変換工数       | 中     | 約 10 ファイル、段階的に実施            |
+| $effect 過剰使用によるパフォーマンス低下 | 中     | $derived 優先、$effect 最小化           |
+| デザイン崩れ                             | 中     | 既存 CSS 変数維持、スタイルはコピー移植 |
+| Wails 互換性問題                         | 低     | 公式サポート確認済み                    |
 
 ### 4.7 マイルストーン
 
@@ -625,13 +628,13 @@ frontend/ide/src/lib/flow/
 
 ### 6.3 LLM プロバイダ（Phase 4-5）
 
-| プロバイダ     | 実行方式                    | セッション管理              |
-| -------------- | --------------------------- | --------------------------- |
-| Codex CLI      | `codex chat` コマンド       | CLI サブスクリプションセッション |
-| Claude Code CLI| `claude-code chat` コマンド  | CLI サブスクリプションセッション |
-| Gemini CLI     | `gemini chat` コマンド       | CLI サブスクリプションセッション |
-| Cursor CLI     | `cursor chat` コマンド       | CLI サブスクリプションセッション |
-| Mock           | モック実装                  | なし                        |
+| プロバイダ      | 実行方式                    | セッション管理                   |
+| --------------- | --------------------------- | -------------------------------- |
+| Codex CLI       | `codex chat` コマンド       | CLI サブスクリプションセッション |
+| Claude Code CLI | `claude-code chat` コマンド | CLI サブスクリプションセッション |
+| Gemini CLI      | `gemini chat` コマンド      | CLI サブスクリプションセッション |
+| Cursor CLI      | `cursor chat` コマンド      | CLI サブスクリプションセッション |
+| Mock            | モック実装                  | なし                             |
 
 ---
 
@@ -657,21 +660,21 @@ frontend/ide/src/lib/flow/
 
 ## 8. 技術的リスクと対策
 
-| リスク               | 影響度 | 対策                                           |
-| -------------------- | ------ | ---------------------------------------------- |
-| CLI セッション未認証 | 高     | 起動時検証、明示エラー表示                     |
+| リスク                          | 影響度 | 対策                                              |
+| ------------------------------- | ------ | ------------------------------------------------- |
+| CLI セッション未認証            | 高     | 起動時検証、明示エラー表示                        |
 | Docker 内セッション引き継ぎ失敗 | 高     | 環境変数/ボリュームマウントでセッション情報を伝播 |
-| CLI コマンド実行エラー | 中     | エラーハンドリング、リトライポリシー           |
-| LLM 応答の不安定さ   | 中     | プロンプトエンジニアリング、バリデーション強化 |
+| CLI コマンド実行エラー          | 中     | エラーハンドリング、リトライポリシー              |
+| LLM 応答の不安定さ              | 中     | プロンプトエンジニアリング、バリデーション強化    |
 
 ---
 
 ## 9. 用語集
 
-| 用語         | 説明                                               |
-| ------------ | -------------------------------------------------- |
-| Meta-agent   | CLI セッション（Codex CLI 等）を使ってタスク分解・評価を行うエージェント     |
-| Decompose    | ユーザー入力からタスクを分解するプロトコル         |
-| agent-runner | Docker 内でタスクを実行するコアエンジン            |
-| Worker       | 実際のコード生成・テスト実行を行う CLI（Codex 等） |
+| 用語           | 説明                                                                        |
+| -------------- | --------------------------------------------------------------------------- |
+| Meta-agent     | CLI セッション（Codex CLI 等）を使ってタスク分解・評価を行うエージェント    |
+| Decompose      | ユーザー入力からタスクを分解するプロトコル                                  |
+| agent-runner   | Docker 内でタスクを実行するコアエンジン                                     |
+| Worker         | 実際のコード生成・テスト実行を行う CLI（Codex 等）                          |
 | CLI セッション | Codex / Claude Code / Gemini / Cursor 等の CLI サブスクリプションセッション |

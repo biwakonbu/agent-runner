@@ -6,10 +6,10 @@ import (
 	"testing"
 )
 
-func TestRegistry_Stubs(t *testing.T) {
-	stubKinds := []string{"claude-code", "cursor-cli"}
+func TestRegistry_Implementations(t *testing.T) {
+	implementedKinds := []string{"claude-code", "cursor-cli"}
 
-	for _, kind := range stubKinds {
+	for _, kind := range implementedKinds {
 		t.Run(kind, func(t *testing.T) {
 			// 1. Verify we can create the provider
 			p, err := New(kind, ProviderConfig{Kind: kind})
@@ -21,16 +21,17 @@ func TestRegistry_Stubs(t *testing.T) {
 				t.Errorf("Kind() = %q, want %q", p.Kind(), kind)
 			}
 
-			// 2. Verify Build returns "not implemented" error
+			// 2. Verify Build returns a valid plan (not "not implemented" error)
 			ctx := context.Background()
 			req := Request{Prompt: "hello"}
-			_, err = p.Build(ctx, req)
-			if err == nil {
-				t.Fatal("Build() should have failed")
+			plan, err := p.Build(ctx, req)
+			if err != nil {
+				t.Fatalf("Build() failed: %v (expected success for implemented provider)", err)
 			}
 
-			if !strings.Contains(err.Error(), "not implemented yet") {
-				t.Errorf("Error should mention 'not implemented yet', got: %v", err)
+			// 3. Verify basic plan structure
+			if plan.Command == "" {
+				t.Error("Build() returned empty Command")
 			}
 		})
 	}

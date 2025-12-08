@@ -1,88 +1,51 @@
-# CLI サブスクリプション運用ガイド
+# CLI Subscription Setup Guide
 
-このガイドでは、AgentRunner で各種 CLI プロバイダ（Codex, Gemini, Claude 等）を利用するためのセットアップと運用方法について説明します。
+AgentRunner uses your local CLI sessions to execute tasks. This avoids the need for API keys to be stored in the application and allows you to use your existing subscriptions.
 
-## 1. 概要
+## Supported Providers
 
-AgentRunner (v1) は、ローカル環境にインストールされた各社 AI アシスタント CLI ツールを「Worker」として利用します。API キーを直接埋め込むのではなく、CLI ツールが保持する認証セッション（サブスクリプション）を再利用することで、以下のメリットがあります：
+- **Codex CLI**: `codex`
+- **Claude Code**: `claude` / `claude-code`
+- **Gemini CLI**: `gemini`
+- **Cursor CLI**: `cursor`
 
-- **セキュア**: API キーの管理が不要。
-- **コスト効率**: 既存の Pro/Enterprise サブスクリプションを活用可能。
-- **一貫性**: 開発者が普段使用している CLI と同じモデル・設定を利用可能。
+## Setup Instructions
 
-## 2. 対応プロバイダ状況
+### 1. Codex CLI
 
-| プロバイダ              | 対応状況        | 備考                |
-| :---------------------- | :-------------- | :------------------ |
-| **Codex CLI** (`codex`) | ✅ **対応済み** | v1 のデフォルト推奨 |
-| **Gemini CLI**          | ✅ **対応済み** | `gemini-cli`        |
-| **Claude Code**         | 🚧 準備中       | スタブのみ実装      |
-| **Cursor CLI**          | 🚧 準備中       | スタブのみ実装      |
+1. Install Codex CLI.
+2. Login to your account:
+   ```bash
+   codex login
+   ```
+   This should create a session file at `~/.codex/auth.json`.
+3. AgentRunner will automatically mount this file into the sandbox container.
 
-## 3. Codex CLI のセットアップ
+### 2. Claude Code
 
-現在、メインでサポートされている Codex CLI の利用手順です。
+1. Install Claude Code (`npm install -g @anthropic-ai/claude-code`).
+2. Login:
+   ```bash
+   claude login
+   ```
+3. Ensure the `claude` command is in your PATH.
 
-### 3.1 インストールとログイン
+### 3. Gemini CLI
 
-事前に `codex` コマンドが利用可能である必要があります。
+1. Install Gemini CLI.
+2. Login or setup credentials as per official documentation.
 
-```bash
-# 1. ログイン（ブラウザが開きます）
-codex login
+### 4. Cursor CLI
 
-# 2. 接続確認
-codex auth status
-# -> "Logged in as user@example.com (Pro)" のように表示されればOK
-```
+1. Ensure Cursor is installed and the CLI is available in your PATH.
 
-### 3.2 AgentRunner での利用
+## Configuration in Multiverse IDE
 
-AgentRunner は実行時に自動的にローカルの CLI セッションを検出します。特別な設定は不要です。
+1. Open **Settings** -> **LLM**.
+2. Select your desired provider from the list (e.g., `codex-cli`, `claude-code`).
+3. Click "Test Connection" to verify that AgentRunner can access your local session.
 
-#### 実行モデルの指定
+## Troubleshooting
 
-デフォルトでは `agent-runner` 側で設定されたデフォルトモデルが使用されますが、CLI オプションで明示的に指定することも可能です。
-
-```bash
-# 特定のモデルを指定して実行（CLI オプションは Task YAML やデフォルトより優先されます）
-agent-runner --meta-model="gpt-5.1" < task.yaml
-```
-
-## 4. Gemini CLI のセットアップ
-
-### 4.1 前提条件
-
-`gemini` コマンドがパスに通っており、CLI からの実行が可能である必要があります。
-（例: Node.js ベースの CLI ツール等）
-
-### 4.2 認証
-
-使用する CLI ツールに合わせて認証を行ってください。一般的には API キーを環境変数 `GOOGLE_API_KEY` に設定するか、`gemini login` 等のコマンドを使用します。
-
-### 4.3 AgentRunner での利用
-
-Task YAML で `runner.worker.kind: "gemini-cli"` を指定します。
-
-```yaml
-runner:
-  worker:
-    kind: "gemini-cli"
-    # model: "gemini-1.5-pro" # 任意。デフォルトは gemini-1.5-pro
-```
-
-## 5. トラブルシューティング
-
-### Q. "CLI session not found" エラーが出る
-
-**原因**: `codex login` が行われていないか、セッションが切れています。
-**対策**: 再度 `codex login` を実行してください。
-
-### Q. コンテナ内で CLI が動かない
-
-**原因**: Docker マウントの設定不備の可能性があります。
-**対策**: AgentRunner はデフォルトで `~/.config/codex` 等の認証ディレクトリをコンテナにマウントします。ホスト側のパスが標準と異なる場合、正しく動作しない可能性があります。
-
-## 6. 今後の予定
-
-Claude Code, Cursor などの他プロバイダについても、順次実装を進めていく予定です。
+- **Session not found**: Ensure you have run the login command for the respective CLI.
+- **Permission denied**: On macOS, you might need to grant Full Disk Access to Docker or the terminal running AgentRunner if it needs to read strict paths (though usually standard home paths are fine).

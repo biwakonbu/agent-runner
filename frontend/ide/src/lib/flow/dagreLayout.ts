@@ -23,6 +23,9 @@ function getNodeDimensions(node: Node) {
   return { width, height: BASE_HEIGHT };
 }
 
+const LAYOUT_GRID_X = 200; // grid.cellWidth (160) + grid.gap (40)
+
+
 export const getLayoutedElements = (
   nodes: Node[],
   edges: Edge[],
@@ -32,10 +35,21 @@ export const getLayoutedElements = (
   dagreGraph.setDefaultEdgeLabel(() => ({}));
 
   const isHorizontal = direction === 'LR';
-  dagreGraph.setGraph({ rankdir: direction });
+  
+  // Align rank separation to grid
+  // ranksep: vertical gap between layers
+  // nodesep: horizontal gap between nodes in same layer
+  dagreGraph.setGraph({ 
+    rankdir: direction,
+    ranksep: 60, // Slightly larger than grid.gap (40) to ensure clear separation, total ~160? No, let's try to hit 140 multiple.
+                 // Node height 100. 140 - 100 = 40. So ranksep 40 is ideal for tight packing.
+    nodesep: 50  // Horizontal gap.
+  });
 
   nodes.forEach((node) => {
     const { width, height } = getNodeDimensions(node);
+    // Artificially inflate width to grid multiples for reliable spacing
+    // But this might make it too sparse. Let's trust dagre with real sizes first.
     dagreGraph.setNode(node.id, { width, height });
   });
 
@@ -49,15 +63,29 @@ export const getLayoutedElements = (
     const nodeWithPosition = dagreGraph.node(node.id);
     const { width, height } = getNodeDimensions(node);
     
-    // We are shifting the dagre node position (anchor=center center) to the top left
-    // so it matches the React Flow node anchor point (top left).
+    // Snap center to grid
+    // We want the center (nodeWithPosition.x, y) to be close to a grid intersection
+    // Grid pattern starts at 0,0.
+    // X step = 200. Y step = 140.
+    
+    let snappedX = nodeWithPosition.x;
+    let snappedY = nodeWithPosition.y;
+
+    // Apply snapping only if meaningful
+    snappedX = Math.round(snappedX / (LAYOUT_GRID_X / 2)) * (LAYOUT_GRID_X / 2); // Snap to half-grid for flexibility?
+    // User asked for "Grid Alignment". Let's try strict snapping to 100 (half-cell) or 200.
+    // If we snap to 100, we have more freedom.
+    snappedX = Math.round(snappedX / 100) * 100;
+    snappedY = Math.round(snappedY / 70) * 70; // 140 / 2 = 70.
+
+    // Calculate top-left position based on snapped center
     return {
       ...node,
       targetPosition: isHorizontal ? Position.Left : Position.Top,
       sourcePosition: isHorizontal ? Position.Right : Position.Bottom,
       position: {
-        x: nodeWithPosition.x - width / 2,
-        y: nodeWithPosition.y - height / 2,
+        x: snappedX - width / 2,
+        y: snappedY - height / 2,
       },
     };
   });

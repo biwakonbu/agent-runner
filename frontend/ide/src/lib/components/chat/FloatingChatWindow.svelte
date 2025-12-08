@@ -52,6 +52,10 @@
     windowStore.updatePosition('chat', data.x, data.y);
   }
 
+  function handleResizeEnd(data: { width: number; height: number }) {
+    windowStore.updateSize('chat', data.width, data.height);
+  }
+
   function handleClick() {
     windowStore.bringToFront('chat');
   }
@@ -114,6 +118,9 @@
             type="button"
           >
             {tab}
+            {#if activeTab === tab}
+              <div class="tab-indicator"></div>
+            {/if}
           </button>
         {/each}
       </div>
@@ -138,33 +145,45 @@
 <style>
   .tabs {
     display: flex;
-    gap: var(--mv-spacing-sm);
+    gap: 4px; /* Tighter gap */
+    height: 100%;
+    align-items: center;
   }
 
-  /* Glass Tabs */
+  /* Sophisticated Tab Style */
   .tab {
-    padding: var(--mv-spacing-xxs) var(--mv-spacing-sm);
-    font-size: var(--mv-font-size-xs);
-    font-weight: var(--mv-font-weight-bold);
+    position: relative;
+    padding: 6px 12px;
+    font-size: 13px;
+    font-weight: 500;
     color: var(--mv-color-text-muted);
     background: transparent;
-    border: var(--mv-border-width-thin) solid transparent;
-    border-radius: var(--mv-radius-sm);
+    border: none;
+    border-radius: 6px;
     cursor: pointer;
-    text-transform: uppercase;
-    letter-spacing: var(--mv-letter-spacing-tab);
-    transition: all var(--mv-duration-fast);
+    transition: all 0.2s ease;
   }
 
   .tab:hover {
     color: var(--mv-color-text-primary);
-    background: var(--mv-glass-active);
+    background: rgba(255, 255, 255, 0.05);
   }
 
   .tab.active {
-    color: var(--mv-primitive-frost-1);
-    background: var(--mv-glass-tab-bg);
-    border-color: var(--mv-glass-border-tab);
-    box-shadow: var(--mv-shadow-tab-glow);
+    color: var(--mv-color-text-primary);
+    font-weight: 600;
+  }
+
+  /* Animated bottom indicator inside the tab */
+  .tab-indicator {
+    position: absolute;
+    bottom: -8px; /* Push to bottom of header */
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: var(--mv-primitive-frost-2); /* Accent color */
+    box-shadow: 0 -2px 10px rgba(136, 192, 208, 0.5);
+    border-top-left-radius: 2px;
+    border-top-right-radius: 2px;
   }
 </style>

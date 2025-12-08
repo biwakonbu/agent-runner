@@ -4,7 +4,7 @@
 
 `multiverse` は、AI ネイティブな開発環境を実現するための統合プラットフォームです。以下のコンポーネント群で構成され、ローカル環境での自律的なソフトウェア開発タスクの実行を可能にします。
 
-1.  **AgentRunner Core (Engine)**: AI エージェントを Docker サンドボックス内で安全に実行・管理するコアエンジン。
+1.  **AgentRunner Core (Engine)**: AI エージェントを Docker サンドボックス内で安全に実行・管理するコアエンジン。CLI ベースの LLM セッション（Codex, Claude Code 等）を利用可能。
 2.  **Multiverse Orchestrator (Backend)**: 複数のタスクと Worker を管理し、IDE からのリクエストを処理するオーケストレーション層。
 3.  **Multiverse IDE (Frontend)**: 開発者がタスクの作成、実行、監視を行うためのデスクトップアプリケーション (Wails + Svelte)。
 

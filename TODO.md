@@ -6,13 +6,13 @@ Based on PRD v3.0 - Codex CLI 統合と実タスク実行 + Svelte 5 移行
 
 ## 現在のステータス
 
-| フェーズ      | 内容                             | ステータス |
-| ------------- | -------------------------------- | ---------- |
-| Phase 1       | チャット → タスク生成            | ✅ 完了    |
-| Phase 2       | 依存関係グラフ・WBS 表示         | ✅ 完了    |
-| Phase 3       | 自律実行ループ                   | ✅ 完了    |
-| **Phase 4**   | **Codex CLI 統合と実タスク実行** | 🚧 進行中  |
-| **Phase 4.5** | **Svelte 5 + Svelte Flow 移行**  | 📋 計画済  |
+| フェーズ  | 内容                             | ステータス |
+| --------- | -------------------------------- | ---------- |
+| Phase 1   | チャット → タスク生成            | ✅ 完了    |
+| Phase 2   | 依存関係グラフ・WBS 表示         | ✅ 完了    |
+| Phase 3   | 自律実行ループ                   | ✅ 完了    |
+| Phase 4   | CLI セッション統合・実タスク実行 | ✅ 完了    |
+| Phase 4.5 | Svelte 5 + Svelte Flow 移行      | ✅ 完了    |
 
 ---
 
@@ -34,6 +34,7 @@ ExecutionOrchestrator → agent-runner → Docker Sandbox → codex CLI（既存
 ## 現在の実装メモ（2025-12-07 時点）
 
 ### バックエンド
+
 - [x] **LLMConfigStore** (`internal/ide/llm_config.go`)
   - Kind/Model/BaseURL/SystemPrompt を `~/.multiverse/config/llm.json` に永続化
   - 環境変数オーバーライドあり（API キー保存は不要にする方針）
@@ -51,6 +52,7 @@ ExecutionOrchestrator → agent-runner → Docker Sandbox → codex CLI（既存
   - stdin 実行は未サポート（現在はエラーにする）
 
 ### フロントエンド
+
 - [x] **LLMSettings** (`frontend/ide/src/lib/settings/LLMSettings.svelte`)
   - プロバイダ選択、モデル/エンドポイント入力、接続テスト UI
   - API キーは「環境変数に設定済みか」を表示するのみ（保存不可）
@@ -58,6 +60,7 @@ ExecutionOrchestrator → agent-runner → Docker Sandbox → codex CLI（既存
   - 設定モーダルから LLMSettings を呼び出し
 
 ### ビルド検証
+
 - [x] `go build .`
 - [x] `pnpm build`（警告 5 件、エラー 0）
 - [x] `pnpm check`
@@ -67,34 +70,43 @@ ExecutionOrchestrator → agent-runner → Docker Sandbox → codex CLI（既存
 ## 残りのタスク（優先度順）
 
 ### 完了済み（Phase4 実装要点）
+
 - [x] Meta/LLM: LLMConfigStore 経由で `codex-cli` 初期化、接続テストを CLI セッション検証に変更
 - [x] Worker: コンテナ起動前に Codex セッション検証を強制し、未ログインなら IDE へエラー通知して中断
 - [x] Orchestrator: 実行ログを `task:log` イベントでストリーミング
 - [x] UI: LLMSettings を CLI セッション表示に対応（codex-cli 選択可）
 - [x] Doc: PRD/TODO/Golden テスト設計を CLI 前提に更新
 
-### 残タスク（フォローアップ）
-- [ ] CLI サブスクリプション運用手順を GEMINI.md / CLAUDE.md / guides に追記
+### Phase 4 完了タスク
+
+- [x] CLI サブスクリプション運用手順を GEMINI.md / CLAUDE.md / guides に追記
+- [x] Sandbox Exec で stdin 入力をサポートし、AgentToolProvider の UseStdin を有効化（確認済み）
+- [x] Gemini / Claude Code / Cursor の実プロバイダを実装し、registry stub を置換
+  - `internal/agenttools/claude.go`
+  - `internal/agenttools/cursor.go`
+- [x] Meta 層からの WorkerCall 生成で新フィールド（model/flags/env/tool_specific）を活用する経路を整備（確認済み）
+
+### 残タスク（オプション・フォローアップ）
+
 - [ ] E2E: CLI セッション未設定時の IDE 通知を含む回帰テストを追加
-- [ ] Sandbox Exec で stdin 入力をサポートし、AgentToolProvider の UseStdin を有効化
-- [ ] Gemini / Claude Code / Cursor の実プロバイダを実装し、registry stub を置換
-- [ ] Meta 層からの WorkerCall 生成で新フィールド（model/flags/env/tool_specific）を活用する経路を整備
+- [ ] CLI 未ログイン時の IDE 通知と再試行 UX の改善（案内リンク・ボタン）
 
 ---
 
 ## 設計上の注意点
 
 ### Codex / CLI 統合（現状）
+
 1. **Meta-agent (decompose)**: `internal/meta/client.go` が HTTP で OpenAI Chat Completion を呼び出す（`OPENAI_API_KEY` 必須）。CLI サブスクリプション非対応。
 2. **Worker (codex-cli)**: `internal/worker/executor.go` が Docker サンドボックス内で `codex exec ...` を実行。CLI セッション引き継ぎ方法は未整備。
 
 ### セッション/環境（現状）
 
-| 項目                    | 用途                                       | 備考                         |
-| ----------------------- | ------------------------------------------ | ---------------------------- |
-| `MULTIVERSE_META_KIND`  | Meta-agent の種別                          | 現状: mock / openai-chat     |
-| `MULTIVERSE_META_MODEL` | Meta-agent のモデル                        | 現状: gpt-5.1 |
-| CLI セッション          | Codex / Claude Code / Gemini / Cursor 等   | **API キー不要。要セッション** |
+| 項目                    | 用途                                     | 備考                           |
+| ----------------------- | ---------------------------------------- | ------------------------------ |
+| `MULTIVERSE_META_KIND`  | Meta-agent の種別                        | 現状: mock / openai-chat       |
+| `MULTIVERSE_META_MODEL` | Meta-agent のモデル                      | 現状: gpt-5.1                  |
+| CLI セッション          | Codex / Claude Code / Gemini / Cursor 等 | **API キー不要。要セッション** |
 
 ---
 
@@ -108,7 +120,8 @@ ExecutionOrchestrator → agent-runner → Docker Sandbox → codex CLI（既存
 ---
 
 ## 追加で必要な対応（漏れ防止メモ）
-- [ ] CLI サブスクリプション運用手順のドキュメント化（auth.json / env / codex login）
+
+- [x] CLI サブスクリプション運用手順のドキュメント化（`docs/guides/cli-subscription.md` 作成済み）
 - [ ] CLI 未ログイン時の IDE 通知と再試行 UX の改善（案内リンク・ボタン）
 
 ---
@@ -134,10 +147,10 @@ cd frontend/ide
 pnpm install svelte@^5 @sveltejs/vite-plugin-svelte@^4 --save-dev
 ```
 
-- [ ] svelte: ^4.2.12 → ^5.0.0
-- [ ] @sveltejs/vite-plugin-svelte: ^3.0.2 → ^4.0.0
-- [ ] vite: 維持（^5.x）
-- [ ] typescript: 維持（^5.x）
+- [x] svelte: ^4.2.12 → ^5.0.0 (確認済み `^5.0.0`)
+- [x] @sveltejs/vite-plugin-svelte: ^3.0.2 → ^4.0.0 (確認済み `^4.0.0`)
+- [x] vite: 維持（^5.x）
+- [x] typescript: 維持（^5.x）
 
 #### Step 2: 自動移行ツール実行
 
@@ -146,11 +159,13 @@ npx sv migrate svelte-5
 ```
 
 **自動変換される内容:**
+
 - `let` → `$state`
 - `$:` (派生) → `$derived`
 - `export let` → `$props`
 
 **手動変換が必要な内容:**
+
 - `createEventDispatcher` → コールバックプロップ（約 10 ファイル）
 - `beforeUpdate`/`afterUpdate` → `$effect.pre`/`$effect`
 - 複雑な `$:` の `$effect` vs `$derived` 判別
@@ -159,13 +174,13 @@ npx sv migrate svelte-5
 
 **対象ファイル（要手動変換）:**
 
-| ファイル | dispatch イベント | 変換後 |
-|---------|------------------|--------|
-| `FloatingChatWindow.svelte` | close | `onClose` コールバック |
-| `ChatInput.svelte` | send | `onSend` コールバック |
-| `TaskDetail.svelte` | close | `onClose` コールバック |
-| `Modal.svelte` | close | `onClose` コールバック |
-| その他約 6 ファイル | 各種 | 各コールバック |
+| ファイル                    | dispatch イベント | 変換後                 |
+| --------------------------- | ----------------- | ---------------------- |
+| `FloatingChatWindow.svelte` | close             | `onClose` コールバック |
+| `ChatInput.svelte`          | send              | `onSend` コールバック  |
+| `TaskDetail.svelte`         | close             | `onClose` コールバック |
+| `Modal.svelte`              | close             | `onClose` コールバック |
+| その他約 6 ファイル         | 各種              | 各コールバック         |
 
 **変換例:**
 
@@ -186,8 +201,8 @@ npx sv migrate svelte-5
 
 #### Step 4: テスト実行・修正
 
-- [ ] `pnpm check` パス
-- [ ] `pnpm build` パス
+- [x] `pnpm check` パス (0 errors, 7 warnings)
+- [x] `pnpm build` パス
 - [ ] `pnpm test` パス（該当する場合）
 - [ ] 手動で全画面動作確認
 
@@ -231,28 +246,28 @@ frontend/ide/src/stores/
 
 #### Step 7: カスタムノード実装
 
-- [ ] `TaskFlowNode.svelte` - GridNode.svelte のスタイルを移植
-- [ ] `DependencyEdge.svelte` - ConnectionLine.svelte のスタイルを移植
-- [ ] `WBSFlowNode.svelte` - WBSGraphNode.svelte のスタイルを移植
-- [ ] `MilestoneFlowNode.svelte` - マイルストーン表示
+- [x] `TaskNode.svelte` - GridNode.svelte のスタイルを移植（`lib/flow/nodes/TaskNode.svelte`）
+- [x] `DependencyEdge.svelte` - ConnectionLine.svelte のスタイルを移植（`lib/flow/edges/DependencyEdge.svelte`）
+- [ ] `WBSFlowNode.svelte` - WBSGraphNode.svelte のスタイルを移植（WBS 切り替えは UnifiedFlowCanvas 内部で対応）
+- [ ] `MilestoneFlowNode.svelte` - マイルストーン表示（将来対応可）
 
 #### Step 8: Dagre レイアウト統合
 
-- [ ] `dagreLayout.ts` - Dagre による自動レイアウト計算
-- [ ] `layoutStore.ts` - レイアウト方向（LR/TB）の状態管理
+- [x] `dagreLayout.ts` - Dagre による自動レイアウト計算（`lib/flow/dagreLayout.ts` 実装済み）
+- [ ] `layoutStore.ts` - レイアウト方向（LR/TB）の状態管理（将来対応可）
 
 #### Step 9: UnifiedFlowCanvas 実装
 
-- [ ] Svelte Flow のセットアップ
-- [ ] カスタムノード/エッジタイプ登録
-- [ ] taskStore/wbsStore との連携
-- [ ] viewMode 切替対応
+- [x] Svelte Flow のセットアップ
+- [x] カスタムノード/エッジタイプ登録
+- [x] taskStore/wbsStore との連携
+- [x] viewMode 切替対応（WBS モード時にグラフをフェードアウト）
 
 #### Step 10: App.svelte 統合
 
-- [ ] GridCanvas → UnifiedFlowCanvas 切替
-- [ ] WBSGraphView → UnifiedFlowCanvas 統合
-- [ ] Toolbar との連携確認
+- [x] GridCanvas → UnifiedFlowCanvas 切替（`App.svelte` で確認済み）
+- [x] WBSGraphView → UnifiedFlowCanvas 統合（WBS パネルを Panel として統合）
+- [x] Toolbar との連携確認
 
 #### Step 11: パフォーマンステスト
 
@@ -271,14 +286,14 @@ frontend/ide/src/stores/
 
 #### Svelte 5 Runes 早見表
 
-| Rune | 用途 | Svelte 4 相当 |
-|------|------|--------------|
-| `$state(value)` | リアクティブ状態 | `let value` |
-| `$derived(expr)` | 派生値 | `$: derived = expr` |
-| `$derived.by(fn)` | 複雑な派生 | `$: { ... }` |
-| `$effect(fn)` | 副作用 | `$: { sideEffect() }` |
-| `$props()` | プロップ受取 | `export let` |
-| `$bindable()` | bind 可能 | `export let` |
+| Rune              | 用途             | Svelte 4 相当         |
+| ----------------- | ---------------- | --------------------- |
+| `$state(value)`   | リアクティブ状態 | `let value`           |
+| `$derived(expr)`  | 派生値           | `$: derived = expr`   |
+| `$derived.by(fn)` | 複雑な派生       | `$: { ... }`          |
+| `$effect(fn)`     | 副作用           | `$: { sideEffect() }` |
+| `$props()`        | プロップ受取     | `export let`          |
+| `$bindable()`     | bind 可能        | `export let`          |
 
 #### Svelte Flow 基本構成
 

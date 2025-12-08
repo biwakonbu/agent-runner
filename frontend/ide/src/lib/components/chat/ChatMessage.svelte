@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { run } from 'svelte/legacy';
+  import { run } from "svelte/legacy";
 
   import { formatLocalTime } from "../../utils/time";
   import { marked } from "marked";
@@ -13,8 +13,8 @@
 
   let { role = "user", content, timestamp }: Props = $props();
 
-  const isUser = role === "user";
-  const isSystem = role === "system";
+  let isUser = $derived(role === "user");
+  let isSystem = $derived(role === "system");
 
   let displayTime = $derived(formatLocalTime(timestamp));
 

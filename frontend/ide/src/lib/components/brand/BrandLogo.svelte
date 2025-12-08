@@ -8,15 +8,16 @@
 
   let { size = "md", customSize = "32px" }: Props = $props();
 
-  const sizes = {
+  const sizeMap: Record<string, string> = {
     sm: "24px",
     md: "48px",
     lg: "96px",
     xl: "192px",
-    custom: customSize,
   };
 
-  let computedSize = $derived(size === "custom" ? customSize : sizes[size]);
+  let computedSize = $derived(
+    size === "custom" ? customSize : (sizeMap[size] ?? "48px")
+  );
 </script>
 
 <div class="brand-logo" style:--logo-size={computedSize}>

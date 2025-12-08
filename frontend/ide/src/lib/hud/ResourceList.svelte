@@ -1,5 +1,6 @@
 <script lang="ts">
   import { slide } from "svelte/transition";
+  import { Brain, Server, Box } from "lucide-svelte";
   import type { ResourceNode, ResourceType, ResourceStatus } from "./types";
 
   interface Props {
@@ -61,15 +62,40 @@
 
   function getTypeBadgeStyle(type: ResourceType): string {
     switch (type) {
-      case "META":
-        return "background: rgba(136, 192, 208, 0.2); color: #88c0d0; border: 1px solid rgba(136, 192, 208, 0.3);";
-      case "WORKER":
-        return "background: rgba(163, 190, 140, 0.2); color: #a3be8c; border: 1px solid rgba(163, 190, 140, 0.3);";
-      case "CONTAINER":
-        return "background: rgba(180, 142, 173, 0.2); color: #b48ead; border: 1px solid rgba(180, 142, 173, 0.3);";
+      case "META": // Purple
+        return "background: rgba(180, 142, 173, 0.2); color: #B48EAD; border: 1px solid rgba(180, 142, 173, 0.1);";
+      case "WORKER": // Green
+        return "background: rgba(163, 190, 140, 0.2); color: #A3BE8C; border: 1px solid rgba(163, 190, 140, 0.1);";
+      case "CONTAINER": // Orange/Gold
+        return "background: rgba(235, 203, 139, 0.2); color: #EBCB8B; border: 1px solid rgba(235, 203, 139, 0.1);";
       default:
-        return "background: rgba(255,255,255,0.1); color: #ccc;";
+        return "background: rgba(255,255,255,0.05); color: #999;";
     }
+  }
+
+  // Parse utility for metrics
+  function parseMetrics(
+    detail?: string
+  ): { label: string; percent: number; color: string }[] {
+    if (!detail) return [];
+    const metrics: { label: string; percent: number; color: string }[] = [];
+
+    // Match "CPU: 12%" or "Mem: 50%" patterns
+    const cpuMatch = detail.match(/CPU:\s*(\d+)%/i);
+    if (cpuMatch) {
+      const val = parseInt(cpuMatch[1], 10);
+      metrics.push({
+        label: "CPU",
+        percent: val,
+        color:
+          val > 80
+            ? "var(--mv-primitive-aurora-red)"
+            : "var(--mv-primitive-frost-3)",
+      });
+    }
+
+    // Additional parsing for logic can go here
+    return metrics;
   }
 </script>
 
@@ -78,13 +104,18 @@
     <div class="col-name">Resource</div>
     <div class="col-type">Type</div>
     <div class="col-status">Status</div>
-    <div class="col-activity">Activity / Detail</div>
+    <div class="col-activity">Activity / Monitor</div>
   </div>
 
   <div class="list-body">
     {#each flatNodes as node (node.id)}
+      {@const metrics = parseMetrics(node.detail)}
+      {@const icon =
+        node.type === "META" ? Brain : node.type === "WORKER" ? Server : Box}
       <div
         class="resource-row"
+        class:status-running={node.status === "RUNNING"}
+        class:status-error={node.status === "ERROR"}
         onclick={() => toggleExpand(node.id)}
         role="button"
         tabindex="0"
@@ -104,9 +135,16 @@
 
         <!-- Type Column -->
         <div class="col-type">
-          <span class="type-badge" style={getTypeBadgeStyle(node.type)}
-            >{node.type}</span
-          >
+          <div class="type-badge-pill" style={getTypeBadgeStyle(node.type)}>
+            {#if node.type === "META"}
+              <Brain size={10} strokeWidth={3} />
+            {:else if node.type === "WORKER"}
+              <Server size={10} strokeWidth={3} />
+            {:else}
+              <Box size={10} strokeWidth={3} />
+            {/if}
+            <span>{node.type}</span>
+          </div>
         </div>
 
         <!-- Status Column -->
@@ -129,9 +167,30 @@
           </div>
         </div>
 
-        <!-- Activity Column -->
+        <!-- Activity/Monitor Column -->
         <div class="col-activity">
-          <span class="detail-text">{node.detail || "-"}</span>
+          {#if metrics.length > 0}
+            <div class="metrics-grid">
+              {#each metrics as metric}
+                <div class="metric-item">
+                  <span class="metric-label">{metric.label}</span>
+                  <div class="metric-bar-bg">
+                    <div
+                      class="metric-bar-fill"
+                      style:width="{metric.percent}%"
+                      style:background-color={metric.color}
+                    ></div>
+                  </div>
+                  <span class="metric-val">{metric.percent}%</span>
+                </div>
+              {/each}
+              {#if node.detail && !node.detail.includes("CPU:")}
+                <span class="detail-text extra">{node.detail}</span>
+              {/if}
+            </div>
+          {:else}
+            <span class="detail-text">{node.detail || "-"}</span>
+          {/if}
         </div>
       </div>
     {/each}
@@ -143,25 +202,33 @@
     display: flex;
     flex-direction: column;
     width: 100%;
-    background: var(--mv-glass-bg);
-    backdrop-filter: var(--mv-glass-blur);
-    border: var(--mv-border-width-sm) solid var(--mv-glass-border-subtle);
-    border-radius: var(--mv-radius-md);
+    /* Remove self-contained glass style since it lives in a glass window now */
+    background: transparent;
+    border: none;
+    border-radius: 0;
     font-family: var(--mv-font-sans);
     overflow: hidden;
   }
 
   .header-row {
     display: grid;
-    grid-template-columns: 2fr var(--mv-space-24) var(--mv-space-28) 3fr;
+    grid-template-columns: 2.5fr 120px 120px 4fr;
     padding: var(--mv-space-2) var(--mv-space-3);
-    background: var(--mv-glass-border);
-    border-bottom: var(--mv-border-width-sm) solid var(--mv-glass-border-subtle);
+    background: rgba(255, 255, 255, 0.03);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
     font-size: var(--mv-font-size-xs);
-    font-weight: var(--mv-font-weight-bold);
-    color: var(--mv-color-text-muted);
+    font-weight: 600;
+    color: var(--mv-color-text-secondary);
     text-transform: uppercase;
-    letter-spacing: var(--mv-letter-spacing-wide);
+    letter-spacing: 0.05em;
+    align-items: center;
+  }
+
+  /* Header alignment specific */
+  .header-row > .col-type,
+  .header-row > .col-status {
+    display: flex;
+    justify-content: center;
   }
 
   .list-body {
@@ -171,17 +238,33 @@
 
   .resource-row {
     display: grid;
-    grid-template-columns: 2fr var(--mv-space-24) var(--mv-space-28) 3fr;
+    grid-template-columns: 2.5fr 120px 120px 4fr;
     padding: var(--mv-space-2) 0;
-    border-bottom: var(--mv-border-width-sm) solid var(--mv-glass-border-active);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.02);
     align-items: center;
     cursor: pointer;
-    transition: background var(--mv-transition-hover);
+    transition: background 0.1s ease;
     font-size: var(--mv-font-size-sm);
   }
 
   .resource-row:hover {
-    background: var(--mv-glass-hover);
+    background: rgba(255, 255, 255, 0.04);
+  }
+
+  .resource-row.status-running {
+    background: linear-gradient(
+      90deg,
+      rgba(163, 190, 140, 0.05) 0%,
+      transparent 100%
+    );
+  }
+
+  .resource-row.status-error {
+    background: linear-gradient(
+      90deg,
+      rgba(191, 97, 106, 0.05) 0%,
+      transparent 100%
+    );
   }
 
   .resource-row:last-child {
@@ -214,19 +297,26 @@
   .col-type {
     display: flex;
     align-items: center;
+    justify-content: center; /* Center content in body */
   }
 
-  .type-badge {
-    font-size: var(--mv-font-size-2xs);
-    padding: var(--mv-space-0-5) var(--mv-space-1-5);
-    border-radius: var(--mv-radius-sm);
-    font-weight: var(--mv-font-weight-bold);
-    letter-spacing: var(--mv-letter-spacing-wide);
+  .type-badge-pill {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 10px;
+    padding: 2px 8px;
+    border-radius: 99px; /* Pill shape */
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    min-width: 80px;
+    justify-content: center;
   }
 
   .col-status {
     display: flex;
     align-items: center;
+    justify-content: center; /* Center content in body */
   }
 
   .status-indicator-wrapper {
@@ -263,11 +353,64 @@
     color: var(--mv-color-text-secondary);
     font-family: var(--mv-font-mono);
     font-size: var(--mv-font-size-xs);
-    opacity: var(--mv-opacity-80);
+    /* opacity: var(--mv-opacity-80); Removed to fix contrast on charts */
+    padding-right: var(--mv-space-3);
+    display: flex;
+    align-items: center;
+  }
+
+  /* Metrics Grid */
+  .metrics-grid {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    width: 100%;
+  }
+
+  .metric-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 120px;
+  }
+
+  .metric-label {
+    font-size: 10px;
+    color: var(--mv-color-text-muted);
+    width: 24px;
+  }
+
+  .metric-bar-bg {
+    flex: 1;
+    height: 4px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+
+  .metric-bar-fill {
+    height: 100%;
+    border-radius: 2px;
+    transition: width 0.3s ease;
+  }
+
+  .metric-val {
+    font-size: 10px;
+    width: 30px;
+    text-align: right;
+  }
+
+  .detail-text {
+    white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    white-space: nowrap;
-    padding-right: var(--mv-space-3);
+    opacity: 0.8;
+  }
+
+  .detail-text.extra {
+    margin-left: 8px;
+    font-size: 10px;
+    opacity: 0.6;
   }
 
   @keyframes pulse {

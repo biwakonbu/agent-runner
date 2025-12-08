@@ -1,6 +1,5 @@
 <script lang="ts">
-  import { type EdgeProps } from "@xyflow/svelte";
-  import { grid } from "../../../design-system";
+  import { type EdgeProps, getSmoothStepPath } from "@xyflow/svelte";
 
   interface Props extends EdgeProps {
     data?: {
@@ -21,34 +20,17 @@
     data,
   }: Props = $props();
 
-  // Custom Circuit Path Logic ported from ConnectionLine.svelte
-  function calculatePath(
-    sx: number,
-    sy: number,
-    tx: number,
-    ty: number
-  ): string {
-    const dist = tx - sx;
-
-    if (dist > 40) {
-      // 順方向：素直なS字サーキット
-      const controlDist = Math.min(dist * 0.4, 60);
-      return `M ${sx} ${sy} C ${sx + controlDist} ${sy}, ${tx - controlDist} ${ty}, ${tx} ${ty}`;
-    } else {
-      // 逆方向/近接：テクニカルな迂回
-      const loopWidth = 40;
-      const verticalBypass =
-        ty > sy ? grid.cellHeight + 30 : -(grid.cellHeight + 30);
-
-      return `M ${sx} ${sy}
-              Q ${sx + loopWidth} ${sy} ${sx + loopWidth} ${sy + verticalBypass / 2}
-              L ${sx + loopWidth} ${sy + verticalBypass}
-              L ${tx - loopWidth} ${sy + verticalBypass}
-              Q ${tx - loopWidth} ${ty} ${tx} ${ty}`;
-    }
-  }
-
-  let edgePath = $derived(calculatePath(sourceX, sourceY, targetX, targetY));
+  let edgePath = $derived(
+    getSmoothStepPath({
+      sourceX,
+      sourceY,
+      sourcePosition,
+      targetX,
+      targetY,
+      targetPosition,
+      borderRadius: 16, // Smoother corners for the grid-aligned look
+    })[0]
+  );
 
   let strokeColor = $derived(
     data?.satisfied

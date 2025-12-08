@@ -1,6 +1,8 @@
 import type { Meta, StoryObj } from "@storybook/svelte";
 import TaskBar from "./TaskBar.svelte";
 
+import { windowStore } from "../../stores/windowStore";
+
 const meta = {
   title: "HUD/TaskBar",
   component: TaskBar,
@@ -18,6 +20,16 @@ const meta = {
       },
     },
   },
+  decorators: [
+    (Story) => {
+        // Chat is open by default to show active glow
+        windowStore.update((s: any) => ({ 
+             ...s, 
+             chat: { ...s.chat, isOpen: true } 
+        }));
+        return Story();
+    }
+  ]
 } as Meta<typeof TaskBar>;
 
 export default meta;

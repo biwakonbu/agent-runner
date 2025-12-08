@@ -2,7 +2,7 @@ import { describe, it, expect, afterEach } from 'vitest';
 import { cleanup, render } from '@testing-library/svelte';
 import Button from './components/Button.svelte';
 import Badge from './components/Badge.svelte';
-import Flex from './components/Flex.svelte';
+
 
 describe.skip('Design System', () => {
   afterEach(() => {

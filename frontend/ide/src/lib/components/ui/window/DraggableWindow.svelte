@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { stopPropagation } from 'svelte/legacy';
+  import { stopPropagation } from "svelte/legacy";
+  import { Minus, X } from "lucide-svelte";
 
   interface Props {
     id?: string;
@@ -8,14 +9,15 @@
     title?: string;
     controls?: { minimize: boolean; close: boolean };
     zIndex?: number;
-    header?: import('svelte').Snippet;
-    children?: import('svelte').Snippet;
-    footer?: import('svelte').Snippet;
+    header?: import("svelte").Snippet;
+    children?: import("svelte").Snippet;
+    footer?: import("svelte").Snippet;
     // コールバックプロップ
     onclose?: () => void;
     onminimize?: (data: { minimized: boolean }) => void;
     onclick?: () => void;
     ondragend?: (data: { x: number; y: number }) => void;
+    onresizeend?: (data: { width: number; height: number }) => void;
   }
 
   let {
@@ -32,13 +34,24 @@
     onminimize,
     onclick,
     ondragend,
+    onresizeend,
   }: Props = $props();
 
-  let position = $state({ ...initialPosition });
+  let position = $state({ x: 0, y: 0 });
   let isDragging = false;
+  let isResizing = false;
   let windowEl: HTMLElement | undefined = $state();
   let isMinimized = $state(false);
-  let size = $state(initialSize);
+  let size = $state<{ width: number; height: number } | undefined>(undefined);
+
+  // Sync initial values when props change
+  $effect(() => {
+    position = { ...initialPosition };
+  });
+
+  $effect(() => {
+    size = initialSize;
+  });
 
   function startDrag(e: MouseEvent) {
     if (e.button !== 0) return;
@@ -46,25 +59,45 @@
     if (!windowEl) return;
 
     isDragging = true;
-    (windowEl as HTMLElement).style.cursor = 'grabbing';
+    (windowEl as HTMLElement).style.cursor = "grabbing";
     window.addEventListener("mouseup", stopDrag);
     onclick?.();
   }
 
   function onMouseMove(e: MouseEvent) {
-    if (!isDragging) return;
-
-    position = {
-      x: position.x + e.movementX,
-      y: position.y + e.movementY,
-    };
+    if (isDragging) {
+      position = {
+        x: position.x + e.movementX,
+        y: position.y + e.movementY,
+      };
+    } else if (isResizing && size) {
+      size = {
+        width: Math.max(200, size.width + e.movementX),
+        height: Math.max(100, size.height + e.movementY),
+      };
+    }
   }
 
   function stopDrag() {
     isDragging = false;
-    if (windowEl) (windowEl as HTMLElement).style.cursor = '';
+    if (windowEl) (windowEl as HTMLElement).style.cursor = "";
     window.removeEventListener("mouseup", stopDrag);
     ondragend?.(position);
+  }
+
+  function startResize(e: MouseEvent) {
+    if (e.button !== 0) return;
+    e.stopPropagation();
+    isResizing = true;
+    window.addEventListener("mouseup", stopResize);
+  }
+
+  function stopResize() {
+    isResizing = false;
+    window.removeEventListener("mouseup", stopResize);
+    if (size) {
+      onresizeend?.(size);
+    }
   }
 
   function toggleMinimize() {
@@ -109,7 +142,7 @@
           aria-label="Minimize"
           type="button"
         >
-          _
+          <Minus size={14} strokeWidth={2.5} />
         </button>
       {/if}
       {#if controls.close}
@@ -119,7 +152,7 @@
           aria-label="Close"
           type="button"
         >
-          ×
+          <X size={14} strokeWidth={2.5} />
         </button>
       {/if}
     </div>
@@ -135,6 +168,13 @@
         {@render footer?.()}
       </div>
     {/if}
+
+    <div
+      class="resize-handle"
+      onmousedown={startResize}
+      role="button"
+      tabindex="0"
+    ></div>
   {/if}
 </div>
 
@@ -146,35 +186,43 @@
     min-width: var(--mv-floating-window-min-width);
     min-height: var(--mv-floating-window-min-height);
 
-    /* If width/height not set via style, use default checks, but we rely on style now */
+    /* Crystal HUD Redesign */
+    background: rgba(10, 10, 12, 0.8); /* Neutral dark glass, no navy tint */
+    backdrop-filter: blur(24px) saturate(140%);
+    -webkit-backdrop-filter: blur(24px) saturate(140%);
 
-    /* Crystal HUD: Slightly more assertive than Header */
-    background: var(--mv-glass-bg-chat);
-    backdrop-filter: blur(24px);
-
-    /* Assertive Border */
-    border: var(--mv-border-width-thin) solid var(--mv-glass-border-strong);
-    border-top: var(--mv-border-width-thin) solid var(--mv-glass-border-top);
-    border-bottom: var(--mv-border-width-thin) solid
-      var(--mv-glass-border-bottom);
+    /* Assertive Gradient Border */
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-top: 1px solid rgba(255, 255, 255, 0.12); /* Subtle highlight */
 
     border-radius: var(--mv-radius-lg);
 
     /* Deep Shadow */
-    box-shadow: var(--mv-shadow-floating-panel);
+    box-shadow:
+      0 20px 25px -5px rgba(0, 0, 0, 0.3),
+      0 8px 10px -6px rgba(0, 0, 0, 0.2),
+      0 0 0 1px rgba(0, 0, 0, 0.4); /* Definition outline */
 
     display: flex;
     flex-direction: column;
 
-    /* z-index is set via style */
     overflow: hidden;
-    transition: height 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    transition:
+      height 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+      box-shadow 0.2s ease;
+  }
+
+  .floating-window:focus-within {
+    border-color: rgba(255, 255, 255, 0.15);
+    box-shadow:
+      0 25px 50px -12px rgba(0, 0, 0, 0.4),
+      0 0 0 1px rgba(136, 192, 208, 0.3); /* Subtle blue glow on focus */
   }
 
   .floating-window.minimized {
-    height: var(--mv-size-floating-header) !important; /* Force override style height */
+    height: var(--mv-size-floating-header) !important;
     overflow: hidden;
-    background: var(--mv-glass-bg-minimized);
+    background: rgba(15, 23, 42, 0.9);
   }
 
   /* Header Area */
@@ -187,13 +235,22 @@
     cursor: grab;
     user-select: none;
     flex-shrink: 0;
-    background: transparent;
-    border-bottom: var(--mv-border-width-thin) solid
-      var(--mv-glass-border-subtle);
+
+    background: linear-gradient(
+      to bottom,
+      rgba(255, 255, 255, 0.03),
+      transparent
+    );
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
   }
 
   .header:active {
     cursor: grabbing;
+    background: linear-gradient(
+      to bottom,
+      rgba(255, 255, 255, 0.05),
+      rgba(255, 255, 255, 0.01)
+    );
   }
 
   .header-content {
@@ -203,8 +260,9 @@
 
   .title {
     font-size: var(--mv-font-size-sm);
-    font-weight: var(--mv-font-weight-bold);
-    color: var(--mv-color-text-secondary);
+    font-weight: 600;
+    color: var(--mv-color-text-primary);
+    letter-spacing: 0.01em;
   }
 
   .window-controls {
@@ -218,44 +276,71 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    width: var(--mv-size-control-btn);
-    height: var(--mv-size-control-btn);
+    width: 24px;
+    height: 24px;
     background: transparent;
-    border: var(--mv-border-width-thin) solid transparent;
-    border-radius: var(--mv-radius-sm);
+    border: none;
+    border-radius: 6px;
     color: var(--mv-color-text-muted);
     cursor: pointer;
-    font-family: var(--mv-font-mono);
-    font-size: var(--mv-font-size-sm);
     padding: 0;
-    transition: all var(--mv-duration-fast);
+    transition: all 0.15s ease;
   }
 
   .control-btn:hover {
-    background: var(--mv-glass-hover);
+    background: rgba(255, 255, 255, 0.1);
     color: var(--mv-color-text-primary);
   }
 
   .control-btn.close:hover {
-    background: var(--mv-glass-close-bg);
-    color: var(--mv-primitive-aurora-red);
-    border-color: var(--mv-glass-close-border);
+    background: rgba(239, 68, 68, 0.2);
+    color: #f87171;
   }
 
   .content {
     flex: 1;
-    min-height: 0; /* Allow flex item to shrink below content size */
-    overflow: hidden; /* Let slotted content handle its own scrolling */
-
-    /* padding is controlled by children if needed, or default */
+    min-height: 0;
+    overflow: hidden;
     display: flex;
     flex-direction: column;
+    position: relative;
+
+    /* Ensure code remains readable on top of blur */
+    background: rgba(0, 0, 0, 0.1);
   }
 
   .footer {
     flex-shrink: 0;
     padding: var(--mv-spacing-sm) var(--mv-spacing-md);
-    border-top: var(--mv-border-width-thin) solid var(--mv-glass-border-subtle);
-    background: var(--mv-glass-footer);
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+    background: rgba(0, 0, 0, 0.2);
+  }
+
+  .resize-handle {
+    position: absolute;
+    bottom: 0;
+    right: 0;
+    width: 16px;
+    height: 16px;
+    cursor: nwse-resize;
+    z-index: 10;
+  }
+
+  /* Visual indicator for resize handle */
+  .resize-handle::after {
+    content: "";
+    position: absolute;
+    bottom: 4px;
+    right: 4px;
+    width: 6px;
+    height: 6px;
+    border-right: 2px solid rgba(255, 255, 255, 0.1);
+    border-bottom: 2px solid rgba(255, 255, 255, 0.1);
+    border-bottom-right-radius: 2px;
+    transition: border-color 0.2s;
+  }
+
+  .resize-handle:hover::after {
+    border-color: var(--mv-color-text-secondary);
   }
 </style>
