@@ -5,13 +5,16 @@
     MiniMap,
     type Node,
     type Edge,
+    Panel,
   } from "@xyflow/svelte";
   import "@xyflow/svelte/dist/style.css";
   import { tasks } from "../../stores/taskStore";
+  import { viewMode } from "../../stores/wbsStore"; // Import viewMode
   import type { Task } from "../../types";
   import TaskNode from "./nodes/TaskNode.svelte";
   import DependencyEdge from "./edges/DependencyEdge.svelte";
   import { getLayoutedElements, convertTasksToFlowData } from "./dagreLayout";
+  import WBSListView from "../wbs/WBSListView.svelte";
 
   // Custom Node/Edge Types
   const nodeTypes = {
@@ -47,9 +50,11 @@
       edges = [];
     }
   });
+
+  let isWBSMode = $derived($viewMode === "wbs");
 </script>
 
-<div class="flow-container">
+<div class="flow-container" class:wbs-mode={isWBSMode}>
   <!-- Custom Grid Background (below Svelte Flow) -->
   <div class="grid-background">
     <svg class="grid-pattern" width="100%" height="100%">
@@ -141,9 +146,17 @@
     minZoom={0.1}
     maxZoom={4}
     defaultEdgeOptions={{ type: "dependency" }}
+    nodesDraggable={!isWBSMode}
+    nodesConnectable={!isWBSMode}
+    elementsSelectable={!isWBSMode}
   >
     <Controls showZoom={true} />
     <MiniMap />
+
+    <Panel position="top-left" class="wbs-panel">
+      <!-- WBSListView is always mounted but hidden via CSS when not in WBS mode -->
+      <WBSListView />
+    </Panel>
   </SvelteFlow>
 </div>
 
@@ -210,7 +223,8 @@
 
   :global(.svelte-flow__controls-button) {
     background: var(--mv-color-surface-primary);
-    border-bottom: var(--mv-border-width-thin) solid var(--mv-color-border-subtle);
+    border-bottom: var(--mv-border-width-thin) solid
+      var(--mv-color-border-subtle);
     fill: var(--mv-color-text-secondary);
   }
 
@@ -228,5 +242,50 @@
     border: var(--mv-border-width-thin) solid var(--mv-color-border-subtle);
     border-radius: var(--mv-radius-md);
   }
-  /* stylelint-enable selector-class-pattern */
+
+  /* Layered Mode Styles */
+
+  /* Graph Layer Control */
+  .flow-container.wbs-mode :global(.svelte-flow__viewport),
+  .flow-container.wbs-mode :global(.svelte-flow__controls),
+  .flow-container.wbs-mode :global(.svelte-flow__minimap) {
+    opacity: 0.15;
+    filter: blur(2px) grayscale(0.5);
+    transition: all 0.3s ease;
+    pointer-events: none;
+  }
+
+  .flow-container:not(.wbs-mode) :global(.svelte-flow__viewport) {
+    opacity: 1;
+    filter: none;
+    transition: all 0.3s ease;
+  }
+
+  /* WBS Panel Control */
+  :global(.svelte-flow__panel.wbs-panel) {
+    margin: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none; /* Default container pass-through */
+    transition: all 0.3s ease;
+    z-index: 1000;
+  }
+
+  /* When WBS is NOT active, hide/fade it */
+  .flow-container:not(.wbs-mode) :global(.svelte-flow__panel.wbs-panel) {
+    opacity: 0;
+    pointer-events: none;
+    transform: scale(0.98);
+  }
+
+  /* When WBS IS active */
+  .flow-container.wbs-mode :global(.svelte-flow__panel.wbs-panel) {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  /* Ensure WBS content is interactive when active */
+  .flow-container.wbs-mode :global(.wbs-panel > *) {
+    pointer-events: auto;
+  }
 </style>

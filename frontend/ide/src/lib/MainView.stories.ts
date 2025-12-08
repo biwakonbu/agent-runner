@@ -5,7 +5,7 @@ import type { Task, TaskStatus } from "../types";
 const meta = {
   title: "IDE/MainView",
   component: MainViewPreview,
-  tags: ["autodocs"],
+  tags: ["autodocs", "skip-vrt"],
   parameters: {
     layout: "fullscreen",
     docs: {

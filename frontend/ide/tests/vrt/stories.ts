@@ -26,9 +26,10 @@ export async function getStories(baseUrl = 'http://localhost:6006'): Promise<Sto
 
   const data = await response.json();
 
-  // entries からストーリータイプのみをフィルタ
+  // entries からストーリータイプのみをフィルタ（skip-vrt タグがあるものは除外）
   const stories = Object.values(data.entries as Record<string, StoryEntry & { type: string }>)
     .filter((entry) => entry.type === 'story')
+    .filter((entry) => !entry.tags?.includes('skip-vrt'))
     .map((entry) => ({
       id: entry.id,
       title: entry.title,

@@ -1,7 +1,4 @@
 <script lang="ts">
-  import { createBubbler } from 'svelte/legacy';
-
-  const bubble = createBubbler();
   /**
    * Flex Component
    * Flexbox container helper.
@@ -32,6 +29,8 @@
     grow?: boolean;
     class?: string;
     children?: import('svelte').Snippet;
+    onclick?: (event: MouseEvent) => void;
+    onkeydown?: (event: KeyboardEvent) => void;
   }
 
   let {
@@ -47,7 +46,9 @@
     width = "auto",
     grow = false,
     class: className = "",
-    children
+    children,
+    onclick,
+    onkeydown
   }: Props = $props();
   
 
@@ -82,8 +83,8 @@
   style:--box-bg={bg}
   style:--box-h={height}
   style:--box-w={width}
-  onclick={bubble('click')}
-  onkeydown={bubble('keydown')}
+  {onclick}
+  {onkeydown}
   role="group"
 >
   {@render children?.()}

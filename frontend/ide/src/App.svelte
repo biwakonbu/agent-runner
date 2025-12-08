@@ -6,7 +6,6 @@
   import WorkspaceSelector from "./lib/WorkspaceSelector.svelte";
   import TitleBar from "./lib/TitleBar.svelte";
   import { Toolbar } from "./lib/toolbar";
-  import { WBSListView } from "./lib/wbs";
   import UnifiedFlowCanvas from "./lib/flow/UnifiedFlowCanvas.svelte";
   import {
     tasks,
@@ -147,19 +146,10 @@
     <!-- メインコンテンツ -->
     <div class="main-content">
       <!-- 常にGraphViewを描画し、canvasとして機能させる -->
-      <div
-        class="canvas-layer"
-        style:visibility={$viewMode === "graph" ? "visible" : "hidden"}
-      >
+      <!-- WBSモードへの切り替えはUnifiedFlowCanvas内部で処理される -->
+      <div class="canvas-layer">
         <UnifiedFlowCanvas />
       </div>
-
-      <!-- WBSモード時はオーバーレイとして表示（あるいはcanvas上に配置） -->
-      {#if $viewMode === "wbs"}
-        <div class="list-overlay">
-          <WBSListView />
-        </div>
-      {/if}
     </div>
 
     <!-- Window System -->
@@ -205,18 +195,6 @@
     position: absolute;
     inset: 0;
     z-index: 1;
-  }
-
-  .list-overlay {
-    position: absolute;
-    inset: var(--mv-spacing-md); /* 少し余白を持たせてフローティング感を出す */
-    z-index: 10;
-    background: var(--mv-color-surface-primary);
-    border-radius: var(--mv-radius-lg);
-    box-shadow: var(--mv-shadow-modal);
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
   }
 
   /* タスク作成モーダルは削除済み */

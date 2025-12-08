@@ -21,15 +21,15 @@
 
   // ステータスラベル
   const statusLabels: Record<TaskStatus, string> = {
-    PENDING: "待機中",
-    READY: "準備完了",
-    RUNNING: "実行中",
-    SUCCEEDED: "成功",
-    COMPLETED: "完了",
-    FAILED: "失敗",
-    CANCELED: "キャンセル",
-    BLOCKED: "ブロック",
-    RETRY_WAIT: "リトライ待機",
+    PENDING: "PENDING",
+    READY: "READY",
+    RUNNING: "RUNNING",
+    SUCCEEDED: "SUCCEEDED",
+    COMPLETED: "COMPLETED",
+    FAILED: "FAILED",
+    CANCELED: "CANCELED",
+    BLOCKED: "BLOCKED",
+    RETRY_WAIT: "RETRY_WAIT",
   };
 
   const phaseLabels: Record<PhaseName, string> = {

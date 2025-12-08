@@ -2,8 +2,26 @@ import dagre from 'dagre';
 import { Position, type Node, type Edge } from '@xyflow/svelte';
 import type { Task } from '../../types';
 
-const nodeWidth = 200;
-const nodeHeight = 80; // Approximate height with header and content
+const BASE_HEIGHT = 100; // Safe default height
+const WIDTH_SMALL = 180;
+const WIDTH_MEDIUM = 240;
+const WIDTH_LARGE = 320;
+
+function getNodeDimensions(node: Node) {
+  const task = node.data?.task as Task | undefined;
+  if (!task) return { width: WIDTH_MEDIUM, height: BASE_HEIGHT };
+
+  const len = task.title.length;
+  let width = WIDTH_LARGE;
+  if (len <= 15) width = WIDTH_SMALL;
+  else if (len <= 30) width = WIDTH_MEDIUM;
+
+  // Rough height estimation
+  // Base 80 + ~20 per extra line of text (max 3 lines) if loose
+  // But let's keep height semi-constant or safe max for layout stability
+  // Just adding a bit of buffer
+  return { width, height: BASE_HEIGHT };
+}
 
 export const getLayoutedElements = (
   nodes: Node[],
@@ -17,7 +35,8 @@ export const getLayoutedElements = (
   dagreGraph.setGraph({ rankdir: direction });
 
   nodes.forEach((node) => {
-    dagreGraph.setNode(node.id, { width: nodeWidth, height: nodeHeight });
+    const { width, height } = getNodeDimensions(node);
+    dagreGraph.setNode(node.id, { width, height });
   });
 
   edges.forEach((edge) => {
@@ -28,6 +47,7 @@ export const getLayoutedElements = (
 
   const layoutedNodes = nodes.map((node) => {
     const nodeWithPosition = dagreGraph.node(node.id);
+    const { width, height } = getNodeDimensions(node);
     
     // We are shifting the dagre node position (anchor=center center) to the top left
     // so it matches the React Flow node anchor point (top left).
@@ -36,8 +56,8 @@ export const getLayoutedElements = (
       targetPosition: isHorizontal ? Position.Left : Position.Top,
       sourcePosition: isHorizontal ? Position.Right : Position.Bottom,
       position: {
-        x: nodeWithPosition.x - nodeWidth / 2,
-        y: nodeWithPosition.y - nodeHeight / 2,
+        x: nodeWithPosition.x - width / 2,
+        y: nodeWithPosition.y - height / 2,
       },
     };
   });
