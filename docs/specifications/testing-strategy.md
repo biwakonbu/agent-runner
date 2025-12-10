@@ -3,19 +3,21 @@
 ## 概要
 
 Multiverse プロジェクトでは、システム全体の信頼性を確保し、開発効率を向上させるために、**包括的な自動テスト環境**を構築しています。
-特に、以下の 2 つの層で End-to-End (E2E) テストを実施することで、バックエンドのロジックとフロントエンドの UI 動作を独立して、かつ確実に検証します。
+特に、以下の 3 つの層でテストを実施することで、バックエンドのロジック、フロントエンドの UI 動作、そして視覚的なリグレッションを独立して検証します。
 
 ## アーキテクチャ
 
-テストアーキテクチャは以下の 2 層で構成されます。
+テストアーキテクチャは以下の 3 層で構成されます。
 
 1.  **Backend Integration E2E**: IDE バックエンドからオーケストレーター、エージェント実行までのフローを検証。
 2.  **Frontend UI E2E**: Wails フロントエンドの UI ロジックとユーザー操作を検証。
+3.  **Visual Regression Testing (VRT)**: コンポーネント単位およびページ単位での視覚的な変化を自動検知。
 
 | 層           | 範囲                                           | 技術スタック               | 目的                                          |
 | ------------ | ---------------------------------------------- | -------------------------- | --------------------------------------------- |
 | **Backend**  | `ide` (Go) -> `orchestrator` -> `agent-runner` | Go Test, Shell Script Mock | プロセス連携、タスクキュー、状態遷移の検証    |
 | **Frontend** | `frontend/ide` (Svelte)                        | Playwright, Wails JS Mock  | UI 描画、イベントハンドリング、画面遷移の検証 |
+| **Visual**   | `frontend/ide` Components                      | Storybook, Playwright      | デザイン崩れの検知、UI カタログ管理           |
 
 ---
 
@@ -69,6 +71,40 @@ Wails アプリケーションのフロントエンド部分はブラウザ技�
 ```bash
 cd frontend/ide
 npm run test:e2e
+```
+
+---
+
+## 3. Frontend Visual Testing
+
+### 配置場所
+
+`frontend/ide/src/**/*.stories.ts` (Storybook)
+`frontend/ide/tests/vrt` (Playwright VRT)
+
+### 設計方針
+
+UI の変更による意図しないデザイン崩れ（リグレッション）を防ぐため、スナップショット比較を行います。
+
+1.  **Storybook**:
+
+    - 全 UI コンポーネントのカタログ化 (`npm run storybook`)。
+    - 各コンポーネントの "States" (Normal, Error, Loading 等) を Story として定義。
+
+2.  **Visual Regression Testing (VRT)**:
+    - Playwright を使用して Storybook の各 Story、または実際のページのスナップショットを撮影。
+    - 前回のマスター画像（Golden Image）との差分をピクセル単位で比較。
+
+### 実行方法
+
+```bash
+cd frontend/ide
+
+# Storybook 起動
+npm run storybook
+
+# VRT 実行 (Playwright)
+npm run test:vrt
 ```
 
 ## 今後の展望

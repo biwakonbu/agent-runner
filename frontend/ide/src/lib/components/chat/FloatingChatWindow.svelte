@@ -44,10 +44,6 @@
     onclose?.();
   }
 
-  function handleMinimize(data: { minimized: boolean }) {
-    windowStore.minimize("chat", data.minimized);
-  }
-
   function handleDragEnd(data: { x: number; y: number }) {
     windowStore.updatePosition("chat", data.x, data.y);
   }
@@ -103,7 +99,6 @@
     initialSize={size}
     {zIndex}
     onclose={closeWindow}
-    onminimize={handleMinimize}
     ondragend={handleDragEnd}
     onclick={handleClick}
   >

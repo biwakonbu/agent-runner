@@ -85,6 +85,7 @@ ExecutionOrchestrator → agent-runner → Docker Sandbox → codex CLI（既存
   - `internal/agenttools/claude.go`
   - `internal/agenttools/cursor.go`
 - [x] Meta 層からの WorkerCall 生成で新フィールド（model/flags/env/tool_specific）を活用する経路を整備（確認済み）
+- [x] Doc: v3.0 (CLI Session / Svelte 5) に合わせて仕様書・アーキテクチャ図を更新
 
 ### 残タスク（オプション・フォローアップ）
 
@@ -271,8 +272,6 @@ frontend/ide/src/stores/
 
 #### Step 11: パフォーマンステスト
 
-- [ ] 500 ノードで動作確認
-- [ ] 2000 ノードで動作確認
 - [ ] パン/ズームの滑らかさ確認
 
 #### Step 12: クリーンアップ

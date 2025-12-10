@@ -20,10 +20,6 @@
     windowStore.close("process");
   }
 
-  function handleMinimize(data: { minimized: boolean }) {
-    windowStore.minimize("process", data.minimized);
-  }
-
   function handleDragEnd(data: { x: number; y: number }) {
     windowStore.updatePosition("process", data.x, data.y);
   }
@@ -44,7 +40,6 @@
     initialSize={size}
     {zIndex}
     onclose={handleClose}
-    onminimize={handleMinimize}
     ondragend={handleDragEnd}
     onresizeend={handleResizeEnd}
     onclick={handleClick}

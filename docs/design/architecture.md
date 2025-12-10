@@ -118,27 +118,29 @@ flowchart TB
 | **Container**  | タスク単位の隔離環境                 |
 | **Worker CLI** | 実際の開発作業（coding, git, tests） |
 
-## AgentToolProvider 設計（Phase 4 拡張）
+## AgentToolProvider Architecture (CLI Integration)
 
 ### 目的
-- Codex / Gemini / Claude Code / Cursor など複数のエージェント CLI を安全に切り替えつつ、共通の実行パイプラインで扱う。Worker 実行と（将来的な）Meta 生成の両方で同じ抽象を再利用し、特定 CLI に縛られない実行面を確保する。
+
+Codex / Gemini / Claude Code / Cursor など複数のエージェント CLI を安全に切り替えつつ、共通の実行パイプラインで扱います。
+Worker 実行と Meta 生成の両方で同じ抽象を再利用し、特定 CLI に縛られない実行面を確保しています。
 
 ### 抽象レイヤと責務
-- **ProviderConfig**: kind, cliPath, model, flags, extraEnv, toolSpecific を保持。kind でプロバイダを切り替え、デフォルト値（例: cliPath=codex）を与える。
-- **Request**: prompt/mode/temperature/maxTokens/workdir/useStdin/extraEnv/flags/toolSpecific など、呼び出し時に上書きしたい情報を集約。ツール固有値は toolSpecific にそのまま渡す（過度な共通化を避ける）。
-- **ExecPlan**: 実行直前の最終形。command/args/env/workdir/timeout/stdin を Sandbox.Exec などに渡す。
-- **Registry**: kind→factory を登録・解決。`agenttools.Build(ctx, kind, cfg, req)` で Provider を生成し ExecPlan を得る。
 
-### 実行フロー（現状）
-1. Meta.NextAction が `WorkerCall` を返す（worker_type, mode, prompt, model, flags, env, tool_specific, workdir, use_stdin を許容）。
-2. Orchestrator/Core で `Executor.RunWorkerCall` を呼び出し、WorkerCall を `agenttools.Request` + `ProviderConfig` に変換。
-3. Registry から kind に対応する Provider を取得し、`ExecPlan` を生成。
-4. ExecPlan の env を `config.Worker.Env` / WorkerCall.Env / 呼び出し時 env でマージし、`Sandbox.Exec` に渡す。
-5. stdout/stderr を受け取り、WorkerRunResult を記録（現状は JSON パースせず RawOutput を保持）。
+- **ProviderConfig**: kind, cliPath, model, flags, extraEnv, toolSpecific を保持。
+- **Request**: 呼び出し時に上書きしたい情報を集約（prompt/mode/env/flags 等）。
+- **ExecPlan**: 実行直前の最終形（command/args/env/workdir）。
+- **Registry**: kind→factory を登録・解決。
+
+### 実行フロー
+
+1. Meta.NextAction が `WorkerCall` を返す。
+2. Orchestrator/Core で `Executor.RunWorkerCall` を呼び出し、`agenttools.Build()` で `ExecPlan` を生成。
+3. `Sandbox.Exec` (Worker) または `agenttools.Execute` (Meta) で実行。
 
 ### サンドボックス方針（絶対ルール）
 
-**Docker コンテナが外部サンドボックスとして機能するため、CLI エージェントツール内部のサンドボックスは無効化し、最大限の権限を与える。**
+**Docker コンテナが外部サンドボックスとして機能するため、CLI エージェントツール内部のサンドボックスは無効化し、最大限の権限を与えます。**
 
 詳細は [サンドボックス方針](sandbox-policy.md) を参照。
 
@@ -148,9 +150,9 @@ flowchart TB
   - Codex CLI 0.65.0 対応。exec モードのみサポート（chat サブコマンドは存在しない）。
   - Docker 内実行: `--dangerously-bypass-approvals-and-sandbox` でサンドボックス・承認を無効化。
   - フラグ体系: `-C`（作業ディレクトリ）、`--json`（JSONL 出力）、`-m`（モデル）、`-c`（設定オーバーライド）。
-  - デフォルト値: モデル `gpt-5.1-codex`（Worker用）/ `gpt-5.1`（Meta用）、思考の深さ `medium`。
+  - デフォルト値: モデル `gpt-5.1-codex`（Worker 用）/ `gpt-5.1`（Meta 用）、思考の深さ `medium`。
   - stdin 対応: PROMPT に `-` を指定して stdin から読み取り。
-  - **ToolSpecific オプション**: `docker_mode`（Docker内実行フラグ制御）、`json_output`（JSON出力制御）
+  - **ToolSpecific オプション**: `docker_mode`（Docker 内実行フラグ制御）、`json_output`（JSON 出力制御）
 - **Execute ヘルパー** (`internal/agenttools/exec.go`):
   - `agenttools.Execute(ctx, plan)` でホスト上で直接 ExecPlan を実行。
   - Meta-agent の CLI 呼び出しで使用。
@@ -167,22 +169,23 @@ flowchart TB
 
 ### モデル設定
 
-| 用途 | モデル ID | 設定箇所 |
-|------|----------|---------|
-| Meta-agent（計画・思考） | `gpt-5.1` | `internal/meta/client.go` |
-| Worker タスク実行 | `gpt-5.1-codex` | `internal/agenttools/codex.go` |
+| 用途                     | モデル ID       | 設定箇所                       |
+| ------------------------ | --------------- | ------------------------------ |
+| Meta-agent（計画・思考） | `gpt-5.1`       | `internal/meta/client.go`      |
+| Worker タスク実行        | `gpt-5.1-codex` | `internal/agenttools/codex.go` |
 
 ### 思考の深さ（reasoning effort）
 
-| レベル | 用途 |
-|--------|------|
-| `low` | 単純なタスク |
+| レベル   | 用途                           |
+| -------- | ------------------------------ |
+| `low`    | 単純なタスク                   |
 | `medium` | 通常のタスク（**デフォルト**） |
-| `high` | 複雑なタスク・リトライ時 |
+| `high`   | 複雑なタスク・リトライ時       |
 
 設定方法: `-c reasoning_effort=medium`
 
 ### 設計上のポイント
+
 - **サンドボックス方針の一貫性**: 全 CLI ツールで Docker が外部サンドボックスとして機能し、CLI 内部のサンドボックスは無効化。
 - **拡張優先**: 共通化は最小限。model や flags は Provider がそのまま解釈できる形で透過させ、ツール固有の挙動を阻害しない。
 - **差し替え容易性**: kind ごとの factory 登録のみで新 CLI を差し替え可能。既存呼び出し側は WorkerCall/Request を介すため変更を局所化できる。
@@ -210,6 +213,7 @@ agenttools.Build()                    agenttools.Build()
 ```
 
 ### 今後の実装方針
+
 - Gemini / Claude Code / Cursor 各 CLI のフラグ体系に合わせた Provider を追加し、stub を置換。
 - ExecPlan 出力の JSON をパースして WorkerRunResult.Summary を改善（codex --json を活用）。
 

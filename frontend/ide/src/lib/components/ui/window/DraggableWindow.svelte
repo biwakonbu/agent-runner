@@ -1,20 +1,19 @@
 <script lang="ts">
   import { stopPropagation } from "svelte/legacy";
-  import { Minus, X } from "lucide-svelte";
+  import { X } from "lucide-svelte";
 
   interface Props {
     id?: string;
     initialPosition?: { x: number; y: number };
     initialSize?: { width: number; height: number };
     title?: string;
-    controls?: { minimize: boolean; close: boolean };
+    controls?: { close: boolean };
     zIndex?: number;
     header?: import("svelte").Snippet;
     children?: import("svelte").Snippet;
     footer?: import("svelte").Snippet;
     // コールバックプロップ
     onclose?: () => void;
-    onminimize?: (data: { minimized: boolean }) => void;
     onclick?: () => void;
     ondragend?: (data: { x: number; y: number }) => void;
     onresizeend?: (data: { width: number; height: number }) => void;
@@ -25,13 +24,12 @@
     initialPosition = { x: 20, y: 20 },
     initialSize = undefined,
     title = "",
-    controls = { minimize: true, close: true },
+    controls = { close: true },
     zIndex = 100,
     header,
     children,
     footer,
     onclose,
-    onminimize,
     onclick,
     ondragend,
     onresizeend,
@@ -41,7 +39,7 @@
   let isDragging = false;
   let isResizing = false;
   let windowEl: HTMLElement | undefined = $state();
-  let isMinimized = $state(false);
+
   let size = $state<{ width: number; height: number } | undefined>(undefined);
 
   // Sync initial values when props change
@@ -100,11 +98,6 @@
     }
   }
 
-  function toggleMinimize() {
-    isMinimized = !isMinimized;
-    onminimize?.({ minimized: isMinimized });
-  }
-
   function closeWindow() {
     onclose?.();
   }
@@ -119,12 +112,11 @@
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
   class="floating-window"
-  class:minimized={isMinimized}
   style:top="{position.y}px"
   style:left="{position.x}px"
   style:z-index={zIndex}
   style:width={size ? `${size.width}px` : undefined}
-  style:height={size && !isMinimized ? `${size.height}px` : undefined}
+  style:height={size ? `${size.height}px` : undefined}
   bind:this={windowEl}
   onmousedown={onWindowClick}
 >
@@ -135,16 +127,6 @@
       {/if}
     </div>
     <div class="window-controls">
-      {#if controls.minimize}
-        <button
-          class="control-btn"
-          onclick={stopPropagation(toggleMinimize)}
-          aria-label="Minimize"
-          type="button"
-        >
-          <Minus size={14} strokeWidth={2.5} />
-        </button>
-      {/if}
       {#if controls.close}
         <button
           class="control-btn close"
@@ -158,24 +140,22 @@
     </div>
   </div>
 
-  {#if !isMinimized}
-    <div class="content">
-      {@render children?.()}
+  <div class="content">
+    {@render children?.()}
+  </div>
+
+  {#if footer}
+    <div class="footer">
+      {@render footer?.()}
     </div>
-
-    {#if footer}
-      <div class="footer">
-        {@render footer?.()}
-      </div>
-    {/if}
-
-    <div
-      class="resize-handle"
-      onmousedown={startResize}
-      role="button"
-      tabindex="0"
-    ></div>
   {/if}
+
+  <div
+    class="resize-handle"
+    onmousedown={startResize}
+    role="button"
+    tabindex="0"
+  ></div>
 </div>
 
 <style>
@@ -211,12 +191,6 @@
   .floating-window:focus-within {
     border-color: var(--mv-window-border-focus);
     box-shadow: var(--mv-shadow-window-focus);
-  }
-
-  .floating-window.minimized {
-    height: var(--mv-size-floating-header) !important;
-    overflow: hidden;
-    background: var(--mv-window-bg-minimized);
   }
 
   /* Header Area */
