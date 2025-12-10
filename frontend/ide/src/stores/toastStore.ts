@@ -7,6 +7,10 @@ export interface Toast {
   message: string;
   type: ToastType;
   duration?: number;
+  action?: {
+    label: string;
+    onClick: () => void;
+  };
 }
 
 function createToastStore() {
@@ -14,9 +18,14 @@ function createToastStore() {
 
   return {
     subscribe,
-    add: (message: string, type: ToastType = 'info', duration = 3000) => {
+    add: (
+      message: string,
+      type: ToastType = 'info',
+      duration = 3000,
+      action?: { label: string; onClick: () => void }
+    ) => {
       const id = Math.random().toString(36).substring(2, 9);
-      update((toasts) => [...toasts, { id, message, type, duration }]);
+      update((toasts) => [...toasts, { id, message, type, duration, action }]);
       if (duration > 0) {
         setTimeout(() => {
           update((toasts) => toasts.filter((t) => t.id !== id));

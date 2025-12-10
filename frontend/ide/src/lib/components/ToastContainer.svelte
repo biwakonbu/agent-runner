@@ -22,6 +22,18 @@
       tabindex="0"
     >
       <div class="message">{toast.message}</div>
+      {#if toast.action}
+        <button
+          class="action-button"
+          onclick={(e) => {
+            e.stopPropagation();
+            toast.action?.onClick();
+            handleClick(toast.id);
+          }}
+        >
+          {toast.action.label}
+        </button>
+      {/if}
     </div>
   {/each}
 </div>
@@ -71,5 +83,22 @@
   .toast.error {
     border-color: var(--mv-primitive-aurora-red);
     background: var(--mv-bg-glow-red-light);
+  }
+
+  .action-button {
+    margin-top: var(--mv-spacing-xs);
+    padding: var(--mv-spacing-xs) var(--mv-spacing-sm);
+    background: var(--mv-glass-bg-hover);
+    border: var(--mv-border-width-thin) solid var(--mv-glass-border-subtle);
+    border-radius: var(--mv-radius-sm);
+    color: inherit;
+    font-size: var(--mv-font-size-xs);
+    cursor: pointer;
+    transition: all var(--mv-transition-fast);
+  }
+
+  .action-button:hover {
+    background: var(--mv-glass-bg-active);
+    border-color: var(--mv-glass-border);
   }
 </style>

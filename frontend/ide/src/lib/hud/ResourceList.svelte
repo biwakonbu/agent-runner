@@ -311,7 +311,7 @@
     border-radius: var(--mv-space-hidden);
     font-weight: var(--mv-font-weight-bold);
     letter-spacing: var(--mv-letter-spacing-count);
-    min-width: var(--mv-badge-min-width);
+    width: var(--mv-badge-width-lg);
     justify-content: center;
   }
 

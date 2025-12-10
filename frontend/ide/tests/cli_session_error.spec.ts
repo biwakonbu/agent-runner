@@ -24,6 +24,7 @@ test.describe('E2E: CLI Session Validation', () => {
           App: {
             ListTasks: async () => [],
             GetPoolSummaries: async () => [],
+            SelectWorkspace: async () => "mock-workspace-id",
             GetExecutionState: async () => "IDLE",
             StartExecution: async () => {}, // Default success
             StopExecution: async () => {},
@@ -49,15 +50,42 @@ test.describe('E2E: CLI Session Validation', () => {
          (window as any).go.main.App.StartExecution = () => Promise.reject(msg);
      }, errorMessage);
 
-     // 2. Click Start button
-     await page.getByRole('button', { name: 'Start' }).click();
+      // 2. Trigger startExecution programmatically (since UI controls are removed)
+      await page.evaluate(() => {
+        // @ts-ignore
+        if (window.startExecution) {
+          // @ts-ignore
+          window.startExecution();
+        } else {
+          console.error("window.startExecution is not defined");
+          throw new Error("window.startExecution is not defined");
+        }
+      });
 
-     // 3. Verify Error Toast appears with specific message
-     // Check for toast container
-     const toast = page.locator('.toast.error');
-     await expect(toast).toBeVisible();
+      // 3. Verify Error Toast appears
+      const toast = page.locator('.toast.error');
+      // Wait for toast to be attached first
+      await toast.waitFor({ state: 'attached', timeout: 5000 });
+      await expect(toast).toBeVisible();
      
      // Check for error message text
      await expect(toast).toContainText('CLI session not found');
+     
+     // 4. Verify Action Button exists and click it
+     const retryButton = toast.locator('button.action-button', { hasText: 'Retry' });
+     await expect(retryButton).toBeVisible();
+     
+     // Mock StartExecution again to verify retry works (this time succeed)
+     await page.evaluate(() => {
+         (window as any).go.main.App.StartExecution = () => Promise.resolve();
+     });
+     
+     // Click retry
+     await retryButton.click();
+     
+     // Toast should disappear (or new success toast appears, depending on implementation)
+     // Since our impl clears old toast when duration passed or removed, but here we just re-run.
+     // Let's expect success toast "Execution started"
+     await expect(page.locator('.toast.success')).toContainText('Execution started');
   });
 });

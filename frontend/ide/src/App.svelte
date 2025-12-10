@@ -30,6 +30,7 @@
   import TaskBar from "./lib/hud/TaskBar.svelte";
   import ProcessWindow from "./lib/hud/ProcessWindow.svelte";
   import { windowStore } from "./stores/windowStore";
+  import ToastContainer from "./lib/components/ToastContainer.svelte";
 
   const log = Logger.withComponent("App");
 
@@ -64,6 +65,10 @@
     initBacklogEvents();
     initLogEvents();
     initProcessEvents();
+
+    // Loopback for E2E testing since Toolbar controls were removed
+    // @ts-ignore
+    window.startExecution = startExecution;
   });
 
   // タスク一覧を読み込み
@@ -169,6 +174,7 @@
       </div>
     {/if}
   {/if}
+  <ToastContainer />
 </main>
 
 <style>

@@ -277,10 +277,10 @@ frontend/ide/src/stores/
 
 #### Step 12: クリーンアップ
 
-- [ ] `frontend/ide/src/lib/grid/` 削除
-- [ ] `frontend/ide/src/lib/wbs/WBSGraphView.svelte` 削除
-- [ ] `frontend/ide/src/lib/wbs/WBSGraphNode.svelte` 削除
-- [ ] `frontend/ide/src/stores/viewportStore.ts` 削除（flowStore に統合）
+- [x] `frontend/ide/src/lib/grid/` 削除
+- [x] `frontend/ide/src/lib/wbs/WBSGraphView.svelte` 維持（WBS モードで使用）
+- [x] `frontend/ide/src/lib/wbs/WBSGraphNode.svelte` 維持（WBS モードで使用）
+- [x] `frontend/ide/src/stores/viewportStore.ts` 削除（flowStore に統合）
 
 ### 技術メモ
 

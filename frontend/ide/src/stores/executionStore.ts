@@ -26,9 +26,17 @@ export async function startExecution(): Promise<void> {
     try {
         await StartExecution();
         toasts.add('Execution started', 'success');
-    } catch (e) {
+    } catch (e: any) {
         console.error('Failed to start execution:', e);
-        toasts.add(`Failed to start: ${e}`, 'error');
+        const errorMsg = String(e);
+        if (errorMsg.includes('CLI session not found')) {
+            toasts.add('CLI session not found. Please login via terminal.', 'error', 10000, {
+                label: 'Retry',
+                onClick: () => startExecution(),
+            });
+        } else {
+            toasts.add(`Failed to start: ${e}`, 'error');
+        }
     }
 }
 
