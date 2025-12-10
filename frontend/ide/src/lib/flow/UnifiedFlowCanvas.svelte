@@ -14,13 +14,23 @@
   import { viewMode } from "../../stores/wbsStore"; // Import viewMode
   import type { Task } from "../../types";
   import TaskNode from "./nodes/TaskNode.svelte";
+  import WBSFlowNode from "./nodes/WBSFlowNode.svelte";
+  import MilestoneFlowNode from "./nodes/MilestoneFlowNode.svelte";
   import DependencyEdge from "./edges/DependencyEdge.svelte";
-  import { getLayoutedElements, convertTasksToFlowData } from "./dagreLayout";
+  import {
+    getLayoutedElements,
+    convertTasksToFlowData,
+    convertWBSToFlowData,
+  } from "./dagreLayout";
   import WBSListView from "../wbs/WBSListView.svelte";
+  import { wbsTree, expandedNodes } from "../../stores/wbsStore";
+  import { layoutDirection } from "./layout/layoutStore";
 
   // Custom Node/Edge Types
   const nodeTypes = {
     task: TaskNode,
+    wbs: WBSFlowNode,
+    milestone: MilestoneFlowNode,
   };
 
   const edgeTypes = {
@@ -37,14 +47,29 @@
   let nodes = $state<Node[]>([]);
   let edges = $state<Edge[]>([]);
 
-  // Update flow data when tasks change
+  // Update flow data when tasks/mode/expansion change
   $effect(() => {
+    // If we are in WBS mode, render WBS Tree
+    if ($viewMode === "wbs") {
+      const { nodes: initialNodes, edges: initialEdges } = convertWBSToFlowData(
+        $wbsTree,
+        $expandedNodes
+      );
+      // Use LR direction for WBS by default or from store
+      const { nodes: layoutedNodes, edges: layoutedEdges } =
+        getLayoutedElements(initialNodes, initialEdges, $layoutDirection);
+      nodes = layoutedNodes;
+      edges = layoutedEdges;
+      return;
+    }
+
+    // Default: Task Graph Mode
     const targetTasks = taskList ?? $tasks;
     if (targetTasks.length > 0) {
       const { nodes: initialNodes, edges: initialEdges } =
         convertTasksToFlowData(targetTasks);
       const { nodes: layoutedNodes, edges: layoutedEdges } =
-        getLayoutedElements(initialNodes, initialEdges);
+        getLayoutedElements(initialNodes, initialEdges, "TB"); // Default TB for tasks
       nodes = layoutedNodes;
       edges = layoutedEdges;
     } else {
@@ -227,10 +252,8 @@
   .flow-container.wbs-mode :global(.svelte-flow__controls),
   .flow-container.wbs-mode :global(.svelte-flow__minimap),
   .flow-container.wbs-mode :global(.svelte-flow__background) {
-    opacity: 0.15;
-    filter: blur(2px) grayscale(0.5);
+    /* Removed opacity/blur to make WBS Graph visible */
     transition: all 0.3s ease;
-    pointer-events: none;
   }
 
   .flow-container:not(.wbs-mode) :global(.svelte-flow__viewport) {

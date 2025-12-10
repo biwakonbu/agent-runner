@@ -29,8 +29,13 @@ export async function startExecution(): Promise<void> {
     } catch (e: any) {
         console.error('Failed to start execution:', e);
         const errorMsg = String(e);
-        if (errorMsg.includes('CLI session not found')) {
-            toasts.add('CLI session not found. Please login via terminal.', 'error', 10000, {
+        if (errorMsg.includes('CLI session not found') || errorMsg.includes('session') || errorMsg.includes('login')) {
+            // Check if specific CLI mentioned, else default to generic
+            let command = 'codex login';
+            if (errorMsg.includes('claude')) command = 'claude login';
+            if (errorMsg.includes('gemini')) command = 'gemini login';
+            
+            toasts.add(`CLI session not found. Please run '${command}' in your terminal.`, 'error', 0, { // 0 = persistent
                 label: 'Retry',
                 onClick: () => startExecution(),
             });

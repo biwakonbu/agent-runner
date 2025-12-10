@@ -115,264 +115,14 @@ type Request struct {
 }
 ```
 
-#### FR-P4-002: 実行制御 UI の完成
-
-**ツールバー ExecutionControls:**
-
-現在の実装（`app.go`）には API が存在するが、フロントエンドの UI が未完成。
-
-```svelte
-<!-- frontend/ide/src/lib/toolbar/ExecutionControls.svelte -->
-<script lang="ts">
-    import { executionState } from '../../stores/executionStore';
-    import { StartExecution, PauseExecution, ResumeExecution, StopExecution } from '../../../wailsjs/go/main/App';
-    import Button from '../design-system/Button.svelte';
-    import StatusIndicator from '../design-system/StatusIndicator.svelte';
-
-    async function handleStart() {
-        try {
-            await StartExecution();
-        } catch (e) {
-            // TODO: Toast 通知
-            console.error('Failed to start execution:', e);
-        }
-    }
-
-    async function handlePause() {
-        await PauseExecution();
-    }
-
-    async function handleResume() {
-        await ResumeExecution();
-    }
-
-    async function handleStop() {
-        await StopExecution();
-    }
-</script>
-
-<div class="execution-controls">
-    <StatusIndicator status={$executionState === 'RUNNING' ? 'running' : $executionState === 'PAUSED' ? 'paused' : 'idle'} />
-
-    {#if $executionState === 'IDLE'}
-        <Button variant="primary" size="sm" on:click={handleStart}>
-            ▶ 開始
-        </Button>
-    {:else if $executionState === 'RUNNING'}
-        <Button variant="warning" size="sm" on:click={handlePause}>
-            ⏸ 一時停止
-        </Button>
-        <Button variant="danger" size="sm" on:click={handleStop}>
-            ⏹ 停止
-        </Button>
-    {:else if $executionState === 'PAUSED'}
-        <Button variant="primary" size="sm" on:click={handleResume}>
-            ▶ 再開
-        </Button>
-        <Button variant="danger" size="sm" on:click={handleStop}>
-            ⏹ 停止
-        </Button>
-    {/if}
-</div>
-```
-
-#### FR-P4-003: タスク実行ログのリアルタイム表示
-
-**設計方針:**
-
-- agent-runner の stdout/stderr をリアルタイムでフロントエンドに転送
-- Wails Events を使用してログ行を逐次送信
-- ログビューワーで実行中タスクの進捗を確認可能
-
-```go
-// internal/orchestrator/executor.go 拡張
-
-// StreamingExecuteTask はログをリアルタイムストリーミングしながらタスクを実行する
-func (e *Executor) StreamingExecuteTask(ctx context.Context, task *Task, emitter EventEmitter) (*Attempt, error) {
-    // ... (既存の ExecuteTask ロジックを拡張)
-
-    // stdout/stderr をリアルタイムで送信
-    stdoutPipe, _ := cmd.StdoutPipe()
-    stderrPipe, _ := cmd.StderrPipe()
-
-    go func() {
-        scanner := bufio.NewScanner(stdoutPipe)
-        for scanner.Scan() {
-            emitter.Emit(EventTaskLog, TaskLogEvent{
-                TaskID: task.ID,
-                Stream: "stdout",
-                Line:   scanner.Text(),
-                Time:   time.Now(),
-            })
-        }
-    }()
-
-    // ... (stderr も同様)
-}
-```
-
-**フロントエンド TaskLogView:**
-
-```svelte
-<!-- frontend/ide/src/lib/components/TaskLogView.svelte -->
-<script lang="ts">
-    import { taskLogs } from '../../stores/taskLogStore';
-    import { EventsOn } from '../../../wailsjs/runtime/runtime';
-    import { onMount } from 'svelte';
-
-    export let taskId: string;
-
-    $: logs = $taskLogs[taskId] ?? [];
-
-    onMount(() => {
-        EventsOn('task:log', (event: { taskId: string; stream: string; line: string }) => {
-            if (event.taskId === taskId) {
-                taskLogs.addLog(taskId, event);
-            }
-        });
-    });
-</script>
-
-<div class="task-log-view">
-    {#each logs as log}
-        <pre class="log-line {log.stream}">{log.line}</pre>
-    {/each}
-</div>
-```
-
-#### FR-P4-004: 設定画面
-
-**LLM 設定:**
-
-```svelte
-<!-- frontend/ide/src/lib/settings/LLMSettings.svelte -->
-<script lang="ts">
-    import { GetLLMConfig, SetLLMConfig, TestLLMConnection } from '../../../wailsjs/go/main/App';
-    import Input from '../design-system/Input.svelte';
-    import Button from '../design-system/Button.svelte';
-
-    let config = {
-        kind: 'mock',
-        apiKey: '',
-        model: 'gpt-4o',
-    };
-    let testResult = '';
-    let testing = false;
-
-    async function loadConfig() {
-        config = await GetLLMConfig();
-    }
-
-    async function saveConfig() {
-        await SetLLMConfig(config);
-    }
-
-    async function testConnection() {
-        testing = true;
-        try {
-            testResult = await TestLLMConnection();
-        } catch (e) {
-            testResult = `エラー: ${e}`;
-        } finally {
-            testing = false;
-        }
-    }
-</script>
-
-<div class="llm-settings">
-    <h3>LLM 設定</h3>
-
-    <label>
-        プロバイダ
-        <select bind:value={config.kind}>
-            <option value="mock">モック（開発用）</option>
-            <option value="openai-chat">OpenAI</option>
-        </select>
-    </label>
-
-    {#if config.kind === 'openai-chat'}
-        <Input
-            label="API キー"
-            type="password"
-            bind:value={config.apiKey}
-            placeholder="sk-..."
-        />
-        <Input
-            label="モデル"
-            bind:value={config.model}
-            placeholder="gpt-4o"
-        />
-    {/if}
-
-    <div class="actions">
-        <Button on:click={saveConfig}>保存</Button>
-        <Button variant="secondary" on:click={testConnection} disabled={testing}>
-            {testing ? '接続テスト中...' : '接続テスト'}
-        </Button>
-    </div>
-
-    {#if testResult}
-        <div class="test-result">{testResult}</div>
-    {/if}
-</div>
-```
-
-**バックエンド API:**
-
-```go
-// app.go に追加
-
-// LLMConfig は LLM 設定
-type LLMConfig struct {
-    Kind   string `json:"kind"`
-    APIKey string `json:"apiKey"`
-    Model  string `json:"model"`
-}
-
-// GetLLMConfig は現在の LLM 設定を取得する
-func (a *App) GetLLMConfig() LLMConfig {
-    return LLMConfig{
-        Kind:   os.Getenv("MULTIVERSE_META_KIND"),
-        APIKey: "********", // マスク表示
-        Model:  os.Getenv("MULTIVERSE_META_MODEL"),
-    }
-}
-
-// SetLLMConfig は LLM 設定を保存する
-func (a *App) SetLLMConfig(config LLMConfig) error {
-    // 設定ファイルに保存（環境変数ではなく永続化）
-    // TODO: セキュアな保存方法（OS keychain）
-}
-
-// TestLLMConnection は LLM 接続をテストする
-func (a *App) TestLLMConnection() (string, error) {
-    metaClient := newMetaClientFromConfig(a.getLLMConfig())
-    ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-    defer cancel()
-
-    // 簡単なテストプロンプトを送信
-    _, err := metaClient.Decompose(ctx, &meta.DecomposeRequest{
-        UserInput: "テスト接続",
-        Context:   meta.DecomposeContext{},
-    })
-    if err != nil {
-        return "", err
-    }
-    return "接続成功", nil
-}
-```
-
 ### 3.3 受け入れ条件
 
-| ID       | 条件                                                         |
-| -------- | ------------------------------------------------------------ |
-| AC-P4-01 | CLI プロバイダ（Codex CLI 等）を設定画面から選択・保存できる |
-| AC-P4-02 | 設定画面から CLI セッション検証を実行できる                  |
-| AC-P4-03 | チャットメッセージが CLI プロバイダで処理される              |
-| AC-P4-04 | 生成されたタスクが実際に agent-runner で実行される           |
-| AC-P4-05 | タスク実行ログがリアルタイムで表示される                     |
-| AC-P4-06 | 実行コントロール（開始/一時停止/再開/停止）が機能する        |
-| AC-P4-07 | Docker サンドボックスで Codex CLI セッションが引き継がれる   |
+| ID       | 条件                                                       |
+| -------- | ---------------------------------------------------------- |
+| AC-P4-01 | チャットメッセージが CLI プロバイダで処理される            |
+| AC-P4-02 | 生成されたタスクが実際に agent-runner で実行される         |
+| AC-P4-03 | タスク実行ログがチャットのログタブに表示される             |
+| AC-P4-04 | Docker サンドボックスで Codex CLI セッションが引き継がれる |
 
 ---
 
@@ -567,8 +317,6 @@ frontend/ide/src/lib/flow/
 │  - GridCanvas → 依存グラフ表示                       │
 │  - WBSView → マイルストーン表示                      │
 │  - BacklogPanel → バックログ管理                     │
-│  - ExecutionControls → 実行制御 (Phase 4 強化)       │
-│  - LLMSettings → LLM 設定 (Phase 4 新規)            │
 └──────────────┬──────────────────────────────────────┘
                │ Wails IPC + Events
 ┌──────────────▼──────────────────────────────────────┐
@@ -594,15 +342,12 @@ frontend/ide/src/lib/flow/
 └─────────────────────────────────────────────────────┘
 ```
 
-### 5.2 Phase 4 で追加するコンポーネント
+### 5.2 Phase 4 で追加されたコンポーネント
 
-| コンポーネント    | 場所                             | 責務             |
-| ----------------- | -------------------------------- | ---------------- |
-| LLMConfigStore    | internal/ide/llm_config.go       | LLM 設定の永続化 |
-| ExecutionControls | frontend/ide/src/lib/toolbar/    | 実行制御 UI      |
-| LLMSettings       | frontend/ide/src/lib/settings/   | LLM 設定 UI      |
-| TaskLogView       | frontend/ide/src/lib/components/ | タスクログ表示   |
-| taskLogStore      | frontend/ide/src/stores/         | ログ状態管理     |
+| コンポーネント | 場所                       | 責務             |
+| -------------- | -------------------------- | ---------------- |
+| LLMConfigStore | internal/ide/llm_config.go | LLM 設定の永続化 |
+| logStore       | frontend/ide/src/stores/   | ログ状態管理     |
 
 ---
 

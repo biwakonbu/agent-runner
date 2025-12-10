@@ -1,6 +1,7 @@
 import dagre from 'dagre';
 import { Position, type Node, type Edge } from '@xyflow/svelte';
 import type { Task } from '../../types';
+import type { WBSNode } from '../../stores/wbsStore';
 
 const BASE_HEIGHT = 100; // Safe default height
 const WIDTH_SMALL = 180;
@@ -118,5 +119,43 @@ export function convertTasksToFlowData(tasks: Task[]) {
     });
   });
 
+
   return { nodes, edges };
 }
+
+export function convertWBSToFlowData(wbsNodes: WBSNode[], expandedNodeIds: Set<string>) {
+  const nodes: Node[] = [];
+  const edges: Edge[] = [];
+
+  function traverse(node: WBSNode, parentId?: string) {
+    // Only process Milestone, Phase, and Task types
+    const type = node.type === 'milestone' ? 'milestone' : 'wbs';
+
+    nodes.push({
+      id: node.id,
+      type,
+      position: { x: 0, y: 0 },
+      data: { node },
+    });
+
+    if (parentId) {
+      edges.push({
+        id: `e-${parentId}-${node.id}`,
+        source: parentId,
+        target: node.id,
+        type: 'step',
+        animated: false,
+        style: 'stroke: var(--mv-color-border-subtle); stroke-width: 1;',
+      });
+    }
+
+    // Only traverse children if this node is expanded
+    if (expandedNodeIds.has(node.id) && node.children && node.children.length > 0) {
+      node.children.forEach((child) => traverse(child, node.id));
+    }
+  }
+
+  wbsNodes.forEach((node) => traverse(node));
+  return { nodes, edges };
+}
+

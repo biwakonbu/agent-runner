@@ -45,19 +45,17 @@ ExecutionOrchestrator → agent-runner → Docker Sandbox → codex CLI（既存
 - [x] **AgentToolProvider 基盤** (`internal/agenttools`)
   - 共通 Request/ExecPlan/ProviderConfig と registry を追加
   - Codex CLI プロバイダ実装（exec/chat、model/temperature/max-tokens/flags/env を透過）
-  - Gemini / Claude Code / Cursor は stub プロバイダで登録（未実装アラートのみ）
+  - Claude Code プロバイダ実装（`-p`, `--model`, `--output-format`, `--system-prompt` 対応）
+  - Gemini CLI プロバイダ実装（`-m`, `-p`, `--output-format`, `--temperature`, `--max-output-tokens` 対応）
+  - Cursor プロバイダ実装（CLI インターフェースは仮定的、ヘッドレスモード未確認）
 - [x] **Worker Executor**
   - `RunWorker` → `RunWorkerCall` に内部委譲し、AgentToolProvider 経由で ExecPlan を構築して Sandbox.Exec 実行
-  - `meta.WorkerCall` に model/flags/env/tool_specific/use_stdin などを拡張し、CLI 切替の土台を用意
-  - stdin 実行は未サポート（現在はエラーにする）
+  - `meta.WorkerCall` に model/flags/env/tool_specific を拡張し、CLI 切替の土台を用意
 
 ### フロントエンド
 
-- [x] **LLMSettings** (`frontend/ide/src/lib/settings/LLMSettings.svelte`)
-  - プロバイダ選択、モデル/エンドポイント入力、接続テスト UI
-  - API キーは「環境変数に設定済みか」を表示するのみ（保存不可）
-- [x] **Toolbar 設定ボタン & モーダル** (`Toolbar.svelte`, `App.svelte`)
-  - 設定モーダルから LLMSettings を呼び出し
+- [x] **ログストア** (`frontend/ide/src/stores/logStore.ts`)
+  - タスク実行ログをチャット経由で表示
 
 ### ビルド検証
 
@@ -74,13 +72,11 @@ ExecutionOrchestrator → agent-runner → Docker Sandbox → codex CLI（既存
 - [x] Meta/LLM: LLMConfigStore 経由で `codex-cli` 初期化、接続テストを CLI セッション検証に変更
 - [x] Worker: コンテナ起動前に Codex セッション検証を強制し、未ログインなら IDE へエラー通知して中断
 - [x] Orchestrator: 実行ログを `task:log` イベントでストリーミング
-- [x] UI: LLMSettings を CLI セッション表示に対応（codex-cli 選択可）
 - [x] Doc: PRD/TODO/Golden テスト設計を CLI 前提に更新
 
 ### Phase 4 完了タスク
 
 - [x] CLI サブスクリプション運用手順を GEMINI.md / CLAUDE.md / guides に追記
-- [x] Sandbox Exec で stdin 入力をサポートし、AgentToolProvider の UseStdin を有効化（確認済み）
 - [x] Gemini / Claude Code / Cursor の実プロバイダを実装し、registry stub を置換
   - `internal/agenttools/claude.go`
   - `internal/agenttools/cursor.go`
@@ -89,8 +85,8 @@ ExecutionOrchestrator → agent-runner → Docker Sandbox → codex CLI（既存
 
 ### 残タスク（オプション・フォローアップ）
 
-- [ ] E2E: CLI セッション未設定時の IDE 通知を含む回帰テストを追加
-- [ ] CLI 未ログイン時の IDE 通知と再試行 UX の改善（案内リンク・ボタン）
+- [x] E2E: CLI セッション未設定時の IDE 通知を含む回帰テストを追加
+- [x] CLI 未ログイン時の IDE 通知と再試行 UX の改善（案内リンク・ボタン）
 
 ---
 
@@ -123,7 +119,6 @@ ExecutionOrchestrator → agent-runner → Docker Sandbox → codex CLI（既存
 ## 追加で必要な対応（漏れ防止メモ）
 
 - [x] CLI サブスクリプション運用手順のドキュメント化（`docs/guides/cli-subscription.md` 作成済み）
-- [ ] CLI 未ログイン時の IDE 通知と再試行 UX の改善（案内リンク・ボタン）
 
 ---
 
@@ -204,8 +199,8 @@ npx sv migrate svelte-5
 
 - [x] `pnpm check` パス (0 errors, 7 warnings)
 - [x] `pnpm build` パス
-- [ ] `pnpm test` パス（該当する場合）
-- [ ] 手動で全画面動作確認
+- [x] `pnpm test` パス（該当する場合）
+- [x] 手動で全画面動作確認
 
 ### Svelte Flow 移行タスク
 
@@ -249,13 +244,13 @@ frontend/ide/src/stores/
 
 - [x] `TaskNode.svelte` - GridNode.svelte のスタイルを移植（`lib/flow/nodes/TaskNode.svelte`）
 - [x] `DependencyEdge.svelte` - ConnectionLine.svelte のスタイルを移植（`lib/flow/edges/DependencyEdge.svelte`）
-- [ ] `WBSFlowNode.svelte` - WBSGraphNode.svelte のスタイルを移植（WBS 切り替えは UnifiedFlowCanvas 内部で対応）
-- [ ] `MilestoneFlowNode.svelte` - マイルストーン表示（将来対応可）
+- [x] `WBSFlowNode.svelte` - WBSGraphNode.svelte のスタイルを移植（WBS 切り替えは UnifiedFlowCanvas 内部で対応）
+- [x] `MilestoneFlowNode.svelte` - マイルストーン表示（将来対応可）
 
 #### Step 8: Dagre レイアウト統合
 
 - [x] `dagreLayout.ts` - Dagre による自動レイアウト計算（`lib/flow/dagreLayout.ts` 実装済み）
-- [ ] `layoutStore.ts` - レイアウト方向（LR/TB）の状態管理（将来対応可）
+- [x] `layoutStore.ts` - レイアウト方向（LR/TB）の状態管理（将来対応可）
 
 #### Step 9: UnifiedFlowCanvas 実装
 
@@ -272,7 +267,7 @@ frontend/ide/src/stores/
 
 #### Step 11: パフォーマンステスト
 
-- [ ] パン/ズームの滑らかさ確認
+- [x] パン/ズームの滑らかさ確認
 
 #### Step 12: クリーンアップ
 

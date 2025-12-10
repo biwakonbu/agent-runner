@@ -60,17 +60,8 @@ func (p *ClaudeProvider) Build(_ context.Context, req Request) (ExecPlan, error)
 
 	args := []string{}
 
-	// JSON output support check
-	// Note: claude-code might not support --json for all commands, checking docs or assuming future support.
-	// For now, if requested, we add it.
-	jsonOutput := true
-	if v, ok := req.ToolSpecific["json_output"].(bool); ok {
-		jsonOutput = v
-	}
-	// TODO: Verify if claude cli supports --json. Currently assuming standard behavior or ignoring if unknown.
-	// Let's assume it doesn't support --json by default unless we know specific flag.
-	// Removing --json for safety unless explicitly needed or verified.
-	_ = jsonOutput
+	// Claude Code CLIは--jsonフラグをサポートしていない
+	// 出力を構造化する場合は --output-format json を使用
 
 	// Model specification
 	if p.model != "" || req.Model != "" {
@@ -78,10 +69,8 @@ func (p *ClaudeProvider) Build(_ context.Context, req Request) (ExecPlan, error)
 		args = append(args, "--model", model)
 	}
 
-	// Temperature mapping (if supported)
-	// Claude Code CLI flags are TBD.
-	// TODO: Add temperature flag when Claude Code CLI supports it
-	_ = req.Temperature // Currently unused, pending CLI support
+	// Temperature: Claude Code CLIは --temperature フラグをサポートしていない
+	// system prompt: --system-prompt / --append-system-prompt
 
 	// Extra flags
 	args = append(args, p.flags...)
