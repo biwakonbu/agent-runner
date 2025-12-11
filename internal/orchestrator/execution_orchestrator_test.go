@@ -10,11 +10,6 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
-// waitForStop はゴルーチンが終了するための時間を待つヘルパー
-func waitForStop() {
-	time.Sleep(50 * time.Millisecond)
-}
-
 // MockEventEmitter is a mock implementation of EventEmitter
 type MockEventEmitter struct {
 	mock.Mock
@@ -78,7 +73,7 @@ func TestExecutionOrchestrator_StateTransitions(t *testing.T) {
 	assert.NoError(t, err)
 
 	// ゴルーチン終了を待つ
-	waitForStop()
+	orch.Wait()
 }
 
 func TestExecutionOrchestrator_Flow(t *testing.T) {
@@ -169,7 +164,7 @@ func TestExecutionOrchestrator_EventEmission(t *testing.T) {
 	_ = orch.Stop()
 
 	// ゴルーチン終了を待つ
-	waitForStop()
+	orch.Wait()
 
 	emitter.AssertExpectations(t)
 }
@@ -226,7 +221,7 @@ func TestExecutionOrchestrator_InvalidTransitions(t *testing.T) {
 	_ = orch.Stop()
 
 	// ゴルーチン終了を待つ
-	waitForStop()
+	orch.Wait()
 }
 
 func TestExecutionOrchestrator_ContextCancellation(t *testing.T) {
@@ -252,7 +247,7 @@ func TestExecutionOrchestrator_ContextCancellation(t *testing.T) {
 	assert.Equal(t, ExecutionStateIdle, orch.State())
 
 	// ゴルーチン終了を待つ
-	waitForStop()
+	orch.Wait()
 }
 
 func TestExecutionOrchestrator_NilEventEmitter(t *testing.T) {
@@ -275,7 +270,7 @@ func TestExecutionOrchestrator_NilEventEmitter(t *testing.T) {
 	})
 
 	// ゴルーチン終了を待つ
-	waitForStop()
+	orch.Wait()
 }
 
 func TestExecutionOrchestrator_StateMethod(t *testing.T) {
@@ -305,7 +300,7 @@ func TestExecutionOrchestrator_StateMethod(t *testing.T) {
 	assert.Equal(t, ExecutionStateIdle, orch.State())
 
 	// ゴルーチン終了を待つ
-	waitForStop()
+	orch.Wait()
 }
 
 // MockExecutor implements TaskExecutor for testing
@@ -390,7 +385,7 @@ func TestExecutionOrchestrator_Stop_CancelsRunningTask(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Ensure runLoop exits before asserting expectations to avoid data races
-	waitForStop()
+	orch.Wait()
 
 	// Verify executed task was canceled
 	mockExecutor.AssertExpectations(t)

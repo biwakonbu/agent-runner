@@ -35,6 +35,9 @@ function createToastStore() {
     remove: (id: string) => {
       update((toasts) => toasts.filter((t) => t.id !== id));
     },
+    reset: () => {
+      update(() => []);
+    }
   };
 }
 

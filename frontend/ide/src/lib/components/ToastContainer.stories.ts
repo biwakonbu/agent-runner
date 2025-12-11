@@ -17,47 +17,22 @@ type Story = StoryObj<typeof meta>;
 export const Default: Story = {
   play: async () => {
     // Reset toasts
-    toasts.set([]);
+    toasts.reset();
     
     // Add demo toasts
-    toasts.add({
-      type: 'info',
-      message: 'This is an info toast',
-    });
-    
-    setTimeout(() => {
-      toasts.add({
-        type: 'success',
-        message: 'This is a success toast',
-      });
-    }, 500);
-
-    setTimeout(() => {
-        toasts.add({
-          type: 'warning',
-          message: 'This is a warning toast',
-        });
-      }, 1000);
-
-    setTimeout(() => {
-      toasts.add({
-        type: 'error',
-        message: 'This is an error toast',
-      });
-    }, 1500);
+    toasts.add('This is an info toast', 'info');
+    toasts.add('This is a success toast', 'success');
+    toasts.add('This is a warning toast', 'warning');
+    toasts.add('This is an error toast', 'error');
   }
 };
 
 export const WithAction: Story = {
     play: async () => {
-        toasts.set([]);
-        toasts.add({
-            type: 'info',
-            message: 'Toast with action',
-            action: {
+        toasts.reset();
+        toasts.add('Toast with action', 'info', 3000, {
                 label: 'Undo',
                 onClick: () => console.log('Undo clicked')
-            }
         });
     }
 }

@@ -41,6 +41,8 @@ type ExecutionOrchestrator struct {
 	stopCh   chan struct{}
 	resumeCh chan struct{}
 
+	wg sync.WaitGroup
+
 	logger *slog.Logger
 }
 
@@ -91,6 +93,7 @@ func (e *ExecutionOrchestrator) Start(ctx context.Context) error {
 	e.logger.Info("execution orchestrator started")
 
 	// Start the loop in a goroutine
+	e.wg.Add(1)
 	go e.runLoop(ctx, stopCh)
 
 	return nil
@@ -166,6 +169,11 @@ func (e *ExecutionOrchestrator) State() ExecutionState {
 	return e.state
 }
 
+// Wait waits for the run loop to exit
+func (e *ExecutionOrchestrator) Wait() {
+	e.wg.Wait()
+}
+
 func (e *ExecutionOrchestrator) emitStateChange(oldState, newState ExecutionState) {
 	if e.EventEmitter != nil {
 		e.EventEmitter.Emit(EventExecutionStateChange, ExecutionStateChangeEvent{
@@ -177,6 +185,7 @@ func (e *ExecutionOrchestrator) emitStateChange(oldState, newState ExecutionStat
 }
 
 func (e *ExecutionOrchestrator) runLoop(ctx context.Context, stopCh <-chan struct{}) {
+	defer e.wg.Done()
 	ticker := time.NewTicker(2 * time.Second) // Poll every 2s
 	defer ticker.Stop()
 

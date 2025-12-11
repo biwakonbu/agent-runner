@@ -24,6 +24,7 @@ PRIORITY_FILES=(
   "design/README.md"
   "design/architecture.md"
   "design/ide-architecture.md"
+  "design/orchestrator-persistence-v2.md"
   "design/data-flow.md"
   "design/implementation-guide.md"
   "design/sandbox-policy.md"

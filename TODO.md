@@ -1,335 +1,59 @@
-# TODO: multiverse v3.0 - Phase 4 & 4.5 Implementation
+# TODO: Multiverse IDE Core 永続化 & スケジューラ V2
 
-Based on PRD v3.0 - Codex CLI 統合と実タスク実行 + Svelte 5 移行
+## 1. データモデル & リポジトリ層 (新規 `internal/orchestrator/persistence`)
 
----
+- [x] **データモデル定義 (`internal/orchestrator/persistence/models.go`)**
 
-## 現在のステータス
+  - [x] `WBS` および `NodeIndex` 構造体
+  - [x] `NodeDesign` 構造体 (estimate, suggested_impl 含む)
+  - [x] `NodesRuntime` および `NodeRuntime` 構造体
+  - [x] `TasksState`, `TaskState` (v2), `QueueMeta` 構造体
+  - [x] `AgentsState` および `AgentState` 構造体
+  - [x] `Action` 構造体 (共通フィールド + Payload)
 
-| フェーズ  | 内容                             | ステータス |
-| --------- | -------------------------------- | ---------- |
-| Phase 1   | チャット → タスク生成            | ✅ 完了    |
-| Phase 2   | 依存関係グラフ・WBS 表示         | ✅ 完了    |
-| Phase 3   | 自律実行ループ                   | ✅ 完了    |
-| Phase 4   | CLI セッション統合・実タスク実行 | ✅ 完了    |
-| Phase 4.5 | Svelte 5 + Svelte Flow 移行      | ✅ 完了    |
+- [x] **リポジトリ実装 (`internal/orchestrator/persistence/repo.go`)**
 
----
+  - [x] `DesignRepository`: `LoadWBS`, `SaveWBS`, `GetNode`, `SaveNode`
+  - [x] `StateRepository`: `LoadTasks`, `SaveTasks`, `LoadNodesRuntime`, `SaveNodesRuntime`
+  - [x] `HistoryRepository`: `AppendAction`, `ListActions`
+  - [x] `WorkspaceRepository`: 全リポジトリのマネージャ、ディレクトリ初期化処理
 
-## 設計方針（重要・現状差分あり）
+- [x] **データアクセス・テスト**
+  - [x] JSON シリアライズ/デシリアライズのユニットテスト
+  - [x] ファイル I/O と原子的更新の統合テスト
 
-> [!IMPORTANT]
-> API キーは不要。Codex / Claude Code / Gemini / Cursor など **CLI サブスクリプションセッションを優先利用**する。Meta 層も CLI セッション前提に置き換え、API キー依存を排除する。
+## 2. スケジューラロジック V2 (`internal/orchestrator/scheduler_v2.go`)
 
-**現在のデータフロー（実装ベース）:**
+- [x] **スケジューラのリファクタリング/書き換え**
 
-```
-Chat → Meta-agent (openai-chat via HTTP + OPENAI_API_KEY) → Task 生成
-                                                            ↓
-ExecutionOrchestrator → agent-runner → Docker Sandbox → codex CLI（既存セッション想定）
-```
+  - [x] `TaskStore` の代わりに `StateRepository` を使用するよう `Scheduler` 構造体を更新
+  - [x] 以下の処理を行う `ScheduleLoop` (または `Step`) を実装:
+    1. `state/tasks.json` から保留中(pending)タスクを読み込む
+    2. `state/nodes-runtime.json` と `design/` を使用して依存関係をチェック
+    3. `state/agents.json` でエージェントの空き状況をチェック
+    4. `task.started` アクションを作成
+    5. `state/tasks.json` (status=running) と `state/agents.json` を更新
+  - [x] `allDependenciesSatisfied` ロジックを新データモデルへ移植
 
----
+- [x] **アクション & イベント統合**
+  - [x] すべての状態変更に先立って `HistoryRepository.AppendAction` が実行されることを保証
+  - [ ] UI 通知用の内部イベントを発火 (後で IPC 経由で送信)
 
-## 現在の実装メモ（2025-12-07 時点）
+## 3. Executor & IPC との統合
 
-### バックエンド
+- [ ] **Executor 更新**
 
-- [x] **LLMConfigStore** (`internal/ide/llm_config.go`)
-  - Kind/Model/BaseURL/SystemPrompt を `~/.multiverse/config/llm.json` に永続化
-  - 環境変数オーバーライドあり（API キー保存は不要にする方針）
-- [x] **App API** (`app.go`)
-  - `GetLLMConfig` / `SetLLMConfig` / `TestLLMConnection` を追加
-  - ただし **ChatHandler 生成は `newMetaClientFromEnv()` 固定**で LLMConfigStore の設定が Meta 層に反映されない
-  - `TestLLMConnection` は OpenAI API キー前提の HTTP 呼び出し（API キー不要の CLI セッション検証に置換予定）
-- [x] **AgentToolProvider 基盤** (`internal/agenttools`)
-  - 共通 Request/ExecPlan/ProviderConfig と registry を追加
-  - Codex CLI プロバイダ実装（exec/chat、model/temperature/max-tokens/flags/env を透過）
-  - Claude Code プロバイダ実装（`-p`, `--model`, `--output-format`, `--system-prompt` 対応）
-  - Gemini CLI プロバイダ実装（`-m`, `-p`, `--output-format`, `--temperature`, `--max-output-tokens` 対応）
-  - Cursor プロバイダ実装（CLI インターフェースは仮定的、ヘッドレスモード未確認）
-- [x] **Worker Executor**
-  - `RunWorker` → `RunWorkerCall` に内部委譲し、AgentToolProvider 経由で ExecPlan を構築して Sandbox.Exec 実行
-  - `meta.WorkerCall` に model/flags/env/tool_specific を拡張し、CLI 切替の土台を用意
+  - [x] `TaskState` (v2) オブジェクトを受け取るよう `Executor` を修正 (v2 実装済み)
+  - [x] 実行完了時、`task.succeeded` または `task.failed` アクションを記録
+  - [x] 結果に基づいて `state/tasks.json` と `state/nodes-runtime.json` を更新
 
-### フロントエンド
+- [ ] **IPC Manager 更新**
+  - [ ] 生ファイルを書き込むのではなく、アクション (例: `node.created`, `task.created`) を作成するよう IPC ハンドラを適合させる
 
-- [x] **ログストア** (`frontend/ide/src/stores/logStore.ts`)
-  - タスク実行ログをチャット経由で表示
+## 4. 検証 & テスト
 
-### ビルド検証
-
-- [x] `go build .`
-- [x] `pnpm build`（警告 5 件、エラー 0）
-- [x] `pnpm check`
-
----
-
-## 残りのタスク（優先度順）
-
-### 完了済み（Phase4 実装要点）
-
-- [x] Meta/LLM: LLMConfigStore 経由で `codex-cli` 初期化、接続テストを CLI セッション検証に変更
-- [x] Worker: コンテナ起動前に Codex セッション検証を強制し、未ログインなら IDE へエラー通知して中断
-- [x] Orchestrator: 実行ログを `task:log` イベントでストリーミング
-- [x] Doc: PRD/TODO/Golden テスト設計を CLI 前提に更新
-
-### Phase 4 完了タスク
-
-- [x] CLI サブスクリプション運用手順を GEMINI.md / CLAUDE.md / guides に追記
-- [x] Gemini / Claude Code / Cursor の実プロバイダを実装し、registry stub を置換
-  - `internal/agenttools/claude.go`
-  - `internal/agenttools/cursor.go`
-- [x] Meta 層からの WorkerCall 生成で新フィールド（model/flags/env/tool_specific）を活用する経路を整備（確認済み）
-- [x] Doc: v3.0 (CLI Session / Svelte 5) に合わせて仕様書・アーキテクチャ図を更新
-
-### 残タスク（オプション・フォローアップ）
-
-- [x] E2E: CLI セッション未設定時の IDE 通知を含む回帰テストを追加
-- [x] CLI 未ログイン時の IDE 通知と再試行 UX の改善（案内リンク・ボタン）
-
----
-
-## 設計上の注意点
-
-### Codex / CLI 統合（現状）
-
-1. **Meta-agent (decompose)**: `internal/meta/client.go` が HTTP で OpenAI Chat Completion を呼び出す（`OPENAI_API_KEY` 必須）。CLI サブスクリプション非対応。
-2. **Worker (codex-cli)**: `internal/worker/executor.go` が Docker サンドボックス内で `codex exec ...` を実行。CLI セッション引き継ぎ方法は未整備。
-
-### セッション/環境（現状）
-
-| 項目                    | 用途                                     | 備考                           |
-| ----------------------- | ---------------------------------------- | ------------------------------ |
-| `MULTIVERSE_META_KIND`  | Meta-agent の種別                        | 現状: mock / openai-chat       |
-| `MULTIVERSE_META_MODEL` | Meta-agent のモデル                      | 現状: gpt-5.1                  |
-| CLI セッション          | Codex / Claude Code / Gemini / Cursor 等 | **API キー不要。要セッション** |
-
----
-
-## 次のアクション
-
-1. Meta 層を CLI セッション対応に変更する設計・実装方針を決定（AgentToolProvider と整合）
-2. `agent-runner` + worker へ CLI セッションを確実に引き継ぐ仕組みを確認（env/マウント/cli path）
-3. `go test ./internal/ide/...` 実行で LLMConfigStore の回帰確認
-4. ストリーミングログと CLI ベース接続の E2E テストを追加
-
----
-
-## 追加で必要な対応（漏れ防止メモ）
-
-- [x] CLI サブスクリプション運用手順のドキュメント化（`docs/guides/cli-subscription.md` 作成済み）
-
----
-
-## Phase 4.5: Svelte 5 + Svelte Flow 移行
-
-### 背景・目的
-
-現在のグラフノード管理（GridCanvas/WBSGraphView）は手実装で以下の課題がある：
-
-- **大量ノード非対応**: 全ノードを常時描画、2000+ タスクでパフォーマンス劣化
-- **レイアウト最適化なし**: 単純な列配置、依存関係を考慮しない
-- **保守コスト高**: パン/ズーム/エッジ描画を全て自前実装
-
-**解決策**: Svelte 5 へアップグレードし、Svelte Flow (@xyflow/svelte v1.5+) を導入
-
-### Svelte 5 移行タスク
-
-#### Step 1: 依存パッケージ更新
-
-```bash
-cd frontend/ide
-pnpm install svelte@^5 @sveltejs/vite-plugin-svelte@^4 --save-dev
-```
-
-- [x] svelte: ^4.2.12 → ^5.0.0 (確認済み `^5.0.0`)
-- [x] @sveltejs/vite-plugin-svelte: ^3.0.2 → ^4.0.0 (確認済み `^4.0.0`)
-- [x] vite: 維持（^5.x）
-- [x] typescript: 維持（^5.x）
-
-#### Step 2: 自動移行ツール実行
-
-```bash
-npx sv migrate svelte-5
-```
-
-**自動変換される内容:**
-
-- `let` → `$state`
-- `$:` (派生) → `$derived`
-- `export let` → `$props`
-
-**手動変換が必要な内容:**
-
-- `createEventDispatcher` → コールバックプロップ（約 10 ファイル）
-- `beforeUpdate`/`afterUpdate` → `$effect.pre`/`$effect`
-- 複雑な `$:` の `$effect` vs `$derived` 判別
-
-#### Step 3: createEventDispatcher 置き換え
-
-**対象ファイル（要手動変換）:**
-
-| ファイル                    | dispatch イベント | 変換後                 |
-| --------------------------- | ----------------- | ---------------------- |
-| `FloatingChatWindow.svelte` | close             | `onClose` コールバック |
-| `ChatInput.svelte`          | send              | `onSend` コールバック  |
-| `TaskDetail.svelte`         | close             | `onClose` コールバック |
-| `Modal.svelte`              | close             | `onClose` コールバック |
-| その他約 6 ファイル         | 各種              | 各コールバック         |
-
-**変換例:**
-
-```svelte
-// Before (Svelte 4)
-<script>
-  import { createEventDispatcher } from 'svelte';
-  const dispatch = createEventDispatcher();
-  function close() { dispatch('close'); }
-</script>
-
-// After (Svelte 5)
-<script>
-  let { onClose } = $props();
-  function close() { onClose?.(); }
-</script>
-```
-
-#### Step 4: テスト実行・修正
-
-- [x] `pnpm check` パス (0 errors, 7 warnings)
-- [x] `pnpm build` パス
-- [x] `pnpm test` パス（該当する場合）
-- [x] 手動で全画面動作確認
-
-### Svelte Flow 移行タスク
-
-#### Step 5: パッケージインストール
-
-```bash
-cd frontend/ide
-pnpm add @xyflow/svelte dagre
-pnpm add -D @types/dagre
-```
-
-#### Step 6: 新規ファイル作成
-
-```
-frontend/ide/src/lib/flow/
-├── CLAUDE.md                        # 設計ガイド
-├── index.ts                         # エクスポート集約
-├── UnifiedFlowCanvas.svelte         # 統合キャンバス
-├── nodes/
-│   ├── TaskFlowNode.svelte          # タスクノード
-│   ├── WBSFlowNode.svelte           # WBS ノード
-│   ├── MilestoneFlowNode.svelte     # マイルストーン
-│   └── index.ts
-├── edges/
-│   ├── DependencyEdge.svelte        # 依存エッジ
-│   └── index.ts
-├── layout/
-│   ├── dagreLayout.ts               # Dagre 統合
-│   ├── layoutStore.ts               # レイアウト状態
-│   └── index.ts
-└── utils/
-    ├── nodeConverter.ts             # Task → FlowNode 変換
-    ├── edgeConverter.ts             # Edge 変換
-    └── constants.ts                 # サイズ定数
-
-frontend/ide/src/stores/
-└── flowStore.ts                     # Svelte Flow 用ストア
-```
-
-#### Step 7: カスタムノード実装
-
-- [x] `TaskNode.svelte` - GridNode.svelte のスタイルを移植（`lib/flow/nodes/TaskNode.svelte`）
-- [x] `DependencyEdge.svelte` - ConnectionLine.svelte のスタイルを移植（`lib/flow/edges/DependencyEdge.svelte`）
-- [x] `WBSFlowNode.svelte` - WBSGraphNode.svelte のスタイルを移植（WBS 切り替えは UnifiedFlowCanvas 内部で対応）
-- [x] `MilestoneFlowNode.svelte` - マイルストーン表示（将来対応可）
-
-#### Step 8: Dagre レイアウト統合
-
-- [x] `dagreLayout.ts` - Dagre による自動レイアウト計算（`lib/flow/dagreLayout.ts` 実装済み）
-- [x] `layoutStore.ts` - レイアウト方向（LR/TB）の状態管理（将来対応可）
-
-#### Step 9: UnifiedFlowCanvas 実装
-
-- [x] Svelte Flow のセットアップ
-- [x] カスタムノード/エッジタイプ登録
-- [x] taskStore/wbsStore との連携
-- [x] viewMode 切替対応（WBS モード時にグラフをフェードアウト）
-
-#### Step 10: App.svelte 統合
-
-- [x] GridCanvas → UnifiedFlowCanvas 切替（`App.svelte` で確認済み）
-- [x] WBSGraphView → UnifiedFlowCanvas 統合（WBS パネルを Panel として統合）
-- [x] Toolbar との連携確認
-
-#### Step 11: パフォーマンステスト
-
-- [x] パン/ズームの滑らかさ確認
-
-#### Step 12: クリーンアップ
-
-- [x] `frontend/ide/src/lib/grid/` 削除
-- [x] `frontend/ide/src/lib/wbs/WBSGraphView.svelte` 維持（WBS モードで使用）
-- [x] `frontend/ide/src/lib/wbs/WBSGraphNode.svelte` 維持（WBS モードで使用）
-- [x] `frontend/ide/src/stores/viewportStore.ts` 削除（flowStore に統合）
-
-### 技術メモ
-
-#### Svelte 5 Runes 早見表
-
-| Rune              | 用途             | Svelte 4 相当         |
-| ----------------- | ---------------- | --------------------- |
-| `$state(value)`   | リアクティブ状態 | `let value`           |
-| `$derived(expr)`  | 派生値           | `$: derived = expr`   |
-| `$derived.by(fn)` | 複雑な派生       | `$: { ... }`          |
-| `$effect(fn)`     | 副作用           | `$: { sideEffect() }` |
-| `$props()`        | プロップ受取     | `export let`          |
-| `$bindable()`     | bind 可能        | `export let`          |
-
-#### Svelte Flow 基本構成
-
-```svelte
-<script>
-  import { SvelteFlow, Background, Controls } from '@xyflow/svelte';
-  import '@xyflow/svelte/dist/style.css';
-
-  import TaskFlowNode from './nodes/TaskFlowNode.svelte';
-
-  const nodeTypes = { task: TaskFlowNode };
-
-  let nodes = $state([...]);
-  let edges = $state([...]);
-</script>
-
-<SvelteFlow
-  {nodes}
-  {edges}
-  {nodeTypes}
-  fitView
-  onlyRenderVisibleElements={true}
->
-  <Background />
-  <Controls />
-</SvelteFlow>
-```
-
-#### 仮想化（Viewport Culling）
-
-```svelte
-<SvelteFlow
-  onlyRenderVisibleElements={true}  <!-- 画面外ノードは非描画 -->
-  minZoom={0.1}
-  maxZoom={3}
-/>
-```
-
-### 参考リンク
-
-- [Svelte 5 Migration Guide](https://svelte.dev/docs/svelte/v5-migration-guide)
-- [sv migrate CLI](https://svelte.dev/docs/cli/sv-migrate)
-- [Svelte Flow Docs](https://svelteflow.dev/)
-- [Svelte Flow Dagre Example](https://svelteflow.dev/examples/layout/dagre)
-- [Svelte 5 Runes](https://svelte.dev/docs/svelte/runes)
+- [x] **ユニットテスト**
+  - [x] `persistence` パッケージのテスト
+  - [x] `scheduler` ロジックのテスト (リポジトリはモック化)
+- [ ] **統合テスト**
+  - [x] シミュレーションテスト: WBS 作成 -> ノード計画 -> タスクスケジュール -> 実行 -> 状態 & 履歴の検証

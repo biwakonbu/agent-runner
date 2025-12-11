@@ -18,6 +18,7 @@ export default defineConfig({
   use: {
     baseURL: 'http://localhost:6006',
     trace: 'off', // トレース無効化で高速化
+    contextOptions: { reducedMotion: 'reduce' },
   },
 
   expect: {
