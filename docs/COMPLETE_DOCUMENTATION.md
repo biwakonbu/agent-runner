@@ -1,7 +1,7 @@
 
 # Complete Documentation
 
-Generated: 2025-12-07 17:19:06
+Generated: 2025-12-11 16:22:58
 
 This document consolidates all documentation from the docs/ directory for LLM context.
 
@@ -28,14 +28,30 @@ This document consolidates all documentation from the docs/ directory for LLM co
 
 - [README](#design-README)
 - [Architecture](#design-architecture)
+- [Ide Architecture](#design-ide-architecture)
 - [Data Flow](#design-data-flow)
 - [Implementation Guide](#design-implementation-guide)
+- [Sandbox Policy](#design-sandbox-policy)
+
+### Overview
+
+- [Task Builder And Golden Test Design](#task-builder-and-golden-test-design)
+
+### cli-agents
+
+- [README](#cli-agents-README)
+
+### cli-agents/codex
+
+- [Version 0.65.0](#cli-agents-codex-version-0.65.0)
 
 ### Guides
 
 - [README](#guides-README)
 - [Testing](#guides-testing)
 - [Codex Integration](#guides-codex-integration)
+- [Cli Subscription](#guides-cli-subscription)
+- [Gemini Cli](#guides-gemini-cli)
 
 ---
 
@@ -237,7 +253,9 @@ Meta 用 LLM モデル ID は以下の優先順位で決定されます：
 2. **Task YAML**: `runner.meta.model` で指定された値
 3. **ビルトインデフォルト**: `gpt-5.1`
 
-※ 設定ファイルによるデフォルト指定は将来拡張です。
+**認証について (v3.0 以降)**:
+AgentRunner Core は、各プロバイダ（OpenAI, Anthropic 等）の **CLI ツールが保持する認証セッション** を利用することを推奨します。
+環境変数 `OPENAI_API_KEY` 等は、CLI セッションが利用できない場合のフォールバック、または `openai-chat` (HTTP) プロバイダを明示的に使用する場合のみ必要となります。
 
 #### 1.4 出力
 
@@ -290,18 +308,18 @@ runner:
 
 #### 2.3 デフォルト補完ルール
 
-| フィールド                       | デフォルト値                                     |
-| -------------------------------- | ------------------------------------------------ |
-| `task.id`                        | UUID 自動生成                                    |
-| `task.title`                     | `task.id` と同じ                                 |
-| `task.repo`                      | `"."` (カレントディレクトリ)                     |
-| `task.test`                      | 未設定（テスト自動実行なし）                     |
-| `runner.meta.kind`               | `"openai-chat"`                                  |
+| フィールド                       | デフォルト値                      |
+| -------------------------------- | --------------------------------- |
+| `task.id`                        | UUID 自動生成                     |
+| `task.title`                     | `task.id` と同じ                  |
+| `task.repo`                      | `"."` (カレントディレクトリ)      |
+| `task.test`                      | 未設定（テスト自動実行なし）      |
+| `runner.meta.kind`               | `"openai-chat"`                   |
 | `runner.meta.model`              | `gpt-5.1` (プロバイダのモデル ID) |
-| `runner.meta.max_loops`          | `5`                                              |
-| `runner.worker.kind`             | `"codex-cli"`                                    |
-| `runner.worker.docker_image`     | デフォルトイメージ                               |
-| `runner.worker.max_run_time_sec` | `1800` (30 分)                                   |
+| `runner.meta.max_loops`          | `5`                               |
+| `runner.worker.kind`             | `"codex-cli"`                     |
+| `runner.worker.docker_image`     | デフォルトイメージ                |
+| `runner.worker.max_run_time_sec` | `1800` (30 分)                    |
 
 #### 2.4 環境変数参照
 
@@ -539,7 +557,7 @@ Go の `text/template` を使用してテンプレートを展開します。
 #### 6.2 制約事項
 
 - v1 ではコマンドラインオプションは未サポート
-- Worker 種別は `codex-cli` のみ
+- Worker 種別は `codex-cli`, `gemini-cli` をサポート
 - Meta 種別は `openai-chat` のみ
 
 <a id="specifications-meta-protocol"></a>
@@ -641,6 +659,14 @@ type AcceptanceCriterion struct {
 #### 4.2 入力
 
 Core は TaskContext の要約を Meta に渡します：
+The transport format between AgentRunner and LLM is **JSON**.
+Internally, the `MetaClient` converts this JSON into YAML to maintain compatibility with legacy processing logic before unmarshaling into Go structs.
+
+- **Request**: JSON sent to LLM (via prompts).
+- **Response**: JSON string received from LLM.
+- **Conversion**: JSON string -> YAML string -> Go Struct.
+
+All structs in `internal/meta/protocol.go` are tagged with both `yaml` and `json` to support this flow.
 
 ```yaml
 task:
@@ -685,15 +711,20 @@ decision:
 
 #### 4.4 フィールド定義
 
-| フィールド                | 型     | 必須     | 説明                                    |
-| ------------------------- | ------ | -------- | --------------------------------------- |
-| `type`                    | string | ✅       | 固定値: `"next_action"`                 |
-| `decision.action`         | string | ✅       | `"run_worker"` または `"mark_complete"` |
-| `decision.reason`         | string | ✅       | 判断理由                                |
-| `worker_call`             | object | 条件付き | `action` が `"run_worker"` の場合必須   |
-| `worker_call.worker_type` | string | ✅       | Worker 種別（v1: `"codex-cli"`）        |
-| `worker_call.mode`        | string | ✅       | 実行モード（v1: `"exec"`）              |
-| `worker_call.prompt`      | string | ✅       | Worker への指示文                       |
+| フィールド                  | 型     | 必須     | 説明                                    |
+| --------------------------- | ------ | -------- | --------------------------------------- |
+| `type`                      | string | ✅       | 固定値: `"next_action"`                 |
+| `decision.action`           | string | ✅       | `"run_worker"` または `"mark_complete"` |
+| `decision.reason`           | string | ✅       | 判断理由                                |
+| `worker_call`               | object | 条件付き | `action` が `"run_worker"` の場合必須   |
+| `worker_call.worker_type`   | string | ✅       | Worker 種別（v1: `"codex-cli"`）        |
+| `worker_call.mode`          | string | ✅       | 実行モード（v1: `"exec"`）              |
+| `worker_call.prompt`        | string | ✅       | Worker への指示文                       |
+| `worker_call.model`         | string | 任意     | 使用するモデル ID                       |
+| `worker_call.flags`         | array  | 任意     | CLI フラグのリスト                      |
+| `worker_call.env`           | map    | 任意     | 環境変数のマップ                        |
+| `worker_call.tool_specific` | map    | 任意     | ツール固有の設定                        |
+| `worker_call.use_stdin`     | bool   | 任意     | 標準入力を使用するかどうか              |
 
 #### 4.5 実装例
 
@@ -787,10 +818,43 @@ Meta が不正な YAML を返した場合：
 
 #### 6.3 タイムアウト
 
-Meta 呼び出しのタイムアウト設定：
+Meta 呼び出しのタイムアウト設定は、使用するプロバイダによって異なります。
+
+#### OpenAI Chat プロバイダ
 
 - デフォルト: 60 秒
 - 環境変数 `META_TIMEOUT_SEC` で変更可能
+
+#### Codex CLI プロバイダ
+
+LLM の処理は時間がかかるため、より長いタイムアウトを設定しています。
+
+| 層 | デフォルト値 | 説明 |
+|----|------------|------|
+| ChatHandler | 15 分 | `chat/handler.go` の `metaTimeout` |
+| Meta-agent | 10 分 | `meta/cli_provider.go` の `DefaultMetaAgentTimeout` |
+| agenttools | 10 分 | `ExecPlan.Timeout` で指定 |
+
+**タイムアウト階層**:
+
+```
+ChatHandler (15分)
+  └→ Meta.Decompose()
+       └→ CodexCLIProvider (10分)
+            └→ agenttools.Execute() (親コンテキストから独立)
+```
+
+`agenttools.Execute()` は `ExecPlan.Timeout` が設定されている場合、親コンテキストから独立した新しいコンテキストを作成します。これにより、外部プロセス（Codex CLI）の実行時間を正確に制御できます。
+
+#### Graceful Shutdown
+
+タイムアウト発生時、プロセスは以下の順序で終了されます：
+
+1. **SIGTERM** 送信（graceful shutdown のチャンス）
+2. **5 秒待機**（`GracefulShutdownDelay`）
+3. **SIGKILL** 送信（強制終了）
+
+これにより、Codex CLI は可能な限りクリーンに終了できます
 
 ### 7. プロンプト設計
 
@@ -1452,19 +1516,21 @@ Logger.setLevel("debug");
 ### 概要
 
 Multiverse プロジェクトでは、システム全体の信頼性を確保し、開発効率を向上させるために、**包括的な自動テスト環境**を構築しています。
-特に、以下の 2 つの層で End-to-End (E2E) テストを実施することで、バックエンドのロジックとフロントエンドの UI 動作を独立して、かつ確実に検証します。
+特に、以下の 3 つの層でテストを実施することで、バックエンドのロジック、フロントエンドの UI 動作、そして視覚的なリグレッションを独立して検証します。
 
 ### アーキテクチャ
 
-テストアーキテクチャは以下の 2 層で構成されます。
+テストアーキテクチャは以下の 3 層で構成されます。
 
 1.  **Backend Integration E2E**: IDE バックエンドからオーケストレーター、エージェント実行までのフローを検証。
 2.  **Frontend UI E2E**: Wails フロントエンドの UI ロジックとユーザー操作を検証。
+3.  **Visual Regression Testing (VRT)**: コンポーネント単位およびページ単位での視覚的な変化を自動検知。
 
 | 層           | 範囲                                           | 技術スタック               | 目的                                          |
 | ------------ | ---------------------------------------------- | -------------------------- | --------------------------------------------- |
 | **Backend**  | `ide` (Go) -> `orchestrator` -> `agent-runner` | Go Test, Shell Script Mock | プロセス連携、タスクキュー、状態遷移の検証    |
 | **Frontend** | `frontend/ide` (Svelte)                        | Playwright, Wails JS Mock  | UI 描画、イベントハンドリング、画面遷移の検証 |
+| **Visual**   | `frontend/ide` Components                      | Storybook, Playwright      | デザイン崩れの検知、UI カタログ管理           |
 
 ---
 
@@ -1518,6 +1584,40 @@ Wails アプリケーションのフロントエンド部分はブラウザ技�
 ```bash
 cd frontend/ide
 npm run test:e2e
+```
+
+---
+
+### 3. Frontend Visual Testing
+
+#### 配置場所
+
+`frontend/ide/src/**/*.stories.ts` (Storybook)
+`frontend/ide/tests/vrt` (Playwright VRT)
+
+#### 設計方針
+
+UI の変更による意図しないデザイン崩れ（リグレッション）を防ぐため、スナップショット比較を行います。
+
+1.  **Storybook**:
+
+    - 全 UI コンポーネントのカタログ化 (`npm run storybook`)。
+    - 各コンポーネントの "States" (Normal, Error, Loading 等) を Story として定義。
+
+2.  **Visual Regression Testing (VRT)**:
+    - Playwright を使用して Storybook の各 Story、または実際のページのスナップショットを撮影。
+    - 前回のマスター画像（Golden Image）との差分をピクセル単位で比較。
+
+#### 実行方法
+
+```bash
+cd frontend/ide
+
+# Storybook 起動
+npm run storybook
+
+# VRT 実行 (Playwright)
+npm run test:vrt
 ```
 
 ### 今後の展望
@@ -1709,6 +1809,105 @@ flowchart TB
 | -------------- | ------------------------------------ |
 | **Container**  | タスク単位の隔離環境                 |
 | **Worker CLI** | 実際の開発作業（coding, git, tests） |
+
+### AgentToolProvider Architecture (CLI Integration)
+
+#### 目的
+
+Codex / Gemini / Claude Code / Cursor など複数のエージェント CLI を安全に切り替えつつ、共通の実行パイプラインで扱います。
+Worker 実行と Meta 生成の両方で同じ抽象を再利用し、特定 CLI に縛られない実行面を確保しています。
+
+#### 抽象レイヤと責務
+
+- **ProviderConfig**: kind, cliPath, model, flags, extraEnv, toolSpecific を保持。
+- **Request**: 呼び出し時に上書きしたい情報を集約（prompt/mode/env/flags 等）。
+- **ExecPlan**: 実行直前の最終形（command/args/env/workdir）。
+- **Registry**: kind→factory を登録・解決。
+
+#### 実行フロー
+
+1. Meta.NextAction が `WorkerCall` を返す。
+2. Orchestrator/Core で `Executor.RunWorkerCall` を呼び出し、`agenttools.Build()` で `ExecPlan` を生成。
+3. `Sandbox.Exec` (Worker) または `agenttools.Execute` (Meta) で実行。
+
+#### サンドボックス方針（絶対ルール）
+
+**Docker コンテナが外部サンドボックスとして機能するため、CLI エージェントツール内部のサンドボックスは無効化し、最大限の権限を与えます。**
+
+詳細は [サンドボックス方針](sandbox-policy.md) を参照。
+
+#### 実装状態（2025-12-07 更新）
+
+- **CodexProvider** (`internal/agenttools/codex.go`):
+  - Codex CLI 0.65.0 対応。exec モードのみサポート（chat サブコマンドは存在しない）。
+  - Docker 内実行: `--dangerously-bypass-approvals-and-sandbox` でサンドボックス・承認を無効化。
+  - フラグ体系: `-C`（作業ディレクトリ）、`--json`（JSONL 出力）、`-m`（モデル）、`-c`（設定オーバーライド）。
+  - デフォルト値: モデル `gpt-5.1-codex`（Worker 用）/ `gpt-5.1`（Meta 用）、思考の深さ `medium`。
+  - stdin 対応: PROMPT に `-` を指定して stdin から読み取り。
+  - **ToolSpecific オプション**: `docker_mode`（Docker 内実行フラグ制御）、`json_output`（JSON 出力制御）
+- **Execute ヘルパー** (`internal/agenttools/exec.go`):
+  - `agenttools.Execute(ctx, plan)` でホスト上で直接 ExecPlan を実行。
+  - Meta-agent の CLI 呼び出しで使用。
+- **Stub Providers** (`stub_providers.go`):
+  - gemini-cli / claude-code / cursor-cli をスタブ登録し、未実装エラーを明示。実装時は Registry 差し替えで有効化。
+- **WorkerCall 拡張** (`internal/meta/protocol.go`):
+  - model, temperature, max_tokens, reasoning_effort, cli_path, flags, env, tool_specific, workdir, use_stdin を追加。
+- **Worker 実行経路** (`internal/worker/executor.go`):
+  - WorkerCall を `agenttools.Request` に変換し、`agenttools.Build()` で ExecPlan を生成。
+  - ExecPlan を受けて Sandbox.Exec を実行。env は複数ソースをマージ。
+- **Meta-agent CLI 実行** (`internal/meta/cli_provider.go`):
+  - `agenttools` パッケージを使用してフラグ構築ロジックを統一。
+  - `docker_mode: false` でホスト上直接実行、`json_output: false` で YAML 出力。
+
+#### モデル設定
+
+| 用途                     | モデル ID       | 設定箇所                       |
+| ------------------------ | --------------- | ------------------------------ |
+| Meta-agent（計画・思考） | `gpt-5.1`       | `internal/meta/client.go`      |
+| Worker タスク実行        | `gpt-5.1-codex` | `internal/agenttools/codex.go` |
+
+#### 思考の深さ（reasoning effort）
+
+| レベル   | 用途                           |
+| -------- | ------------------------------ |
+| `low`    | 単純なタスク                   |
+| `medium` | 通常のタスク（**デフォルト**） |
+| `high`   | 複雑なタスク・リトライ時       |
+
+設定方法: `-c reasoning_effort=medium`
+
+#### 設計上のポイント
+
+- **サンドボックス方針の一貫性**: 全 CLI ツールで Docker が外部サンドボックスとして機能し、CLI 内部のサンドボックスは無効化。
+- **拡張優先**: 共通化は最小限。model や flags は Provider がそのまま解釈できる形で透過させ、ツール固有の挙動を阻害しない。
+- **差し替え容易性**: kind ごとの factory 登録のみで新 CLI を差し替え可能。既存呼び出し側は WorkerCall/Request を介すため変更を局所化できる。
+
+#### CLI ナレッジ管理
+
+各 CLI ツールの仕様・バージョン情報は `docs/cli-agents/` で管理:
+
+- [CLI エージェント共通ガイド](../cli-agents/README.md)
+- [Codex CLI ナレッジ](../cli-agents/codex/CLAUDE.md)
+
+#### 統一された実行フロー
+
+```
+Worker (Docker 内)                     Meta-agent (ホスト上)
+       ↓                                      ↓
+agenttools.Build()                    agenttools.Build()
+  docker_mode: true (default)           docker_mode: false
+  json_output: true (default)           json_output: false
+       ↓                                      ↓
+  ExecPlan                               ExecPlan
+  (with --dangerously-bypass...)         (without Docker flags)
+       ↓                                      ↓
+  Sandbox.Exec()                      agenttools.Execute()
+```
+
+#### 今後の実装方針
+
+- Gemini / Claude Code / Cursor 各 CLI のフラグ体系に合わせた Provider を追加し、stub を置換。
+- ExecPlan 出力の JSON をパースして WorkerRunResult.Summary を改善（codex --json を活用）。
 
 #### 5. External Outputs
 
@@ -1921,6 +2120,152 @@ runner:
 - [Worker インターフェース仕様](../specifications/worker-interface.md)
 - [実装ガイド](implementation-guide.md)
 - [データフロー設計](data-flow.md)
+
+<a id="design-ide-architecture"></a>
+
+## Ide Architecture
+
+**Source**: `design/ide-architecture.md`
+
+
+### 概要
+
+Multiverse IDE は、開発者が AI エージェント（Worker）と協働するためのデスクトップアプリケーションです。
+Frontend は **Svelte 5** を採用し、高度なグラフ描画に **Svelte Flow** を使用しています。Backend との通信は **Wails v2** を介して行われます。
+
+### 技術スタック
+
+| レイヤー               | 技術              | バージョン/備考                         |
+| ---------------------- | ----------------- | --------------------------------------- |
+| **Frontend Framework** | **Svelte 5**      | Runes ($state, $derived) を全面採用     |
+| **Graph UI**           | **Svelte Flow**   | `@xyflow/svelte` v0.1+                  |
+| **Desktop Runtime**    | **Wails v2**      | Go + WebView2/WebKit                    |
+| **Styling**            | **CSS Modules**   | Scoped CSS, Design Tokens               |
+| **State Management**   | **Svelte Stores** | `writable`, `derived` (Svelte 5 と共存) |
+
+### アーキテクチャ構成
+
+```mermaid
+graph TD
+    subgraph Frontend [Svelte 5 Context]
+        App[App.svelte]
+        Canvas[UnifiedFlowCanvas.svelte]
+        Store[TaskStore / FlowStore]
+        Panel[WBS / Chat Panels]
+    end
+
+    subgraph Bridge [Wails Runtime]
+        Events[Events (On/Emit)]
+        Binds[Go Methods]
+    end
+
+    subgraph Backend [Go Context]
+        AppGo[App.go]
+        Orch[Orchestrator]
+        Service[TaskService]
+    end
+
+    App --> Canvas
+    Canvas -->|Svelte Flow| Store
+    App -->|Events| Bridge
+    Store <-->|Events| Bridge
+    Binds --> Backend
+    Backend -->|Events| Bridge
+```
+
+### 1. Frontend Design (Svelte 5)
+
+#### コンポーネント設計 (Runes)
+
+Svelte 5 の Runes 構文 (`$state`, `$derived`, `$props`, `$effect`) を標準として使用しています。
+
+```svelte
+<script lang="ts">
+  // Props
+  let { taskList }: { taskList: Task[] } = $props();
+
+  // State
+  let nodes = $state([]);
+
+  // Derived
+  let completedCount = $derived(taskList.filter(t => t.status === 'SUCCEEDED').length);
+
+  // Side Effects
+  $effect(() => {
+    console.log('Task list updated:', taskList);
+  });
+</script>
+```
+
+#### 状態管理 (Stores)
+
+グローバルな状態管理には、Svelte 4 互換の `writable` ストアを使用しています。これは Svelte 5 コンポーネント内でも `$` プレフィックス (`$taskStore`) で透過的に利用可能です。
+
+- `stores/taskStore.ts`: タスクおよび依存関係の管理
+- `stores/wbsStore.ts`: WBS 表示モードの状態管理
+- `stores/logStore.ts`: 実行ログのストリーム管理
+
+#### グラフ描画 (Svelte Flow)
+
+タスクグラフの描画には `@xyflow/svelte` を使用しています。
+
+- **UnifiedFlowCanvas.svelte**: Svelte Flow のラッパーコンポーネント。タスクデータを受け取り、フローのノード/エッジに変換して描画します。
+- **Custom Nodes**: `lib/flow/nodes/` にタスク表示専用のノードコンポーネントを定義しています。
+- **Layout**: `dagre` アルゴリズムを使用して、タスクの依存関係に基づいた自動レイアウトを提供します。
+
+### 2. Backend Integration (Wails)
+
+Go 製バックエンドとは以下の 2 つのパターンで通信します。
+
+#### Method Call (Frontend -> Backend)
+
+`wailsjs` 自動生成コードを使用します。
+
+```typescript
+import { CreateTask } from "../../wailsjs/go/main/App";
+
+async function handleSubmit(prompt: string) {
+  await CreateTask(prompt); // Go メソッド呼び出し
+}
+```
+
+#### Events (Backend -> Frontend)
+
+Wails のイベントシステムを使用して、非同期な状態更新を受け取ります。
+
+- `task:created`: 新しいタスクが生成された
+- `task:stateChange`: タスクのステータスが変化した（PENDING -> RUNNING -> SUCCEEDED）
+- `task:log`: 実行ログ（stdout/stderr）のストリーム
+
+`stores/taskStore.ts` 内でリスナーを初期化し、ストアを更しています。
+
+```typescript
+// stores/taskStore.ts
+EventsOn("task:stateChange", (event) => {
+  updateTaskStatus(event.taskId, event.newStatus);
+});
+```
+
+### 3. デザインシステム
+
+`frontend/ide/src/design-system` に定義された CSS 変数とトークンを使用します。
+
+- **Theme**: Nord Deep (Dark mode optimized)
+- **Glassmorphism**: 半透明なパネルとブラー効果 (`--mv-glass-bg`)
+- **Grid**: 黄金比ベースのグリッドシステム
+
+### ディレクトリ構造
+
+```
+frontend/ide/src/
+├── lib/
+│   ├── flow/          # Svelte Flow 関連 (Nodes, Edges, Layout)
+│   ├── components/    # 共有 UI コンポーネント (Window, Button)
+│   └── wbs/           # WBS リストビュー
+├── stores/            # Svelte Stores
+├── design-system/     # CSS 変数・トークン
+└── App.svelte         # ルートコンポーネント
+```
 
 <a id="design-data-flow"></a>
 
@@ -2721,6 +3066,688 @@ func (c *Client) Chat(ctx context.Context, req ChatRequest) (ChatResponse, error
 - [テストガイド](../guides/testing.md)
 - [コア仕様](../specifications/core-specification.md)
 
+<a id="design-sandbox-policy"></a>
+
+## Sandbox Policy
+
+**Source**: `design/sandbox-policy.md`
+
+
+最終更新: 2025-12-07
+
+### 基本原則（絶対遵守）
+
+Docker コンテナが外部サンドボックスとして機能するため、CLI エージェントツール内部のサンドボックス機能は**無効化**し、最大限の権限を与える。
+
+**この方針は multiverse IDE の設計思想の根幹であり、全ての CLI エージェントツールに適用される絶対ルールである。**
+
+### 理由
+
+1. **Docker コンテナ自体が隔離環境として十分な保護を提供**
+   - ファイルシステムの隔離
+   - プロセスの隔離
+   - ネットワークの制御
+
+2. **二重サンドボックスの問題回避**
+   - CLI ツール内部で二重にサンドボックスを有効にすると、ファイル操作・コマンド実行に不必要な制限がかかる
+   - タスク実行に必要な権限が不足し、作業が失敗する
+
+3. **自律実行の要件**
+   - Worker エージェントはコード編集、テスト実行、ビルドなど多様な操作を行う
+   - これらの操作には十分な権限が必要
+
+### 全 CLI ツール共通設定
+
+| CLI ツール | 無効化フラグ | 備考 |
+|-----------|-------------|------|
+| Codex CLI | `--dangerously-bypass-approvals-and-sandbox` | 0.65.0 で確認 |
+| Gemini CLI | （TBD: 実装時に調査） | |
+| Claude Code | （TBD: 実装時に調査） | |
+| Cursor CLI | （TBD: 実装時に調査） | |
+
+### 安全性の保証
+
+#### Docker コンテナによる保護
+
+- **ファイルシステム隔離**: コンテナ内のファイルシステムはホストから隔離
+- **マウント制御**: ホストファイルシステムへのアクセスは明示的なマウント設定でのみ許可
+- **ネットワーク制御**: Docker ネットワーク設定でネットワークアクセスを制御
+- **リソース制限**: CPU・メモリ・ディスクの使用量を制限可能
+
+#### マウント設定
+
+```yaml
+# 推奨マウント設定
+volumes:
+  - type: bind
+    source: ${PROJECT_ROOT}
+    target: /workspace/project
+    # read-write（作業用）
+
+  - type: bind
+    source: ~/.codex/auth.json
+    target: /root/.codex/auth.json
+    read_only: true  # 認証情報は読み取り専用
+```
+
+#### ネットワーク設定
+
+```yaml
+# 推奨ネットワーク設定
+networks:
+  - agent-network  # 必要に応じて外部アクセスを許可
+```
+
+### 実装ガイドライン
+
+#### AgentToolProvider 実装時の必須事項
+
+1. **サンドボックス無効化フラグを必ず指定する**
+   - Docker 内実行であることを前提とし、CLI 内部のサンドボックスを無効化
+
+2. **承認プロンプトを無効化する**
+   - 自律実行のため、ユーザー確認なしで操作を実行
+
+3. **フルアクセス権限を付与する**
+   - ファイル操作、コマンド実行に必要な全権限を付与
+
+#### 禁止事項
+
+1. **ホストで直接 CLI を実行しない**
+   - 必ず Docker コンテナ内で実行すること
+   - ホストで `--dangerously-bypass-approvals-and-sandbox` を使用してはならない
+
+2. **サンドボックスを有効にしたまま Docker 内で実行しない**
+   - 二重サンドボックスは問題を引き起こす
+
+### 関連ドキュメント
+
+- [Worker インターフェース仕様](../specifications/worker-interface.md)
+- [CLI エージェントナレッジ](../cli-agents/README.md)
+- [Codex CLI ナレッジ](../cli-agents/codex/CLAUDE.md)
+
+
+# Overview
+
+<a id="task-builder-and-golden-test-design"></a>
+
+## Task Builder And Golden Test Design
+
+**Source**: `task-builder-and-golden-test-design.md`
+
+
+本ドキュメントは、Multiverse IDE における「チャット入力 → TaskConfig YAML 生成 → AgentRunner 実行 → 結果反映」までの最小パイプラインと、ゴールデンテスト（`TODO アプリを作成して`）の仕様を定義する。
+
+実装時の指示書として利用することを前提とする。
+
+---
+
+### 1. 背景・目的
+
+- ユーザーは **チャット UI から自然文を入力**してタスクを起動する。
+- 内部では、その自然文をもとに **TaskConfig YAML** を生成し、それを AgentRunner に渡す。
+- AgentRunner は、タスク分析・実装・ファイル生成・検証（テスト等）までを実行し、その結果を IDE に返す。
+- Phase 0 のゴールは、以下の 1 本のパイプラインが「ローカルで一気通しで動作すること」である。
+
+> Chat（`TODO アプリを作成して`）  
+> → Task Builder（LLM）で TaskConfig YAML を生成  
+> → AgentRunner でタスク分析 / 実装 / ファイル生成 / 検証を実行  
+> → Orchestrator 経由で結果が IDE に表示される
+
+TODO アプリの仕様・技術スタック・テスト戦略などは **一切固定しない**。  
+本ドキュメントの範囲は「パイプラインとしての契約と責務」のみを定義する。
+
+---
+
+### 2. コンポーネントと責務
+
+#### 2.1 IDE (Chat Layer)
+
+- ユーザーと対話するフロントエンド。
+- ユーザー入力（自然文）を `raw_prompt` として TaskStore に保存する。
+- Task の一覧表示、ステータス表示、結果サマリの表示を行う。
+
+#### 2.2 Orchestrator
+
+- Workspace / TaskStore / IPC の管理を行うバックエンドコンポーネント。
+- 主な責務:
+  - Task 作成時に TaskStore レコードを生成。
+  - Task 実行要求を IPC queue にジョブとして登録。
+  - **Task Builder**（LLM）を呼び出し、`raw_prompt` から TaskConfig YAML を生成。
+  - TaskConfig YAML を AgentRunner に渡して実行。
+  - AgentRunner の結果を受け取り、TaskAttempt として保存し、IPC 結果を IDE に露出。
+
+#### 2.3 Task Builder（CLI プロバイダ）
+
+- Orchestrator から呼び出される CLI ベースのコンポーネント（Codex CLI 等）。
+- 入力:
+  - Workspace 情報（root_dir 等）
+  - ユーザー入力の自然文（`raw_prompt`）
+- 出力:
+  - AgentRunner に渡す **TaskConfig YAML**（本ドキュメントでフォーマットを定義）。
+- 実装:
+  - `codex chat` コマンドを実行し、JSON 形式で応答を受信
+  - CLI セッションの検証とエラーハンドリングを実装
+
+#### 2.4 AgentRunner
+
+- Meta / Worker エージェントのランタイム。
+- 入力:
+  - TaskConfig YAML（Task Builder の出力をそのまま受け取る）
+- 処理:
+  - タスク分析・プランニング
+  - コード編集・新規ファイル生成
+  - 可能な範囲での検証（テスト実行・ビルド・lint 等）
+- 出力:
+  - Task 実行結果の JSON（タスクサマリ・検証内容・ステータス等）。
+
+#### 2.5 TaskStore - Workspace
+
+- ローカルファイルシステム上のメタデータ保存レイヤ。
+- ディレクトリ構造（概要）:
+
+```text
+~/.multiverse/workspaces/<workspace-id>/
+  workspace.json
+  tasks/
+    <task-id>.jsonl
+  ipc/
+    queue/
+    results/
+  logs/
+```
+
+---
+
+### 3. データモデル
+
+#### 3.1 TaskStore: Task レコード
+
+IDE から作成されるタスクの最小レコード定義。
+
+```jsonc
+// ~/.multiverse/workspaces/<workspace-id>/tasks/<task-id>.jsonl
+{
+  "id": "golden-todo-001",
+  "workspace_id": "abcd1234ef56",
+  "title": "TODO アプリを作成して",
+  "raw_prompt": "TODO アプリを作成して",
+  "created_at": "2025-12-07T08:00:00Z"
+}
+```
+
+- `title`
+  - UI 表示用。初期値は `raw_prompt` と同一でよい。
+- `raw_prompt`
+  - ユーザーがチャットで入力した自然文。
+  - Task Builder の入力として利用する。
+
+※ Phase 0 では `test_command` 等は持たない。検証戦略は AgentRunner 側に委譲する。
+
+#### 3.2 IPC Queue: Job JSON
+
+IDE からの「実行してほしい」要求は、Orchestrator に対して IPC queue 経由で渡される。
+
+```jsonc
+// ~/.multiverse/workspaces/<workspace-id>/ipc/queue/<job-id>.json
+{
+  "workspace_id": "abcd1234ef56",
+  "task_id": "golden-todo-001"
+}
+```
+
+- Orchestrator は queue ディレクトリをポーリングし、Job を検出して処理する。
+
+#### 3.3 TaskConfig YAML（Task Builder 出力 - AgentRunner 入力）
+
+Task Builder により生成され、AgentRunner に渡される YAML の最小スキーマを定義する。
+
+```yaml
+task:
+  id: "golden-todo-001"
+  title: "TODO アプリを作成して"
+  instructions: |
+    TODO アプリを作成して。
+    技術スタックや実装方針、検証方法はあなたの判断に任せます。
+    必要に応じて、コードや設定ファイル、テストコードなどを自由に生成してください。
+  project:
+    root_dir: "/path/to/workspace"
+
+runner:
+  meta:
+    model: "gpt-4.1"
+    temperature: 0.2
+  worker:
+    type: "docker_codex_cli"
+    # 必要に応じて image / mount - env 等を拡張
+```
+
+必須フィールド:
+
+- `task.id`（TaskStore の `id` と一致）
+- `task.title`
+- `task.instructions`
+- `task.project.root_dir`
+- `runner.meta.model`
+- `runner.worker.type`
+
+Task Builder 実装は、このスキーマを満たすように LLM 出力を誘導する。
+
+#### 3.4 AgentRunner 結果 JSON
+
+AgentRunner がタスク実行完了時に Orchestrator に返す結果 JSON の最小仕様。
+
+```jsonc
+{
+  "task_id": "golden-todo-001",
+  "status": "succeeded",   // "succeeded" | "failed"
+  "summary": "TODO アプリを作成し、基本的な追加・削除・一覧機能と簡単な検証処理を実行しました。",
+  "validation": {
+    "overall": "passed",   // "passed" | "failed" | "unknown"
+    "commands": [
+      {
+        "command": "npm test",
+        "exit_code": 0,
+        "duration_ms": 12345
+      }
+    ]
+  },
+  "duration_ms": 600000
+}
+```
+
+- `status`
+  - AgentRunner レベルでの成功/失敗。
+- `summary`
+  - 実装内容の自然文サマリ（IDE 表示用）。
+- `validation`
+  - AgentRunner 内で実施した検証（テスト / ビルド / lint 等）の概要。
+  - Phase 0 では 1 コマンド / 0 コマンドでも可（`commands` は空配列を許容）。
+- `duration_ms`
+  - 全体の実行時間（任意だが、あると便利）。
+
+Orchestrator は、本 JSON を TaskAttempt（JSONL）に埋め込み、IDE から参照可能にする。
+
+---
+
+### 4. 処理フロー
+
+#### 4.1 Chat → Task 作成
+
+1. ユーザーが IDE のチャット欄に以下を入力する。
+
+   > `TODO アプリを作成して`
+
+2. IDE は以下を行う。
+   - Workspace を選択中であることを前提に、`workspace_id` を決定。
+   - 新規 Task を作成し、`title` と `raw_prompt` に上記の文言を保存。
+   - TaskStore の `tasks/<task-id>.jsonl` に Task レコードを append。
+
+3. ユーザーは Task 一覧画面で、`TODO アプリを作成して` タスクを確認できる。
+
+#### 4.2 Task 実行要求 → Orchestrator
+
+1. ユーザーが IDE 上で Task の「Run」ボタンを押下。
+2. IDE は IPC queue に Job JSON を作成する（3.2 参照）。
+3. Orchestrator は queue ディレクトリを監視し、Job を検出。
+
+#### 4.3 Task Builder 呼び出し
+
+1. Orchestrator は TaskStore から `task_id` に対応する Task をロード。
+2. Orchestrator は CLI プロバイダ（Task Builder）に以下の情報を渡して呼び出す。
+
+   - Workspace 情報（例）
+     - `root_dir: "/path/to/workspace"`
+   - `raw_prompt: "TODO アプリを作成して"`
+
+3. Task Builder（Codex CLI 等）は、`codex chat` コマンドを実行し、3.3 の TaskConfig スキーマに従う YAML を生成する。
+4. Orchestrator は生成された YAML を TaskConfig として検証する。
+   - YAML としてパース可能か
+   - 必須フィールドが存在するか
+5. 検証に失敗した場合、または CLI セッションが無い場合は、その時点で TaskAttempt を `failed` として記録し、結果を IDE に返す。
+
+#### 4.4 AgentRunner 実行
+
+1. Orchestrator は検証済み TaskConfig YAML を AgentRunner に渡す（実装としては `agent-runner` サブプロセスの stdin 等）。
+2. AgentRunner は内部で以下を行う（振る舞いは AgentRunner 側の設計に従う）:
+   - タスク分析・プランニング
+   - コード編集・ファイル生成
+   - 可能な限りの自己検証（テスト / ビルド / lint 等）
+3. 完了時、AgentRunner は 3.4 の JSON を stdout（またはファイル）として出力する。
+4. Orchestrator はこの JSON を受け取り、TaskAttempt として TaskStore に追記し、IPC results にも書き出す。
+
+#### 4.5 IDE での結果表示
+
+1. IDE は IPC results をポーリング or ファイル監視し、対象 Job の result JSON を検出。
+2. Task 一覧画面:
+   - 対象 Task のステータスを `SUCCEEDED` / `FAILED` に更新。
+3. Task 詳細画面:
+   - `status` / `summary` / `validation.overall` / `validation.commands` 等を表示する。
+
+---
+
+### 5. ゴールデンテスト仕様
+
+#### 5.1 前提
+
+- ゴールデンテストのユーザー入力は **固定** とする。
+
+  ```text
+  TODO アプリを作成して
+  ```
+
+- TODO アプリの解釈・技術スタック・設計・テスト戦略に関するルールは **一切課さない**。
+- 検証対象は「アプリとして妥当か」ではなく、「パイプラインとして正しく通るか」である。
+
+#### 5.2 GT-1: Chat → TaskConfig（Task Builder テスト）
+
+目的:
+
+- `raw_prompt = "TODO アプリを作成して"` から **有効な TaskConfig YAML** が生成されることを確認する。
+
+前提条件:
+
+- Codex CLI がインストールされ、有効なセッションが存在すること
+
+テスト手順（ロジック）:
+
+1. テスト用 Workspace を作成（空 or ほぼ空でよい）。
+2. Task を作成し、`raw_prompt = "TODO アプリを作成して"` を設定。
+3. Orchestrator 経由で Task Builder（Codex CLI）を呼び出し、TaskConfig YAML を取得。
+4. アサーション:
+   - YAML としてパース可能。
+   - `task.id` が TaskStore の `id` と一致。
+   - `task.title` が `TODO アプリを作成して` を含む。
+   - `task.instructions` に `TODO アプリを作成して` の文言が含まれる。
+   - `task.project.root_dir` が Workspace のパスと一致。
+   - `runner.meta.model` / `runner.worker.type` が存在。
+
+#### 5.3 GT-2: TaskConfig → AgentRunner（実行テスト）
+
+目的:
+
+- TaskConfig YAML を AgentRunner に渡した際、実装・ファイル生成・自己検証までの処理が完了し、結果 JSON が返ることを確認する。
+
+前提条件:
+
+- Codex CLI がインストールされ、有効なセッションが存在すること
+- Docker が起動しており、Codex Worker イメージが利用可能であること
+
+テスト手順（ロジック）:
+
+1. GT-1 で取得した TaskConfig YAML をそのまま AgentRunner に入力。
+2. AgentRunner を実行し、結果 JSON（3.4）を取得。
+   - AgentRunner は Docker サンドボックス内で Codex CLI を実行
+   - Codex CLI セッションが Docker コンテナ内で利用可能であることを確認
+3. アサーション:
+   - プロセスとして正常終了している（exit code = 0 が望ましいが、結果 JSON の `status` を見て判定）。
+   - Workspace ディレクトリ内で 1 つ以上のファイルが新規作成 or 更新されている。
+   - 結果 JSON に以下が含まれる:
+     - `task_id`（TaskStore の id と一致）
+     - `status`（"succeeded" or "failed"）
+     - `summary`（非空の文字列）
+     - `validation` オブジェクト（存在すればよい。`commands` が空でも許容）
+
+※ Phase 0 の時点では、`status = failed` であっても、「パイプラインとして最後まで処理され、結果が返る」ことを成功条件としてよい。
+
+#### 5.4 GT-3: E2E（Chat → TaskConfig → AgentRunner → 結果）
+
+目的:
+
+- IDE チャット入力から結果表示まで、全パスが一気通しで動くことを確認する。
+
+テスト手順（ロジック）:
+
+1. IDE のテストモードで以下を実行する:
+   - Chat に `TODO アプリを作成して` を入力し、Task 作成。
+   - Task の「Run」ボタンを押下。
+2. バックグラウンドで:
+   - Orchestrator が Job 処理 → Task Builder → TaskConfig YAML 生成 → AgentRunner 実行 → 結果 JSON 生成。
+3. IDE で Task 詳細画面を開き、以下を確認:
+   - ステータスが `SUCCEEDED` または `FAILED` のいずれか。
+   - summary が表示されている。
+   - validation.overall が `passed` / `failed` / `unknown` のいずれか（存在すればよい）。
+
+---
+
+### 6. 実装順序（Phase 0 向け指針）
+
+実装順序の推奨:
+
+1. Workspace / TaskStore / IPC（queue/results）の基盤実装。
+2. IDE:
+   - Workspace 選択 UI
+   - Task 作成 UI（Chat 入力 → TaskStore に `raw_prompt` 保存）
+3. Orchestrator:
+   - Job queue 処理
+   - TaskBuilder 呼び出し（LLM API ラッパ）
+   - TaskConfig YAML 検証
+4. AgentRunner 連携:
+   - TaskConfig YAML を stdin で渡す Executor 実装
+   - 結果 JSON の受信と TaskAttempt への保存
+5. IDE:
+   - IPC results の監視
+   - Task ステータスと結果サマリの表示
+6. ゴールデンテスト（GT-1 / GT-2 / GT-3）の追加
+
+本設計書は Phase 0 の最小スコープを対象とする。  
+Phase 1 以降で、複数エージェント、WorkerPool、シナリオベースの L2 テスト等を拡張するが、それらは別途仕様書で定義する。
+
+
+# cli-agents
+
+<a id="cli-agents-README"></a>
+
+## README
+
+**Source**: `cli-agents/README.md`
+
+
+このディレクトリには、multiverse IDE で使用する CLI エージェントツールのナレッジを管理します。
+
+### ディレクトリ構造
+
+```
+docs/cli-agents/
+├── README.md           # このファイル
+├── codex/              # Codex CLI
+│   ├── CLAUDE.md       # AI 向けナレッジ
+│   └── version-X.X.X.md # バージョン固有仕様
+├── gemini/             # Gemini CLI（将来拡張）
+├── claude-code/        # Claude Code（将来拡張）
+└── cursor/             # Cursor CLI（将来拡張）
+```
+
+### 共通原則
+
+#### サンドボックス方針
+
+**全ての CLI エージェントツールは Docker コンテナ内で実行され、CLI 内部のサンドボックスは無効化される。**
+
+詳細は [サンドボックス方針](../design/sandbox-policy.md) を参照。
+
+#### ナレッジ管理ルール
+
+1. **CLAUDE.md**: AI（Claude）が参照するための構造化されたナレッジ
+   - 現在対応しているバージョン
+   - 必須フラグと設定
+   - デフォルト値
+   - 使用例
+
+2. **version-X.X.X.md**: バージョン固有の詳細仕様
+   - そのバージョンで利用可能なフラグ一覧
+   - 前バージョンからの変更点
+   - 既知の問題
+
+#### 更新タイミング
+
+- CLI ツールのバージョンアップ時
+- 新しいフラグ・機能の追加時
+- 問題発生時の調査結果
+
+### 対応 CLI ツール
+
+| CLI ツール | ステータス | 対応バージョン |
+|-----------|----------|---------------|
+| Codex CLI | ✅ 対応済み | 0.65.0 |
+| Gemini CLI | ⏳ 未対応 | - |
+| Claude Code | ⏳ 未対応 | - |
+| Cursor CLI | ⏳ 未対応 | - |
+
+### 関連ドキュメント
+
+- [サンドボックス方針](../design/sandbox-policy.md)
+- [AgentToolProvider 設計](../design/architecture.md#agenttoolprovider-設計phase-4-拡張)
+- [Worker インターフェース仕様](../specifications/worker-interface.md)
+
+
+# cli-agents/codex
+
+<a id="cli-agents-codex-version-0.65.0"></a>
+
+## Version 0.65.0
+
+**Source**: `cli-agents/codex/version-0.65.0.md`
+
+
+確認日: 2025-12-07
+
+### インストール
+
+```bash
+npm i -g @openai/codex
+# または
+brew install --cask codex
+```
+
+### サブコマンド
+
+| コマンド | 説明 | エイリアス |
+|---------|------|-----------|
+| `exec` | 非対話モードで実行 | `e` |
+| `review` | コードレビューを非対話モードで実行 | - |
+| `login` | ログイン管理 | - |
+| `logout` | 認証情報を削除 | - |
+| `mcp` | MCP サーバー管理（実験的） | - |
+| `mcp-server` | MCP サーバー起動（実験的） | - |
+| `app-server` | アプリサーバー起動（実験的） | - |
+| `completion` | シェル補完スクリプト生成 | - |
+| `sandbox` | サンドボックス内でコマンド実行 | `debug` |
+| `apply` | 最新の diff を適用 | `a` |
+| `resume` | 前回のセッションを再開 | - |
+| `cloud` | Codex Cloud からタスクを取得（実験的） | - |
+| `features` | フィーチャーフラグを確認 | - |
+
+### exec サブコマンドオプション
+
+#### 基本オプション
+
+| フラグ | 説明 |
+|--------|------|
+| `-c, --config <key=value>` | 設定オーバーライド（TOML 形式） |
+| `--enable <FEATURE>` | フィーチャーフラグを有効化 |
+| `--disable <FEATURE>` | フィーチャーフラグを無効化 |
+| `-i, --image <FILE>...` | 画像ファイルを添付 |
+| `-m, --model <MODEL>` | モデルを指定 |
+| `--oss` | ローカル OSS モデルを使用 |
+| `--local-provider <PROVIDER>` | ローカルプロバイダ（lmstudio/ollama） |
+
+#### サンドボックス・承認オプション
+
+| フラグ | 説明 |
+|--------|------|
+| `-s, --sandbox <MODE>` | `read-only` / `workspace-write` / `danger-full-access` |
+| `--full-auto` | `-a on-request --sandbox workspace-write` のショートカット |
+| `--dangerously-bypass-approvals-and-sandbox` | サンドボックス・承認を完全無効化（**Docker 内専用**） |
+
+#### ディレクトリ・パスオプション
+
+| フラグ | 説明 |
+|--------|------|
+| `-C, --cd <DIR>` | 作業ディレクトリを指定 |
+| `--add-dir <DIR>` | 追加の書き込み可能ディレクトリ |
+| `--skip-git-repo-check` | Git リポジトリ外での実行を許可 |
+
+#### 出力オプション
+
+| フラグ | 説明 |
+|--------|------|
+| `--json` | JSONL 形式で出力 |
+| `-o, --output-last-message <FILE>` | 最後のメッセージをファイルに出力 |
+| `--output-schema <FILE>` | 出力スキーマを指定 |
+| `--color <COLOR>` | カラー設定（always/never/auto） |
+
+#### その他
+
+| フラグ | 説明 |
+|--------|------|
+| `-p, --profile <PROFILE>` | 設定プロファイルを指定 |
+| `-h, --help` | ヘルプを表示 |
+| `-V, --version` | バージョンを表示 |
+
+### 設定オーバーライド (-c)
+
+`-c` フラグで `~/.codex/config.toml` の設定をオーバーライド可能:
+
+```bash
+# モデル指定
+-c model="o3"
+
+# サンドボックス権限
+-c 'sandbox_permissions=["disk-full-read-access"]'
+
+# 環境変数継承
+-c shell_environment_policy.inherit=all
+
+# 思考の深さ
+-c reasoning_effort=medium
+
+# サンプリング設定
+-c temperature=0.5
+-c max_tokens=4000
+```
+
+### stdin 入力
+
+PROMPT 引数を省略するか `-` を指定すると stdin から読み取り:
+
+```bash
+# 省略パターン
+echo "prompt" | codex exec --json
+
+# 明示的指定
+echo "prompt" | codex exec --json -
+```
+
+### 既知の制限
+
+#### プラットフォーム
+
+- **macOS**: 完全サポート
+- **Linux**: 完全サポート
+- **Windows**: 実験的（WSL 推奨）
+
+#### サンドボックス
+
+- macOS: Seatbelt 使用
+- Linux: Landlock/seccomp 使用
+- Docker 内: 無効化推奨（Docker が外部サンドボックスとして機能）
+
+### 前バージョンからの変更点
+
+#### 0.58.0 → 0.65.0
+
+- `review` サブコマンド追加
+- `--local-provider` オプション追加（lmstudio 対応）
+- 各種バグ修正・安定性向上
+
+### 参考リンク
+
+- [Codex CLI 公式ドキュメント](https://developers.openai.com/codex/cli/)
+- [Codex CLI リファレンス](https://developers.openai.com/codex/cli/reference)
+- [Codex セキュリティ](https://developers.openai.com/codex/security/)
+- [GitHub リポジトリ](https://github.com/openai/codex)
+
 
 # Guides
 
@@ -2904,4 +3931,456 @@ Error: failed to start sandbox
 ```
 
 → Docker デーモンが起動していることを確認してください。
+
+#### signal: killed エラー
+
+```
+タスク分解に失敗しました: codex CLI call failed: codex CLI 呼び出し失敗: signal: killed
+```
+
+**原因**: タイムアウトによりプロセスが強制終了されました。
+
+**対策**:
+
+1. **タイムアウト設定の確認**:
+   - ChatHandler: デフォルト 15 分（`DefaultChatMetaTimeout`）
+   - Meta-agent: デフォルト 10 分（`DefaultMetaAgentTimeout`）
+
+2. **ログの確認**:
+   - プロセスがどの段階でタイムアウトしたかを確認
+   - ネットワーク遅延や API レート制限の可能性をチェック
+
+3. **タイムアウト延長**（必要な場合）:
+   ```go
+   // chat/handler.go
+   handler.SetMetaTimeout(20 * time.Minute)
+   ```
+
+#### YAML パースエラー
+
+```
+failed to parse YAML response: mapping values are not allowed in this context
+```
+
+**原因**: Codex CLI の出力にヘッダー情報が含まれており、YAML パーサーがそれを解釈できませんでした。
+
+**対策**:
+
+1. `extractYAML()` 関数が正しく YAML 部分を抽出しているか確認
+2. Codex CLI の出力形式が変わっていないか確認
+
+**Codex CLI の出力形式**:
+
+```
+OpenAI Codex v0.65.0 (research preview)
+--------
+workdir: /path/to/project
+model: gpt-5.1
+provider: openai
+--------
+user
+プロンプト内容...
+codex
+type: decompose
+version: 1
+payload:
+  understanding: "..."
+```
+
+`extractYAML()` は `type:` で始まる行から YAML を抽出します。
+
+<a id="guides-cli-subscription"></a>
+
+## Cli Subscription
+
+**Source**: `guides/cli-subscription.md`
+
+
+AgentRunner uses your local CLI sessions to execute tasks. This avoids the need for API keys to be stored in the application and allows you to use your existing subscriptions.
+
+### Supported Providers
+
+- **Codex CLI**: `codex`
+- **Claude Code**: `claude` / `claude-code`
+- **Gemini CLI**: `gemini`
+- **Cursor CLI**: `cursor`
+
+### Setup Instructions
+
+#### 1. Codex CLI
+
+1. Install Codex CLI.
+2. Login to your account:
+   ```bash
+   codex login
+   ```
+   This should create a session file at `~/.codex/auth.json`.
+3. AgentRunner will automatically mount this file into the sandbox container.
+
+#### 2. Claude Code
+
+1. Install Claude Code (`npm install -g @anthropic-ai/claude-code`).
+2. Login:
+   ```bash
+   claude login
+   ```
+3. Ensure the `claude` command is in your PATH.
+
+#### 3. Gemini CLI
+
+1. Install Gemini CLI.
+2. Login or setup credentials as per official documentation.
+
+#### 4. Cursor CLI
+
+1. Ensure Cursor is installed and the CLI is available in your PATH.
+
+### Configuration in Multiverse IDE
+
+1. Open **Settings** -> **LLM**.
+2. Select your desired provider from the list (e.g., `codex-cli`, `claude-code`).
+3. Click "Test Connection" to verify that AgentRunner can access your local session.
+
+### Troubleshooting
+
+- **Session not found**: Ensure you have run the login command for the respective CLI.
+- **Permission denied**: On macOS, you might need to grant Full Disk Access to Docker or the terminal running AgentRunner if it needs to read strict paths (though usually standard home paths are fine).
+
+<a id="guides-gemini-cli"></a>
+
+## Gemini Cli
+
+**Source**: `guides/gemini-cli.md`
+
+
+このドキュメントでは、Google の Gemini CLI を multiverse で使用するための設定と運用ノウハウをまとめています。
+
+### 概要
+
+Gemini CLI は Google が提供するオープンソースの AI エージェントで、ターミナルから直接 Gemini モデルにアクセスできます。
+
+- **公式リポジトリ**: https://github.com/google-gemini/gemini-cli
+- **ドキュメント**: https://geminicli.com/docs/
+
+#### 主な特徴
+
+- 無料枠: 60 リクエスト/分、1,000 リクエスト/日（個人 Google アカウント）
+- 1M トークンのコンテキストウィンドウ
+- 組み込みツール: Google 検索、ファイル操作、シェルコマンド、Web フェッチ
+- MCP（Model Context Protocol）サポート
+
+### 利用可能なモデル
+
+#### 推奨モデル
+
+| モデル ID | 特徴 | 用途 |
+|-----------|------|------|
+| `gemini-3-pro-preview` | 最新のマルチモーダル、1M入力/65k出力 | **デフォルト・高度なタスク** |
+| `gemini-2.5-pro` | 高度な推論、STEM 分析、安定版 | 複雑なコード生成・分析 |
+| `gemini-2.5-flash` | 価格・性能バランス、安定版 | 日常的な開発作業 |
+| `gemini-2.5-flash-lite` | 超高速・低コスト | 大量リクエスト処理 |
+
+#### プレビューモデル
+
+| モデル ID | 特徴 | 注意事項 |
+|-----------|------|----------|
+| `gemini-3-pro-preview` | 最新のマルチモーダル（**デフォルト**） | 2週間前通知で変更の可能性 |
+| `gemini-2.5-flash-preview-09-2025` | Flash のプレビュー版 | プレビュー版 |
+
+#### 特殊モデル
+
+| モデル ID | 用途 |
+|-----------|------|
+| `gemini-2.5-flash-preview-tts` | テキスト読み上げ |
+| `gemini-2.5-flash-image` | 画像生成 |
+| `gemini-2.5-flash-native-audio-preview-09-2025` | ライブオーディオ |
+
+### 環境設定
+
+#### 認証設定
+
+```bash
+# 方法 1: 環境変数（推奨）
+export GEMINI_API_KEY="your-api-key"
+
+# 方法 2: Google Cloud 認証
+export GOOGLE_API_KEY="your-api-key"
+
+# 方法 3: Vertex AI 経由
+export GOOGLE_GENAI_USE_VERTEXAI=true
+export GOOGLE_CLOUD_PROJECT="your-project-id"
+```
+
+#### .env ファイル
+
+`~/.gemini/.env`（グローバル）または `./.gemini/.env`（プロジェクト）に設定可能:
+
+```bash
+GEMINI_API_KEY=your-api-key
+GEMINI_MODEL=gemini-2.5-flash
+```
+
+### CLI オプション
+
+#### 基本コマンド
+
+```bash
+# インタラクティブモード
+gemini
+
+# 非インタラクティブ（プロンプトモード）
+gemini -p "コードをレビューして"
+
+# モデル指定
+gemini -m gemini-2.5-pro
+
+# JSON 出力
+gemini -p "質問" --output-format json
+
+# 複数ディレクトリをコンテキストに追加
+gemini --include-directories ../lib,../docs
+```
+
+#### 主要フラグ
+
+| フラグ | 説明 |
+|--------|------|
+| `-m`, `--model` | 使用するモデルを指定 |
+| `-p` | プロンプトモード（非インタラクティブ） |
+| `--output-format` | 出力形式（`json`, `stream-json`） |
+| `--include-directories` | コンテキストに含めるディレクトリ |
+
+### 設定ファイル（settings.json）
+
+#### 設定の優先順位
+
+1. コマンドライン引数（最優先）
+2. 環境変数・.env ファイル
+3. システム設定（`/etc/gemini-cli/settings.json`）
+4. プロジェクト設定（`.gemini/settings.json`）
+5. ユーザー設定（`~/.gemini/settings.json`）
+6. デフォルト値（最低優先）
+
+#### 推奨設定
+
+```json
+{
+  "theme": "Default",
+  "vimMode": false,
+  "hideBanner": true,
+  "autoAccept": false,
+  "coreTools": ["read_file", "write_file", "run_shell_command"],
+  "sandbox": false,
+  "checkpointing": {
+    "enabled": true
+  },
+  "summarizeToolOutput": {
+    "run_shell_command": {
+      "enabled": true,
+      "tokenBudget": 2000
+    }
+  }
+}
+```
+
+#### 主要設定項目
+
+#### コンテキスト設定
+
+| 設定 | 型 | 説明 |
+|------|-----|------|
+| `contextFileName` | string/array | コンテキストファイル名（デフォルト: `GEMINI.md`） |
+| `includeDirectories` | array | コンテキストに含めるディレクトリ |
+| `loadMemoryFromIncludeDirectories` | boolean | 含めたディレクトリから GEMINI.md を読み込む |
+
+#### ツール設定
+
+| 設定 | 型 | 説明 |
+|------|-----|------|
+| `coreTools` | array | 有効にするツール |
+| `excludeTools` | array | 除外するツール |
+| `autoAccept` | boolean | 安全なツール実行を自動承認 |
+
+#### MCP サーバー設定
+
+```json
+{
+  "mcpServers": {
+    "my-server": {
+      "command": "node",
+      "args": ["server.js"],
+      "env": {},
+      "timeout": 30000
+    }
+  }
+}
+```
+
+#### サンドボックス設定
+
+| 設定 | 型 | 説明 |
+|------|-----|------|
+| `sandbox` | boolean/string | サンドボックス有効化（`true`, `"docker"`, `"podman"`） |
+
+### GEMINI.md（コンテキストファイル）
+
+プロジェクトの説明をモデルに提供するファイル。
+
+#### 配置場所と優先順位
+
+1. `~/.gemini/GEMINI.md` - グローバル設定
+2. プロジェクトルートから現在ディレクトリまでの祖先
+3. サブディレクトリの GEMINI.md
+
+#### 初期化
+
+```bash
+gemini /init
+```
+
+#### 推奨構成
+
+```markdown
+# プロジェクト名
+
+## 概要
+プロジェクトの目的と主要機能
+
+## 技術スタック
+- 言語: Go 1.23
+- フレームワーク: ...
+
+## ディレクトリ構造
+- `cmd/` - エントリポイント
+- `internal/` - 内部パッケージ
+
+## コーディング規約
+- コメントは日本語
+- 変数名は英語
+
+## よく使うコマンド
+- `go test ./...` - テスト実行
+- `go build ./cmd/...` - ビルド
+```
+
+### multiverse での設定
+
+#### タスク YAML 設定
+
+```yaml
+runner:
+  worker:
+    kind: "gemini-cli"
+    model: "gemini-2.5-flash"  # または gemini-2.5-pro
+    max_run_time_sec: 300
+    env:
+      GEMINI_API_KEY: "env:GEMINI_API_KEY"
+```
+
+#### ProviderConfig
+
+```go
+cfg := agenttools.ProviderConfig{
+    CLIPath:  "gemini",
+    Model:    "gemini-2.5-flash",
+    ExtraEnv: map[string]string{
+        "GEMINI_API_KEY": os.Getenv("GEMINI_API_KEY"),
+    },
+    Flags: []string{},
+}
+provider := agenttools.NewGeminiProvider(cfg)
+```
+
+### 運用ノウハウ
+
+#### モデル選択の指針
+
+| シナリオ | 推奨モデル | 理由 |
+|----------|-----------|------|
+| 高度なタスク・デフォルト | `gemini-3-pro-preview` | 最新のマルチモーダル能力 |
+| 安定性重視のコード生成 | `gemini-2.5-pro` | 高度な推論能力・安定版 |
+| 日常的なコード生成 | `gemini-2.5-flash` | バランスが良く安定・低コスト |
+| 大量のファイル処理 | `gemini-2.5-flash-lite` | 低コスト・高速 |
+
+#### レート制限対策
+
+無料枠の制限（60 req/min、1,000 req/day）に注意:
+
+```go
+// リトライロジックの実装例
+func withRetry(fn func() error, maxRetries int) error {
+    for i := 0; i < maxRetries; i++ {
+        err := fn()
+        if err == nil {
+            return nil
+        }
+        if isRateLimitError(err) {
+            time.Sleep(time.Duration(i+1) * time.Second)
+            continue
+        }
+        return err
+    }
+    return fmt.Errorf("max retries exceeded")
+}
+```
+
+#### コンテキスト最適化
+
+1M トークンのコンテキストを効率的に使用:
+
+```json
+{
+  "fileFiltering": {
+    "respectGitIgnore": true,
+    "enableRecursiveFileSearch": true
+  },
+  "summarizeToolOutput": {
+    "run_shell_command": {
+      "enabled": true,
+      "tokenBudget": 2000
+    }
+  }
+}
+```
+
+#### トラブルシューティング
+
+#### 認証エラー
+
+```
+Error: API key not found
+```
+
+**対策**:
+1. `GEMINI_API_KEY` 環境変数を確認
+2. `~/.gemini/.env` ファイルを確認
+3. API キーの有効性を確認
+
+#### モデルが見つからない
+
+```
+Error: Model not found: gemini-3-pro
+```
+
+**対策**:
+- 正しいモデル ID を使用（`gemini-3-pro-preview` など）
+- プレビューモデルは変更される可能性があることを認識
+
+#### タイムアウト
+
+```
+Error: Request timeout
+```
+
+**対策**:
+1. `max_run_time_sec` を増やす
+2. プロンプトを簡潔にする
+3. `gemini-2.5-flash-lite` で高速化
+
+### 参考リンク
+
+- [Gemini CLI GitHub](https://github.com/google-gemini/gemini-cli)
+- [Gemini API モデル一覧](https://ai.google.dev/gemini-api/docs/models)
+- [Gemini CLI 設定ドキュメント](https://github.com/google-gemini/gemini-cli/blob/main/docs/cli/configuration.md)
+- [Google Codelabs - Gemini CLI ハンズオン](https://codelabs.developers.google.com/gemini-cli-hands-on)
 

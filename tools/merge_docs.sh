@@ -23,12 +23,20 @@ PRIORITY_FILES=(
   # 設計ドキュメント
   "design/README.md"
   "design/architecture.md"
+  "design/ide-architecture.md"
   "design/data-flow.md"
   "design/implementation-guide.md"
+  "design/sandbox-policy.md"
+  "task-builder-and-golden-test-design.md"
+  # CLIエージェント
+  "cli-agents/README.md"
+  "cli-agents/codex/version-0.65.0.md"
   # 開発ガイド
   "guides/README.md"
   "guides/testing.md"
   "guides/codex-integration.md"
+  "guides/cli-subscription.md"
+  "guides/gemini-cli.md"
 )
 
 # 除外するファイル
