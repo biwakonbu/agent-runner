@@ -4,7 +4,7 @@
 
 Codex CLI は OpenAI が提供する AI コーディングアシスタントのコマンドラインツール。
 multiverse IDE では Worker エージェントとして Docker コンテナ内で実行される。
-※ 2025-12-12 現在、Meta-agent 側の `codex-cli` 利用は一旦廃止しており、IDE 経由の計画/分解は `openai-chat` がデフォルト。
+※ IDE の Meta-agent はデフォルト `openai-chat` だが、`OPENAI_API_KEY` 未設定かつ `codex` が利用可能な場合は `codex-cli` に自動フォールバックする（`app.go` の `newMetaClientFromConfig()` 参照）。
 
 ## 対応バージョン
 
@@ -18,7 +18,7 @@ multiverse IDE では Worker エージェントとして Docker コンテナ内�
 ### 統一実装
 
 multiverse IDE では Worker 実行における Codex CLI 呼び出しを `internal/agenttools/codex.go` の `CodexProvider` で統一管理。
-Meta-agent は現状 `openai-chat` をデフォルトとし、設定で `codex-cli` を指定しても `openai-chat` にフォールバックする。
+Meta-agent も `codex-cli` を選択可能（`openai-chat` は `OPENAI_API_KEY` 必須）。
 
 ### 実行モード
 
@@ -41,7 +41,7 @@ Meta-agent は現状 `openai-chat` をデフォルトとし、設定で `codex-c
 
 ### Meta-agent 実行コマンド（ホスト上 / 参考）
 
-※ IDE 経由では `codex-cli` は無効化されているため、手動で Codex CLI を使う場合の参考例。
+※ `codex-cli` をホスト上で実行する場合の参考例（IDE 経由でも `codex-cli` を選択可能）。
 
 ```bash
 	codex exec \

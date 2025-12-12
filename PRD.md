@@ -6,7 +6,7 @@
 
 - AgentRunner Core は `plan_task`/`next_action`/`completion_assessment` と Docker Sandbox を含む実行ループが安定稼働している（`docs/CURRENT_STATUS.md:18`、`docs/design/data-flow.md:13`）。
 - Orchestrator は file-based IPC + Scheduler + Executor を備えるが Beta 段階で、WBS/Node 中心の永続化（design/state/history）を前提とした v2 実装が途中（`docs/CURRENT_STATUS.md:20`、`docs/design/orchestrator-persistence-v2.md:11`）。
-- 現在の Chat は `decompose` を用いてタスク分解し TaskStore に Task を保存するが、design/state には反映していないため、Scheduler が依存解決できず実行に進まない（`internal/chat/handler.go:128`、`internal/orchestrator/scheduler.go:89`）。
+- 現在の Chat は `decompose` 結果を TaskStore に保存するだけでなく、`design/`（WBS/NodeDesign）と `state/`（NodesRuntime/TasksState）へも永続化するため、Scheduler が依存解決して実行に進める（`internal/chat/handler.go:339`、`internal/chat/handler.go:371`、`internal/orchestrator/scheduler.go:31`）。
 
 ## 2. 目的 / ゴール
 
@@ -20,7 +20,7 @@ MVP の到達点は「IDE のチャット入力から、WBS/ノード計画を�
 
 ## 3. 非ゴール（MVPでは扱わない）
 
-- ログのリアルタイムストリーミング（WebSocket/gRPC などの IPC 強化）。
+- ログのリアルタイムストリーミングの外部公開（WebSocket/gRPC などの IPC 強化）。※IDE 内は `task:log` を Wails Events で配信する（`internal/orchestrator/executor.go:121`、`internal/orchestrator/events.go:39`）。
 - マルチノード/リモート Worker プール。
 - 高度な承認フローや差分レビュー UI。
 - アニメーションや高度な UI エフェクト。UI は「カクつかず安定して操作できる」ことを優先する。
@@ -29,7 +29,7 @@ MVP の到達点は「IDE のチャット入力から、WBS/ノード計画を�
 
 - US-1: 開発者は IDE のチャットに要望を入力し、数秒〜数十秒後に WBS/ノードとタスクリストが生成される。
 - US-2: 開発者は「Run」操作で計画全体または特定ノードを実行できる。
-- US-3: IDE 上で各タスク/ノードのステータス（PENDING/READY/RUNNING/SUCCEEDED/FAILED/BLOCKED）が確認でき、生成・更新されたファイル一覧を参照できる。
+- US-3: IDE 上で各タスク/ノードのステータス（PENDING/READY/RUNNING/SUCCEEDED/COMPLETED/FAILED/CANCELED/BLOCKED/RETRY_WAIT）が確認でき、生成・更新されたファイル一覧を参照できる（`internal/orchestrator/task_store.go:16`）。
 
 ## 5. アーキテクチャ方針
 
@@ -93,26 +93,27 @@ MVP では **Chat Handler が Planner/TaskBuilder の役割を兼務**する。
    - WBS ルート作成/更新。
    - NodeDesign 作成/更新。
    - NodesRuntime へ `planned` を追加。
-   - TasksState へ `pending` の TaskState を追加。
-   - TaskStore へ Task を append し、IDE に `task.created` イベントを emit。
+   - TasksState へ `PENDING` の TaskState を追加。
+   - TaskStore へ Task を append し、IDE に `task:created` イベントを emit（`internal/chat/handler.go:344`、`internal/chat/handler.go:361`）。
 
 ### 7.2 Run → 実行
 
-1. IDE が Task の Run を押し、Scheduler が TaskState を READY にし IPC queue に Job を enqueue（`internal/orchestrator/scheduler.go:31`）。
-2. ExecutionOrchestrator が 2 秒ポーリングで Job を dequeue し Executor を起動する（`internal/orchestrator/execution_orchestrator.go:190`）。
-3. Executor が agent-runner に YAML を渡して実行する（`internal/orchestrator/executor.go:64`）。
+1. IDE が `StartExecution` で自律実行ループを開始する（`app.go:472`、`internal/orchestrator/execution_orchestrator.go:80`）。
+2. Scheduler が依存解決し、実行可能タスクを READY→enqueue する（自動: `internal/orchestrator/execution_orchestrator.go:245`、手動: `app.go:377`、`internal/orchestrator/scheduler.go:31`）。
+3. ExecutionOrchestrator が 2 秒ポーリングで Job を dequeue し Executor を起動する（`internal/orchestrator/execution_orchestrator.go:190`、`internal/orchestrator/execution_orchestrator.go:256`）。
+4. Executor が agent-runner に YAML を stdin 経由で渡して実行する（`internal/orchestrator/executor.go:83`、`internal/orchestrator/executor.go:157`）。
 
 ### 7.3 結果反映
 
 1. Executor の Attempt 結果で TaskState.Status を `SUCCEEDED/FAILED` に更新。
 2. SUCCEEDED の場合 NodeRuntime.Status を `implemented` へ更新。
-3. TaskStore の Task も同様に更新し、IDE へ stateChange/artifacts 更新イベントを emit。
+3. TaskStore（legacy）の Task も更新し、IDE へ `task:stateChange` を emit（`internal/orchestrator/execution_orchestrator.go:322`、`internal/orchestrator/execution_orchestrator.go:466`）。
 
 （将来拡張）AgentRunner の出力（Task Note や JSON サマリ）から「生成・変更されたファイル一覧」を抽出し、`Artifacts.Files` に保存して IDE で参照できるようにする。MVP では `Artifacts.Files` が空でも許容する。
 
-## 8. UX/性能方針（非リアルタイム前提）
+## 8. UX/性能方針（イベント駆動）
 
-- 画面のカクつきを避けるため、バックエンドからフロントへのイベントは「状態変化単位」に限定し、ログの行単位配信は MVP では行わない。
+- 画面のカクつきを避けるため、状態変化系イベント（`task:created`/`task:stateChange`/`execution:stateChange`/`chat:progress`）の粒度を維持しつつ、ログ系イベント `task:log` はフロント側で最大 1000 行に制限する（`internal/orchestrator/events.go:34`、`internal/orchestrator/executor.go:121`、`frontend/ide/src/stores/logStore.ts:16`）。
 - Graph/WBS の再レイアウトは Task一覧のバッチ更新後に一度だけ行う。
 - 大量タスク生成時は UI 更新をスロットリング（例: 100ms 単位）する。
 

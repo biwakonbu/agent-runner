@@ -116,6 +116,12 @@ func (c *Client) callLLM(ctx context.Context, systemPrompt, userPrompt string) (
 	logger := logging.WithTraceID(c.logger, ctx)
 	start := time.Now()
 
+	// openai-chat は API キー必須。空のまま送ると 401 になり、原因が分かりづらいので事前に弾く。
+	// mock クライアントは RoundTripper で応答を差し替えるため例外とする。
+	if c.kind == "openai-chat" && strings.TrimSpace(c.apiKey) == "" {
+		return "", fmt.Errorf("OPENAI_API_KEY が設定されていません。`codex-cli` を使うか、環境変数 OPENAI_API_KEY を設定してください")
+	}
+
 	reqBody := chatRequest{
 		Model: c.model,
 		Messages: []message{

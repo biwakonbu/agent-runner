@@ -367,4 +367,4 @@ Go の `text/template` を使用してテンプレートを展開します。
 
 - v1 ではコマンドラインオプションは未サポート
 - Worker 種別は `codex-cli`, `gemini-cli` をサポート
-- Meta 種別は `openai-chat` のみ
+- Meta 種別は `openai-chat`, `codex-cli` をサポート（`mock` はテスト用）

@@ -1,7 +1,5 @@
 <script lang="ts">
-  import { run } from 'svelte/legacy';
-
-  import { onMount } from "svelte";
+  import { onMount, tick } from "svelte";
   import ChatMessage from "../ChatMessage.svelte";
   import {
     chatMessages,
@@ -18,32 +16,32 @@
   let { conflicts = [] }: Props = $props();
 
   const MAX_DISPLAY_MESSAGES = 10000;
+  const BOTTOM_THRESHOLD_PX = 100;
 
   let contentEl: HTMLElement | undefined = $state();
   let showScrollToBottom = $state(false);
   let hasNewMessages = $state(false);
   let lastSeenMessageCount = $state(0);
+  let followLatest = $state(true);
+  let lastAutoScrollKey = $state("");
 
   // スクロール位置を監視して「最新に移動」ボタンの表示を制御
   function handleScroll() {
     if (!contentEl) return;
     const scrollBottom =
       contentEl.scrollHeight - contentEl.scrollTop - contentEl.clientHeight;
-    // 最下部から100px以上離れている場合にボタンを表示
-    showScrollToBottom = scrollBottom > 100;
+    followLatest = scrollBottom <= BOTTOM_THRESHOLD_PX;
+    showScrollToBottom = !followLatest;
+
     // 最下部にいる場合は新着フラグをリセット
-    if (!showScrollToBottom) {
+    if (followLatest) {
       hasNewMessages = false;
       lastSeenMessageCount = $chatMessages.length;
+      lastAutoScrollKey = `${$chatMessages.length}|${conflicts.length}|${
+        $isChatLoading ? progressContent : ""
+      }`;
     }
   }
-
-  // 新しいメッセージが追加されたかチェック
-  run(() => {
-    if ($chatMessages.length > lastSeenMessageCount && showScrollToBottom) {
-      hasNewMessages = true;
-    }
-  });
 
   // 表示するメッセージ（最新10000件まで）
   let displayMessages = $derived($chatMessages.slice(-MAX_DISPLAY_MESSAGES));
@@ -60,14 +58,55 @@
   function scrollToBottom() {
     if (contentEl) {
       contentEl.scrollTop = contentEl.scrollHeight;
+      followLatest = true;
       showScrollToBottom = false;
       hasNewMessages = false;
       lastSeenMessageCount = $chatMessages.length;
+      lastAutoScrollKey = `${$chatMessages.length}|${conflicts.length}|${
+        $isChatLoading ? progressContent : ""
+      }`;
     }
   }
 
+  // 「最下部表示中のみ自動追従」:
+  // - followLatest=true のときは、新規メッセージ/進捗/コンフリクトのDOM更新後に最下部へ追従
+  // - followLatest=false のときは、スクロール位置を維持しつつ新着バッジだけ更新
+  $effect(() => {
+    const autoScrollKey = `${$chatMessages.length}|${conflicts.length}|${
+      $isChatLoading ? progressContent : ""
+    }`;
+
+    if (!contentEl) return;
+
+    if (followLatest) {
+      if (autoScrollKey === lastAutoScrollKey) return;
+      lastAutoScrollKey = autoScrollKey;
+      void (async () => {
+        await tick();
+        scrollToBottom();
+      })();
+      return;
+    }
+
+    // 最下部から離れている場合は「最新へ」ボタンを出しつつ、新着フラグだけ立てる
+    const scrollBottom =
+      contentEl.scrollHeight - contentEl.scrollTop - contentEl.clientHeight;
+    showScrollToBottom = scrollBottom > BOTTOM_THRESHOLD_PX;
+    if (!showScrollToBottom) {
+      followLatest = true;
+      hasNewMessages = false;
+      lastSeenMessageCount = $chatMessages.length;
+      lastAutoScrollKey = autoScrollKey;
+      return;
+    }
+    if ($chatMessages.length > lastSeenMessageCount && showScrollToBottom) {
+      hasNewMessages = true;
+    }
+  });
+
   onMount(() => {
     lastSeenMessageCount = $chatMessages.length;
+    void tick().then(() => scrollToBottom());
   });
 </script>
 

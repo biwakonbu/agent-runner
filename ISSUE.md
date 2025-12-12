@@ -10,9 +10,10 @@
   - `LLMSettings` は Kind/Model を保存するが、CLI セッション状態を表示できず、`TestLLMConnection` も OpenAI HTTP 前提で CLI セッションを検証できない。API キーは不要なので UI をセッション表示に置換する必要。
   - 対応: CLI セッション検証用のテストエンドポイントに差し替え、設定保存を Meta 層の初期化に反映。API キー保存/表示を廃止し、セッション検知を表示。
 
-- [ ] 実行ログのリアルタイム配信が未実装
-  - `internal/orchestrator/executor.go` は `CombinedOutput` を一括取得するのみで、Wails Events によるストリーミングが無い。`TaskLogView` 相当の UI も未接続のため AC-P4-05 を満たさない。
-  - 対応: stdout/stderr を逐次読み取り、`task:log` イベントを送出する実装と UI 連携を追加。
+- [ ] 実行ログ（stdout/stderr）のリアルタイム配信/表示の整備
+  - バックエンド: stdout/stderr を逐次読み取り、`task:log` イベントを送出済み（`internal/orchestrator/executor.go:93`、`internal/orchestrator/executor.go:121`、`internal/orchestrator/events.go:39`）。
+  - フロント: `task:log` を購読して store に蓄積する実装は存在（`frontend/ide/src/stores/logStore.ts:49`）。
+  - 残タスク: UI 上でのタスク別フィルタ/クリア導線/常時表示など、運用可能な表示体験に仕上げる。
 
 - [ ] Codex CLI セッションの存在確認・注入手段が未整備
   - Worker Executor は `codex exec ...` を呼び出すが、セッション有無の検証・警告やコンテナへのセッション注入方法（環境変数/ボリューム）が明確でない。

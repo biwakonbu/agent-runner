@@ -1,7 +1,7 @@
 
 # Complete Documentation
 
-Generated: 2025-12-12 16:05:02
+Generated: 2025-12-12 22:35:24
 
 This document consolidates all documentation from the docs/ directory for LLM context.
 
@@ -592,7 +592,7 @@ Go の `text/template` を使用してテンプレートを展開します。
 
 - v1 ではコマンドラインオプションは未サポート
 - Worker 種別は `codex-cli`, `gemini-cli` をサポート
-- Meta 種別は `openai-chat` のみ
+- Meta 種別は `openai-chat`, `codex-cli` をサポート（`mock` はテスト用）
 
 <a id="specifications-meta-protocol"></a>
 
@@ -2018,6 +2018,7 @@ Worker 実行と Meta 生成の両方で同じ抽象を再利用し、特定 CLI
   - Docker 内実行: `--dangerously-bypass-approvals-and-sandbox` でサンドボックス・承認を無効化。
   - フラグ体系: `-C`（作業ディレクトリ）、`--json`（JSONL 出力）、`-m`（モデル）、`-c`（設定オーバーライド）。
   - デフォルト値: モデル `gpt-5.1-codex`（Worker 用）/ `gpt-5.2`（Meta 用）、思考の深さ `medium`。
+  - **注意**: IDE の Meta-agent はデフォルト `openai-chat` ですが、`OPENAI_API_KEY` 未設定かつ `codex` が利用可能な場合は `codex-cli` に自動フォールバックします（`app.go` の `newMetaClientFromConfig()` 参照）。
   - stdin 対応: PROMPT に `-` を指定して stdin から読み取り。
   - **ToolSpecific オプション**: `docker_mode`（Docker 内実行フラグ制御）、`json_output`（JSON 出力制御）
 - **Execute ヘルパー** (`internal/agenttools/exec.go`):
@@ -3208,13 +3209,13 @@ task:
   repo: "."
   prd:
     path: "./docs/prd.md"
-runner:
-  meta:
-    kind: "openai-chat"
-    model: "gpt-5.2"
-    max_loops: 5
-  worker:
-    kind: "codex-cli"
+  runner:
+    meta:
+      kind: "openai-chat"
+      model: "gpt-5.2"
+      max_loops: 5
+    worker:
+      kind: "codex-cli"
 ```
 
 #### 中間データ
@@ -5115,3 +5116,4 @@ Error: Request timeout
 - [Gemini API モデル一覧](https://ai.google.dev/gemini-api/docs/models)
 - [Gemini CLI 設定ドキュメント](https://github.com/google-gemini/gemini-cli/blob/main/docs/cli/configuration.md)
 - [Google Codelabs - Gemini CLI ハンズオン](https://codelabs.developers.google.com/gemini-cli-hands-on)
+

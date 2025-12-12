@@ -59,31 +59,42 @@ func (a *App) startup(ctx context.Context) {
 func (a *App) newMetaClientFromConfig() *meta.Client {
 	config, err := a.llmConfigStore.GetEffectiveConfig()
 	if err != nil {
-		// codex-cli は環境に Codex CLI が無い場合に失敗するため、当面は openai-chat にフォールバックする。
-		runtime.LogErrorf(a.ctx, "Failed to load LLM config, falling back to default openai-chat: %v", err)
-		apiKey := os.Getenv("OPENAI_API_KEY")
-		return meta.NewClient("openai-chat", apiKey, "", "")
+		runtime.LogErrorf(a.ctx, "Failed to load LLM config, falling back to default: %v", err)
+		config = ide.DefaultLLMConfig()
 	}
 
 	kind := config.Kind
 	if kind == "" {
-		kind = "openai-chat" // codex-cli を一旦廃止し、HTTP ベースをデフォルトに
+		kind = "openai-chat"
+	}
+
+	apiKey, apiKeyErr := a.llmConfigStore.GetAPIKey()
+	if apiKeyErr != nil {
+		runtime.LogWarningf(a.ctx, "Failed to read API key: %v", apiKeyErr)
+		apiKey = os.Getenv("OPENAI_API_KEY")
+	}
+
+	// openai-chat は API キー必須。未設定時は codex-cli に自動フォールバックする。
+	if kind == "openai-chat" && apiKey == "" {
+		if _, err := exec.LookPath("codex"); err == nil {
+			runtime.LogInfof(a.ctx, "OPENAI_API_KEY is empty; switching Meta provider from openai-chat to codex-cli")
+			kind = "codex-cli"
+		} else {
+			runtime.LogWarningf(a.ctx, "OPENAI_API_KEY is empty and codex CLI not found; Meta requests will fail")
+		}
 	}
 
 	switch kind {
+	case "mock":
+		return meta.NewMockClient()
 	case "codex-cli":
-		// codex-cli は一旦廃止。設定で指定されても openai-chat にフォールバックする。
-		runtime.LogErrorf(a.ctx, "codex-cli is temporarily disabled, falling back to openai-chat")
-		apiKey := os.Getenv("OPENAI_API_KEY")
-		return meta.NewClient("openai-chat", apiKey, config.Model, config.SystemPrompt)
+		return meta.NewClient("codex-cli", "", config.Model, config.SystemPrompt)
 	case "openai-chat":
 		// 後方互換性のため残す（HTTP ベース）
-		apiKey := os.Getenv("OPENAI_API_KEY")
 		return meta.NewClient("openai-chat", apiKey, config.Model, config.SystemPrompt)
 	default:
 		// 未知の種類の時も openai-chat にフォールバックする。
 		runtime.LogErrorf(a.ctx, "Unknown LLM kind '%s', falling back to openai-chat", kind)
-		apiKey := os.Getenv("OPENAI_API_KEY")
 		return meta.NewClient("openai-chat", apiKey, config.Model, config.SystemPrompt)
 	}
 }

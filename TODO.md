@@ -5,7 +5,7 @@
 ## 0. 前提
 
 - MVP のゴールは `PRD.md` の「MVP 完了条件」参照。
-- リアルタイム UX（ログストリーミング等）は後回し。UI のカクつき防止と体感性能を優先する。
+- リアルタイム UX は最小限（Wails Events による `chat:progress`/`task:stateChange`/`task:log` は実装済み、ログはフロントで最大 1000 行に制限）。UI のカクつき防止と体感性能を優先する（`internal/orchestrator/events.go:34`、`internal/orchestrator/executor.go:121`、`frontend/ide/src/stores/logStore.ts:16`）。
 
 ## 1. 計画生成の橋渡し（Chat → design/state）
 

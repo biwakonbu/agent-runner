@@ -245,9 +245,12 @@
     background: transparent !important;
   }
 
-  :global(.svelte-flow__viewport) {
-    background: transparent !important;
-  }
+	  :global(.svelte-flow__viewport) {
+	    background: transparent !important;
+
+	    /* transform を高頻度で更新するためヒントを与える */
+	    will-change: transform;
+	  }
 
   :global(.svelte-flow__node) {
     border-radius: var(--mv-radius-md);
@@ -295,16 +298,18 @@
   /* Graph Layer Control */
   .flow-container.wbs-mode :global(.svelte-flow__viewport),
   .flow-container.wbs-mode :global(.svelte-flow__controls),
-  .flow-container.wbs-mode :global(.svelte-flow__minimap),
-  .flow-container.wbs-mode :global(.svelte-flow__background) {
-    /* Removed opacity/blur to make WBS Graph visible */
-    transition: all 0.3s ease;
-  }
+	  .flow-container.wbs-mode :global(.svelte-flow__minimap),
+	  .flow-container.wbs-mode :global(.svelte-flow__background) {
+	    /* Removed opacity/blur to make WBS Graph visible */
+
+	    /* transform(パン/ズーム) に transition を掛けるとドラッグが遅延してカクつくため除外 */
+	    transition: opacity 0.3s ease, filter 0.3s ease;
+	  }
 
   .flow-container:not(.wbs-mode) :global(.svelte-flow__viewport) {
     opacity: 1;
     filter: none;
-    transition: all 0.3s ease;
+    transition: opacity 0.3s ease, filter 0.3s ease;
   }
 
   /* Apply opacity to the background dots in normal mode too, to make them subtle */

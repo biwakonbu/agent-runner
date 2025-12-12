@@ -494,8 +494,9 @@ func (t *timeoutError) Temporary() bool { return false }
 // TestCallLLM_SuccessFirstAttempt tests that successful first attempt returns immediately
 func TestCallLLM_SuccessFirstAttempt(t *testing.T) {
 	client := &Client{
-		kind:  "openai-chat",
-		model: "gpt-4-turbo",
+		kind:   "openai-chat",
+		apiKey: "test-api-key",
+		model:  "gpt-4-turbo",
 		client: &http.Client{
 			Transport: &mockRoundTripper{
 				responses: []http.Response{
@@ -524,8 +525,9 @@ func TestCallLLM_SuccessFirstAttempt(t *testing.T) {
 // TestCallLLM_RetryOn5xx tests retry behavior on 5xx errors
 func TestCallLLM_RetryOn5xx(t *testing.T) {
 	client := &Client{
-		kind:  "openai-chat",
-		model: "gpt-4-turbo",
+		kind:   "openai-chat",
+		apiKey: "test-api-key",
+		model:  "gpt-4-turbo",
 		client: &http.Client{
 			Transport: &mockRoundTripper{
 				responses: []http.Response{
@@ -559,8 +561,9 @@ func TestCallLLM_RetryOn5xx(t *testing.T) {
 // TestCallLLM_RetryOnRateLimit tests retry behavior on 429 (rate limit) errors
 func TestCallLLM_RetryOnRateLimit(t *testing.T) {
 	client := &Client{
-		kind:  "openai-chat",
-		model: "gpt-4-turbo",
+		kind:   "openai-chat",
+		apiKey: "test-api-key",
+		model:  "gpt-4-turbo",
 		client: &http.Client{
 			Transport: &mockRoundTripper{
 				responses: []http.Response{
@@ -594,8 +597,9 @@ func TestCallLLM_RetryOnRateLimit(t *testing.T) {
 // TestCallLLM_NoRetryOn4xx tests that 4xx errors are not retried
 func TestCallLLM_NoRetryOn4xx(t *testing.T) {
 	client := &Client{
-		kind:  "openai-chat",
-		model: "gpt-4-turbo",
+		kind:   "openai-chat",
+		apiKey: "test-api-key",
+		model:  "gpt-4-turbo",
 		client: &http.Client{
 			Transport: &mockRoundTripper{
 				responses: []http.Response{
@@ -625,8 +629,9 @@ func TestCallLLM_NoRetryOn4xx(t *testing.T) {
 // TestCallLLM_MaxRetriesExceeded tests failure after max retries
 func TestCallLLM_MaxRetriesExceeded(t *testing.T) {
 	client := &Client{
-		kind:  "openai-chat",
-		model: "gpt-4-turbo",
+		kind:   "openai-chat",
+		apiKey: "test-api-key",
+		model:  "gpt-4-turbo",
 		client: &http.Client{
 			Transport: &mockRoundTripper{
 				responses: []http.Response{
@@ -685,8 +690,9 @@ func TestCallLLM_RetryOnTimeout(t *testing.T) {
 	})
 
 	client := &Client{
-		kind:  "openai-chat",
-		model: "gpt-4-turbo",
+		kind:   "openai-chat",
+		apiKey: "test-api-key",
+		model:  "gpt-4-turbo",
 		client: &http.Client{
 			Transport: customTransport,
 		},
@@ -709,8 +715,9 @@ func TestCallLLM_ExponentialBackoff(t *testing.T) {
 	startTime := time.Now()
 
 	client := &Client{
-		kind:  "openai-chat",
-		model: "gpt-4-turbo",
+		kind:   "openai-chat",
+		apiKey: "test-api-key",
+		model:  "gpt-4-turbo",
 		client: &http.Client{
 			Transport: &mockRoundTripper{
 				responses: []http.Response{
@@ -818,8 +825,9 @@ payload:
 	jsonResponse := fmt.Sprintf(`{"choices":[{"message":{"role":"assistant","content":%q}}]}`, responseYAML)
 
 	client := &Client{
-		kind:  "openai-chat",
-		model: "gpt-4-turbo",
+		kind:   "openai-chat",
+		apiKey: "test-api-key",
+		model:  "gpt-4-turbo",
 		client: &http.Client{
 			Transport: mockRoundTripperFunc(func(req *http.Request) (*http.Response, error) {
 				return &http.Response{
@@ -881,8 +889,9 @@ func TestClient_CompletionAssessment_MarkdownCodeBlock(t *testing.T) {
 	jsonResponse := fmt.Sprintf(`{"choices":[{"message":{"role":"assistant","content":%q}}]}`, responseMarkdown)
 
 	client := &Client{
-		kind:  "openai-chat",
-		model: "gpt-4-turbo",
+		kind:   "openai-chat",
+		apiKey: "test-api-key",
+		model:  "gpt-4-turbo",
 		client: &http.Client{
 			Transport: mockRoundTripperFunc(func(req *http.Request) (*http.Response, error) {
 				return &http.Response{
@@ -941,8 +950,9 @@ payload:
 	jsonResponse := fmt.Sprintf(`{"choices":[{"message":{"role":"assistant","content":%q}}]}`, responseYAML)
 
 	client := &Client{
-		kind:  "openai-chat",
-		model: "gpt-4-turbo",
+		kind:   "openai-chat",
+		apiKey: "test-api-key",
+		model:  "gpt-4-turbo",
 		client: &http.Client{
 			Transport: &mockRoundTripper{
 				responses: []http.Response{
@@ -1016,8 +1026,9 @@ payload:
 	jsonResponse := fmt.Sprintf(`{"choices":[{"message":{"role":"assistant","content":%q}}]}`, responseYAML)
 
 	client := &Client{
-		kind:  "openai-chat",
-		model: "gpt-4-turbo",
+		kind:   "openai-chat",
+		apiKey: "test-api-key",
+		model:  "gpt-4-turbo",
 		client: &http.Client{
 			Transport: mockRoundTripperFunc(func(req *http.Request) (*http.Response, error) {
 				return &http.Response{

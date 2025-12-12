@@ -6,6 +6,7 @@ import { writable, get } from 'svelte/store';
 import { GetChatHistory, SendChatMessage, CreateChatSession } from '../../wailsjs/go/main/App';
 import { EventsOn } from '../../wailsjs/runtime/runtime';
 import type { ChatMessage } from '../types';
+import { toasts } from './toastStore';
 
 export interface ChatResponse {
     message: ChatMessage;
@@ -149,7 +150,14 @@ const chatStore = {
             if (response.error) {
                 console.error('Chat error:', response.error);
                 chatError.set(response.error);
-                // エラー時はロールバック推奨だが、現状はエラー表示のみ
+                toasts.add(response.error, 'error', 0);
+                // エラー時もバックエンド側でアシスタントメッセージを保存している場合があるため履歴を更新する
+                try {
+                    const history = await GetChatHistory(sessionId!) as unknown as ChatMessage[];
+                    chatMessages.setMessages(history);
+                } catch (e) {
+                    console.error('Failed to load chat history after error:', e);
+                }
             } else {
                  const history = await GetChatHistory(sessionId!) as unknown as ChatMessage[];
                  chatMessages.setMessages(history);
@@ -160,7 +168,9 @@ const chatStore = {
 
         } catch (e) {
             console.error('Failed to send message:', e);
-            chatError.set(e instanceof Error ? e.message : 'Failed to send message');
+            const msg = e instanceof Error ? e.message : 'Failed to send message';
+            chatError.set(msg);
+            toasts.add(msg, 'error', 0);
             // 失敗した場合、Optimistic Message をどうするか？
             // ここでは再取得で整合性を取るのが安全
             try {
