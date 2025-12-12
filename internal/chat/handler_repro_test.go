@@ -18,7 +18,7 @@ func TestHandleMessage_Mock(t *testing.T) {
 	mockMeta := meta.NewMockClient()
 
 	// Create Handler
-	handler := chat.NewHandler(mockMeta, taskStore, sessionStore, "test-ws", tmpDir, nil)
+	handler := chat.NewHandler(mockMeta, taskStore, sessionStore, "test-ws", tmpDir, nil, nil)
 
 	// Create Session
 	ctx := context.Background()
@@ -68,7 +68,7 @@ func TestHandleMessage_EmitsFailedEventOnMetaError(t *testing.T) {
 	taskStore := orchestrator.NewTaskStore(tmpDir)
 	sessionStore := chat.NewChatSessionStore(tmpDir)
 	recorder := &recordingEmitter{}
-	handler := chat.NewHandler(failingMetaClient{}, taskStore, sessionStore, "ws", tmpDir, recorder)
+	handler := chat.NewHandler(failingMetaClient{}, taskStore, sessionStore, "ws", tmpDir, nil, recorder)
 
 	ctx := context.Background()
 	session, err := handler.CreateSession(ctx)
@@ -113,7 +113,7 @@ func TestHandleMessage_FailsOnUnknownDependency(t *testing.T) {
 		},
 	}
 
-	handler := chat.NewHandler(staticMetaClient{resp: resp}, taskStore, sessionStore, "ws", tmpDir, recorder)
+	handler := chat.NewHandler(staticMetaClient{resp: resp}, taskStore, sessionStore, "ws", tmpDir, nil, recorder)
 
 	ctx := context.Background()
 	session, err := handler.CreateSession(ctx)

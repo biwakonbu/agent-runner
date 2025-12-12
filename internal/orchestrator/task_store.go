@@ -25,6 +25,20 @@ const (
 	TaskStatusRetryWait TaskStatus = "RETRY_WAIT"
 )
 
+// Default runner settings for AgentRunner tasks.
+const (
+	DefaultRunnerMaxLoops = 5
+	DefaultWorkerKind     = "codex-cli"
+)
+
+// Inputs map keys (state/tasks.json).
+const (
+	InputKeyAttemptCount     = "attempt_count"
+	InputKeyNextRetryAt      = "next_retry_at"
+	InputKeyRunnerMaxLoops   = "runner_max_loops"
+	InputKeyRunnerWorkerKind = "runner_worker_kind"
+)
+
 // Task represents a unit of work.
 type Task struct {
 	// 基本フィールド
@@ -54,6 +68,15 @@ type Task struct {
 	// Phase 1: Data Model Enhancements
 	SuggestedImpl *SuggestedImpl `json:"suggestedImpl,omitempty"` // 実装のヒント（ファイルパス、言語等）
 	Artifacts     *Artifacts     `json:"artifacts,omitempty"`     // 生成物（ファイル、ログ等）
+
+	// Runner settings (legacy TaskStore / YAML generation).
+	Runner *RunnerSpec `json:"runner,omitempty"`
+}
+
+// RunnerSpec holds execution hints for AgentRunner.
+type RunnerSpec struct {
+	MaxLoops   int    `json:"maxLoops,omitempty"`
+	WorkerKind string `json:"workerKind,omitempty"`
 }
 
 // SuggestedImpl represents the suggested implementation details from the Planner.

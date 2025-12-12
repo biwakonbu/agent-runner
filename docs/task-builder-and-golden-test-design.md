@@ -1,6 +1,6 @@
 # Task Builder & Golden Test 設計書
 
-本ドキュメントは、Multiverse IDE における「チャット入力 → TaskConfig YAML 生成 → AgentRunner 実行 → 結果反映」までの最小パイプラインと、ゴールデンテスト（`TODO アプリを作成して`）の仕様を定義する。
+本ドキュメントは、Multiverse IDE における「チャット入力 → decompose（WBS/Node/TaskState 生成） → TaskConfig YAML 生成 → AgentRunner 実行 → 結果反映」までの最小パイプラインと、ゴールデンテスト（`TODO アプリを作成して`）の仕様を定義する。
 
 実装時の指示書として利用することを前提とする。
 
@@ -14,9 +14,9 @@
 - Phase 0 のゴールは、以下の 1 本のパイプラインが「ローカルで一気通しで動作すること」である。
 
 > Chat（`TODO アプリを作成して`）  
-> → Task Builder（LLM）で TaskConfig YAML を生成  
-> → AgentRunner でタスク分析 / 実装 / ファイル生成 / 検証を実行  
-> → Orchestrator 経由で結果が IDE に表示される
+> → Meta decompose により WBS/NodeDesign/TaskState を生成（ChatHandler）  
+> → Orchestrator が依存解決し Executor で TaskConfig YAML を生成 → AgentRunner 実行  
+> → 結果が IDE に表示される
 
 TODO アプリの仕様・技術スタック・テスト戦略などは **一切固定しない**。  
 本ドキュメントの範囲は「パイプラインとしての契約と責務」のみを定義する。
@@ -28,36 +28,28 @@ TODO アプリの仕様・技術スタック・テスト戦略などは **一切
 ### 2.1 IDE (Chat Layer)
 
 - ユーザーと対話するフロントエンド。
-- ユーザー入力（自然文）を `raw_prompt` として TaskStore に保存する。
-- Task の一覧表示、ステータス表示、結果サマリの表示を行う。
+- ユーザー入力（自然文）をバックエンドの ChatHandler に送信する。
+- Task の一覧表示、ステータス表示、結果サマリの表示を行う（TaskStore / state の反映を受け取る）。
 
 ### 2.2 Orchestrator
 
 - Workspace / TaskStore / IPC の管理を行うバックエンドコンポーネント。
 - 主な責務:
-  - Task 作成時に TaskStore レコードを生成。
-  - Task 実行要求を IPC queue にジョブとして登録。
-  - **Task Builder**（LLM）を呼び出し、`raw_prompt` から TaskConfig YAML を生成。
-  - TaskConfig YAML を AgentRunner に渡して実行。
-  - AgentRunner の結果を受け取り、TaskAttempt として保存し、IPC 結果を IDE に露出。
+  - `state/tasks.json` / `state/nodes-runtime.json` / `design/nodes/*.json` を読み、依存関係を解決して READY タスクを選ぶ（Scheduler）。
+  - READY タスクを IPC queue にジョブとして登録し、ExecutionOrchestrator が消費する。
+  - Executor がタスクから TaskConfig YAML を生成し、`agent-runner` に stdin で渡して実行する。
+  - 実行結果を `state/` と TaskStore に反映し、IDE にイベントとして露出する。
 
-### 2.3 Task Builder（CLI プロバイダ）
+### 2.3 Task Builder（CLI プロバイダ / 将来拡張）
 
-- Orchestrator から呼び出される CLI ベースのコンポーネント（Codex CLI 等）。
-- 入力:
-  - Workspace 情報（root_dir 等）
-  - ユーザー入力の自然文（`raw_prompt`）
-- 出力:
-  - AgentRunner に渡す **TaskConfig YAML**（本ドキュメントでフォーマットを定義）。
-- 実装:
-  - `codex chat` コマンドを実行し、JSON 形式で応答を受信
-  - CLI セッションの検証とエラーハンドリングを実装
+将来的に、`raw_prompt` から TaskConfig YAML を LLM で生成するコンポーネントを想定する。  
+現行 MVP では Task Builder は未使用で、TaskConfig YAML は Executor が決定的に生成する。
 
 ### 2.4 AgentRunner
 
 - Meta / Worker エージェントのランタイム。
 - 入力:
-  - TaskConfig YAML（Task Builder の出力をそのまま受け取る）
+  - TaskConfig YAML（Executor の出力をそのまま受け取る）
 - 処理:
   - タスク分析・プランニング
   - コード編集・新規ファイル生成
@@ -87,24 +79,24 @@ TODO アプリの仕様・技術スタック・テスト戦略などは **一切
 
 ### 3.1 TaskStore: Task レコード
 
-IDE から作成されるタスクの最小レコード定義。
+ChatHandler により作成されるタスクの最小レコード定義（実体は `orchestrator.Task` の JSONL 追記）。
 
 ```jsonc
 // ~/.multiverse/workspaces/<workspace-id>/tasks/<task-id>.jsonl
 {
   "id": "golden-todo-001",
-  "workspace_id": "abcd1234ef56",
   "title": "TODO アプリを作成して",
-  "raw_prompt": "TODO アプリを作成して",
-  "created_at": "2025-12-07T08:00:00Z"
+  "description": "TODO アプリを作成して。技術スタックや実装方針、検証方法はあなたの判断に任せます。",
+  "status": "PENDING",
+  "dependencies": [],
+  "wbsLevel": 1,
+  "phaseName": "Implementation",
+  "milestone": "implementation",
+  "acceptanceCriteria": ["アプリが起動すること"]
 }
 ```
 
-- `title`
-  - UI 表示用。初期値は `raw_prompt` と同一でよい。
-- `raw_prompt`
-  - ユーザーがチャットで入力した自然文。
-  - Task Builder の入力として利用する。
+※ ユーザーの自然文入力そのものは TaskStore ではなく ChatSessionStore に保存される。
 
 ※ Phase 0 では `test_command` 等は持たない。検証戦略は AgentRunner 側に委譲する。
 
@@ -122,40 +114,34 @@ IDE からの「実行してほしい」要求は、Orchestrator に対して IP
 
 - Orchestrator は queue ディレクトリをポーリングし、Job を検出して処理する。
 
-### 3.3 TaskConfig YAML（Task Builder 出力 / AgentRunner 入力）
+### 3.3 TaskConfig YAML（Executor 出力 / AgentRunner 入力）
 
-Task Builder により生成され、AgentRunner に渡される YAML の最小スキーマを定義する。
+Executor が生成し、AgentRunner に渡される YAML の最小スキーマを定義する（`pkg/config/config.go` に準拠）。
 
 ```yaml
+version: 1
+
 task:
   id: "golden-todo-001"
   title: "TODO アプリを作成して"
-  instructions: |
-    TODO アプリを作成して。
-    技術スタックや実装方針、検証方法はあなたの判断に任せます。
-    必要に応じて、コードや設定ファイル、テストコードなどを自由に生成してください。
-  project:
-    root_dir: "/path/to/workspace"
+  repo: "."
+  prd:
+    text: |
+      TODO アプリを作成して。
 
 runner:
-  meta:
-    model: "gpt-4.1"
-    temperature: 0.2
+  max_loops: 5
   worker:
-    type: "docker_codex_cli"
-    # 必要に応じて image / mount / env 等を拡張
+    kind: "codex-cli"
+    # 必要に応じて docker_image / env 等を拡張
 ```
 
 必須フィールド:
 
-- `task.id`（TaskStore の `id` と一致）
-- `task.title`
-- `task.instructions`
-- `task.project.root_dir`
-- `runner.meta.model`
-- `runner.worker.type`
+- `version`（値は `1`）
+- `task.prd`（`path` または `text` のいずれか）
 
-Task Builder 実装は、このスキーマを満たすように LLM 出力を誘導する。
+Executor 実装は、このスキーマを満たす YAML を決定的に生成する。
 
 ### 3.4 AgentRunner 結果 JSON
 
@@ -202,30 +188,25 @@ Orchestrator は、本 JSON を TaskAttempt（JSONL）に埋め込み、IDE か�
 
    > `TODO アプリを作成して`
 
-2. IDE は以下を行う。
-   - Workspace を選択中であることを前提に、`workspace_id` を決定。
-   - 新規 Task を作成し、`title` と `raw_prompt` に上記の文言を保存。
-   - TaskStore の `tasks/<task-id>.jsonl` に Task レコードを append。
+2. バックエンドの ChatHandler が Meta decompose を呼び出し、Task 群を生成する。
+3. ChatHandler が以下を永続化する:
+   - `design/wbs.json`, `design/nodes/*.json`
+   - `state/tasks.json`, `state/nodes-runtime.json`
+   - TaskStore の `tasks/<task-id>.jsonl`
 
-3. ユーザーは Task 一覧画面で、`TODO アプリを作成して` タスクを確認できる。
+4. ユーザーは Task 一覧画面で生成されたタスクを確認できる。
 
 ### 4.2 Task 実行要求 → Orchestrator
 
 1. ユーザーが IDE 上で Task の「Run」ボタンを押下。
-2. IDE は IPC queue に Job JSON を作成する（3.2 参照）。
-3. Orchestrator は queue ディレクトリを監視し、Job を検出。
+2. IDE はバックエンドに実行要求を送信し、Scheduler が IPC queue に Job JSON を作成する（3.2 参照）。
+3. ExecutionOrchestrator が queue ディレクトリを監視し、Job を検出。
 
-### 4.3 Task Builder 呼び出し
+### 4.3 Executor による TaskConfig YAML 生成
 
-1. Orchestrator は TaskStore から `task_id` に対応する Task をロード。
-2. Orchestrator は CLI プロバイダ（Task Builder）に以下の情報を渡して呼び出す。
-
-   - Workspace 情報（例）
-     - `root_dir: "/path/to/workspace"`
-   - `raw_prompt: "TODO アプリを作成して"`
-
-3. Task Builder（Codex CLI 等）は、`codex chat` コマンドを実行し、3.3 の TaskConfig スキーマに従う YAML を生成する。
-4. Orchestrator は生成された YAML を TaskConfig として検証する。
+1. ExecutionOrchestrator は `state/tasks.json` と `design/nodes/*.json` から Task をロードする。
+2. Executor が Task から TaskConfig YAML を生成する（3.3 に準拠）。
+3. ExecutionOrchestrator が YAML を `agent-runner` に stdin で渡して実行する。
    - YAML としてパース可能か
    - 必須フィールドが存在するか
 5. 検証に失敗した場合、または CLI セッションが無い場合は、その時点で TaskAttempt を `failed` として記録し、結果を IDE に返す。
@@ -263,28 +244,28 @@ Orchestrator は、本 JSON を TaskAttempt（JSONL）に埋め込み、IDE か�
 - TODO アプリの解釈・技術スタック・設計・テスト戦略に関するルールは **一切課さない**。
 - 検証対象は「アプリとして妥当か」ではなく、「パイプラインとして正しく通るか」である。
 
-### 5.2 GT-1: Chat → TaskConfig（Task Builder テスト）
+### 5.2 GT-1: Chat → TaskConfig（Executor テスト）
 
 目的:
 
-- `raw_prompt = "TODO アプリを作成して"` から **有効な TaskConfig YAML** が生成されることを確認する。
+- `TODO アプリを作成して` の decompose 結果から **有効な TaskConfig YAML** が生成されることを確認する。
 
 前提条件:
 
-- Codex CLI がインストールされ、有効なセッションが存在すること
+- Meta decompose をモックできること（LLM 実行は不要）
 
 テスト手順（ロジック）:
 
 1. テスト用 Workspace を作成（空 or ほぼ空でよい）。
-2. Task を作成し、`raw_prompt = "TODO アプリを作成して"` を設定。
-3. Orchestrator 経由で Task Builder（Codex CLI）を呼び出し、TaskConfig YAML を取得。
+2. ChatHandler に `TODO アプリを作成して` を入力し、Task を生成。
+3. Executor を起動し、TaskConfig YAML を取得。
 4. アサーション:
    - YAML としてパース可能。
    - `task.id` が TaskStore の `id` と一致。
    - `task.title` が `TODO アプリを作成して` を含む。
-   - `task.instructions` に `TODO アプリを作成して` の文言が含まれる。
-   - `task.project.root_dir` が Workspace のパスと一致。
-   - `runner.meta.model` / `runner.worker.type` が存在。
+   - `task.repo` が `"."`。
+   - `task.prd.text` に `TODO アプリを作成して` と Acceptance Criteria が含まれる。
+   - `runner.max_loops` と `runner.worker.kind` が存在。
 
 ### 5.3 GT-2: TaskConfig → AgentRunner（実行テスト）
 
@@ -314,7 +295,7 @@ Orchestrator は、本 JSON を TaskAttempt（JSONL）に埋め込み、IDE か�
 
 ※ Phase 0 の時点では、`status = failed` であっても、「パイプラインとして最後まで処理され、結果が返る」ことを成功条件としてよい。
 
-### 5.4 GT-3: E2E（Chat → TaskConfig → AgentRunner → 結果）
+### 5.4 GT-3: E2E（Chat → decompose → TaskConfig → AgentRunner → 結果）
 
 目的:
 
@@ -326,7 +307,8 @@ Orchestrator は、本 JSON を TaskAttempt（JSONL）に埋め込み、IDE か�
    - Chat に `TODO アプリを作成して` を入力し、Task 作成。
    - Task の「Run」ボタンを押下。
 2. バックグラウンドで:
-   - Orchestrator が Job 処理 → Task Builder → TaskConfig YAML 生成 → AgentRunner 実行 → 結果 JSON 生成。
+   - ChatHandler が decompose → design/state/task_store 永続化を実行。
+   - Orchestrator が依存解決 → Executor による TaskConfig YAML 生成 → AgentRunner 実行 → 結果 JSON 生成。
 3. IDE で Task 詳細画面を開き、以下を確認:
    - ステータスが `SUCCEEDED` または `FAILED` のいずれか。
    - summary が表示されている。
@@ -338,20 +320,20 @@ Orchestrator は、本 JSON を TaskAttempt（JSONL）に埋め込み、IDE か�
 
 実装順序の推奨:
 
-1. Workspace / TaskStore / IPC（queue/results）の基盤実装。
+1. Workspace / design / state / TaskStore / IPC（queue/results）の基盤実装。
 2. IDE:
    - Workspace 選択 UI
-   - Task 作成 UI（Chat 入力 → TaskStore に `raw_prompt` 保存）
-3. Orchestrator:
-   - Job queue 処理
-   - TaskBuilder 呼び出し（LLM API ラッパ）
-   - TaskConfig YAML 検証
-4. AgentRunner 連携:
-   - TaskConfig YAML を stdin で渡す Executor 実装
-   - 結果 JSON の受信と TaskAttempt への保存
-5. IDE:
-   - IPC results の監視
-   - Task ステータスと結果サマリの表示
+   - Chat 入力 UI と Task 表示 UI
+   - Task 実行要求 UI（Run ボタン）
+3. ChatHandler:
+   - Meta decompose 呼び出し
+   - `design/`・`state/`・TaskStore の永続化
+4. Orchestrator:
+   - Scheduler による依存解決と Job enqueue
+   - ExecutionOrchestrator による Job 実行と状態更新
+5. Executor / AgentRunner 連携:
+   - TaskConfig YAML 生成（Executor）
+   - `agent-runner` 実行と結果 JSON の保存
 6. ゴールデンテスト（GT-1 / GT-2 / GT-3）の追加
 
 本設計書は Phase 0 の最小スコープを対象とする。  

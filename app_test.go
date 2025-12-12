@@ -185,7 +185,7 @@ func TestSendChatMessage(t *testing.T) {
 	// Actually SendChatMessage calls handler.HandleMessage.
 	// app.SendChatMessage calls a.chatHandler.HandleMessage.
 
-	handler := chat.NewHandler(metaClient, taskStore, sessionStore, "test-ws-id", tmpDir, nil)
+	handler := chat.NewHandler(metaClient, taskStore, sessionStore, "test-ws-id", tmpDir, nil, nil)
 
 	app := NewApp()
 	app.chatHandler = handler
@@ -221,7 +221,7 @@ func TestSendChatMessage_PersistsTasksAndDependencies(t *testing.T) {
 	sessionStore := chat.NewChatSessionStore(tmpDir)
 	metaClient := meta.NewMockClient()
 
-	handler := chat.NewHandler(metaClient, taskStore, sessionStore, "ws-id", tmpDir, nil)
+	handler := chat.NewHandler(metaClient, taskStore, sessionStore, "ws-id", tmpDir, nil, nil)
 
 	app := NewApp()
 	app.chatHandler = handler

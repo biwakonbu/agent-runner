@@ -174,7 +174,7 @@ func (a *App) SelectWorkspace() string {
 	// For this block I will pass 'nil' and fix compilation later?
 	// Or define 'taskStore' locally if ChatHandler needs it.
 	taskStore := orchestrator.NewTaskStore(wsDir) // Temporary for ChatHandler compatibility?
-	a.chatHandler = chat.NewHandler(metaClient, taskStore, sessionStore, id, ws.ProjectRoot, a.eventEmitter)
+	a.chatHandler = chat.NewHandler(metaClient, taskStore, sessionStore, id, ws.ProjectRoot, a.repo, a.eventEmitter)
 
 	return id
 }
@@ -255,7 +255,7 @@ func (a *App) OpenWorkspaceByID(id string) string {
 	metaClient := a.newMetaClientFromConfig()
 	// Temporary taskStore instance for ChatHandler
 	taskStore := orchestrator.NewTaskStore(wsDir)
-	a.chatHandler = chat.NewHandler(metaClient, taskStore, sessionStore, id, ws.ProjectRoot, a.eventEmitter)
+	a.chatHandler = chat.NewHandler(metaClient, taskStore, sessionStore, id, ws.ProjectRoot, a.repo, a.eventEmitter)
 
 	return id
 }
@@ -575,7 +575,7 @@ func (a *App) SetLLMConfig(dto LLMConfigDTO) error {
 		sessionStore := chat.NewChatSessionStore(wsDir)
 		metaClient := a.newMetaClientFromConfig()
 		taskStore := orchestrator.NewTaskStore(wsDir) // Temp
-		a.chatHandler = chat.NewHandler(metaClient, taskStore, sessionStore, a.currentWSID, a.currentWS.ProjectRoot, a.eventEmitter)
+		a.chatHandler = chat.NewHandler(metaClient, taskStore, sessionStore, a.currentWSID, a.currentWS.ProjectRoot, a.repo, a.eventEmitter)
 	}
 
 	return nil

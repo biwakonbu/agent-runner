@@ -292,54 +292,40 @@ func (e *ExecutionOrchestrator) processJob(ctx context.Context, job *ipc.Job) {
 		return
 	}
 
-	// Increment (Note: TaskState model in previous step might not have AttemptCount?
-	// If missing, we track via retries or inputs?
-	// Plan says: "Update persistence.TaskState based on Executor's result."
-	// Let's assume TaskState has AttemptCount or we add it to models.go?
-	// Existing models.go TaskState definition:
-	// type TaskState struct { ... Priority int, Inputs map, Outputs map ... }
-	// It did NOT show AttemptCount in Step 52 summary.
-	// I should probably add it or use Inputs/Outputs.
-	// For now, I'll use Inputs/Outputs if strictly following provided models.
-	// But adding field is better. I'll add AttemptCount to TaskState in models.go later.
-	// For now, assuming it exists or I map to Inputs?
-	// Let's assume I will add it to models.go.
-	// But compilation will fail if I use it and it's missing.
-	// I'll check models.go content. I saw it earlier.
-	// Step 52: "This struct represents the state of a task... Inputs map... Outputs...". No AttemptCount.
-	// I'll add AttemptCount to TaskState in models.go in next step.
-	// Here I will access it assuming it exists.
-	// task.AttemptCount++
+	// Pre-exec update: increment attempt count and set RUNNING.
+	now := time.Now()
+	if task.Inputs == nil {
+		task.Inputs = make(map[string]interface{})
+	}
+	attemptCount := 0
+	switch v := task.Inputs[InputKeyAttemptCount].(type) {
+	case float64:
+		attemptCount = int(v)
+	case int:
+		attemptCount = v
+	}
+	attemptCount++
+	task.Inputs[InputKeyAttemptCount] = attemptCount
 
-	// Wait, cannot assume field exists if not defined.
-	// I will use Inputs as temporary storage if field missing?
-	// Or just update models.go FIRST?
-	// Updating models.go first is safer but I can't do it in this call sequence cleanly without context switching.
-	// I will just use Inputs map for attempt count for now to avoid compilation error until I update model.
-	// attempt := 0
-	// if val, ok := task.Inputs["attempt_count"].(float64); ok { attempt = int(val) }
-	// attempt++
-	// task.Inputs["attempt_count"] = attempt
-
-	// NO, I should just fix the model.
-	// But for this file I will comment out AttemptCount access and rely on "Update persistence.TaskState" placeholder.
-	// Actually, HandleFailure relies on attempt count.
-	// processJob gets attempt count from task?
-	// I'll comment out increment or use local var.
-
-	// Actually, I can update models.go in parallel? No.
-	// I will skip AttemptCount increment here for a moment or use Inputs.
-
-	// task.AttemptCount++
-	// if err := e.TaskStore.SaveTask(task); err != nil { ... }
-
-	// New logic:
-	// e.Repo.State().SaveTasks(tasksState)
-
-	// I'll implement logic assuming I fix models.go immediately after.
-	// But `task` variable here is `*persistence.TaskState`.
-
-	// ... (implementation below)
+	preExecStatus := TaskStatus(task.Status)
+	task.Status = string(TaskStatusRunning)
+	task.UpdatedAt = now
+	if preExecStatus != TaskStatusRunning {
+		e.emitTaskStateChange(task.TaskID, preExecStatus, TaskStatusRunning)
+	}
+	if err := e.Repo.State().SaveTasks(tasksState); err != nil {
+		e.logger.Error("failed to persist pre-exec task update",
+			slog.String("task_id", task.TaskID),
+			slog.Any("error", err),
+		)
+	}
+	e.updateLegacyTask(task.TaskID, func(t *Task) {
+		if t.StartedAt == nil {
+			t.StartedAt = &now
+		}
+		t.Status = TaskStatusRunning
+		t.AttemptCount = attemptCount
+	})
 
 	// Create cancellable context for this job
 	jobCtx, cancel := context.WithCancel(ctx)
@@ -370,6 +356,7 @@ func (e *ExecutionOrchestrator) processJob(ctx context.Context, job *ipc.Job) {
 		Status: TaskStatus(task.Status),       // constant cast
 		// Other fields...
 	}
+	taskDTO.Runner = runnerSpecFromInputs(task.Inputs)
 	// Try to get Title from Design?
 	if node, err := e.Repo.Design().GetNode(task.NodeID); err == nil {
 		taskDTO.Title = node.Name
@@ -402,10 +389,34 @@ func (e *ExecutionOrchestrator) processJob(ctx context.Context, job *ipc.Job) {
 		// Executor returns Attempt. Status is in Attempt.
 		// If attempt succeeded -> Succeeded.
 		if attempt != nil {
+			finishedAt := attempt.FinishedAt
+			if finishedAt == nil {
+				finished := time.Now()
+				finishedAt = &finished
+			}
 			if attempt.Status == AttemptStatusSucceeded {
 				task.Status = string(TaskStatusSucceeded)
+				if err := e.markNodeImplemented(task.NodeID); err != nil {
+					e.logger.Warn("failed to update node runtime on success",
+						slog.String("node_id", task.NodeID),
+						slog.Any("error", err),
+					)
+				}
+				e.updateLegacyTask(task.TaskID, func(t *Task) {
+					t.Status = TaskStatusSucceeded
+					t.DoneAt = finishedAt
+					t.AttemptCount = attemptCount
+					if taskDTO.Artifacts != nil {
+						t.Artifacts = taskDTO.Artifacts
+					}
+				})
 			} else if attempt.Status == AttemptStatusFailed {
 				task.Status = string(TaskStatusFailed)
+				e.updateLegacyTask(task.TaskID, func(t *Task) {
+					t.Status = TaskStatusFailed
+					t.DoneAt = finishedAt
+					t.AttemptCount = attemptCount
+				})
 			}
 		}
 
@@ -430,9 +441,9 @@ func (e *ExecutionOrchestrator) processJob(ctx context.Context, job *ipc.Job) {
 		// HandleFailure relies on attempt count.
 		// Get attempt count from inputs or state?
 		attemptCount := 0
-		if val, ok := task.Inputs["attempt_count"].(float64); ok {
+		if val, ok := task.Inputs[InputKeyAttemptCount].(float64); ok {
 			attemptCount = int(val)
-		} else if val, ok := task.Inputs["attempt_count"].(int); ok {
+		} else if val, ok := task.Inputs[InputKeyAttemptCount].(int); ok {
 			attemptCount = val
 		}
 		// Should increment attempt count? done earlier?
@@ -461,6 +472,99 @@ func (e *ExecutionOrchestrator) emitTaskStateChange(taskID string, oldStatus, ne
 			NewStatus: newStatus,
 			Timestamp: time.Now(),
 		})
+	}
+}
+
+// markNodeImplemented updates NodesRuntime so dependency resolution can proceed.
+func (e *ExecutionOrchestrator) markNodeImplemented(nodeID string) error {
+	if nodeID == "" || e.Repo == nil {
+		return nil
+	}
+	now := time.Now()
+	nodesRuntime, err := e.Repo.State().LoadNodesRuntime()
+	if err != nil {
+		return err
+	}
+
+	for i := range nodesRuntime.Nodes {
+		if nodesRuntime.Nodes[i].NodeID == nodeID {
+			nodesRuntime.Nodes[i].Status = "implemented"
+			nodesRuntime.Nodes[i].Implementation.LastModifiedAt = now
+			nodesRuntime.Nodes[i].Implementation.LastModifiedBy = "agent-runner"
+			if nodesRuntime.Nodes[i].Implementation.Files == nil {
+				nodesRuntime.Nodes[i].Implementation.Files = []string{}
+			}
+			return e.Repo.State().SaveNodesRuntime(nodesRuntime)
+		}
+	}
+
+	nodesRuntime.Nodes = append(nodesRuntime.Nodes, persistence.NodeRuntime{
+		NodeID: nodeID,
+		Status: "implemented",
+		Implementation: persistence.NodeImplementation{
+			Files:          []string{},
+			LastModifiedAt: now,
+			LastModifiedBy: "agent-runner",
+		},
+		Verification: persistence.NodeVerification{
+			Status: "not_tested",
+		},
+		Notes: []persistence.NodeNote{
+			{At: now, By: "execution-orchestrator", Text: "auto-marked implemented on task success"},
+		},
+	})
+
+	return e.Repo.State().SaveNodesRuntime(nodesRuntime)
+}
+
+func runnerSpecFromInputs(inputs map[string]interface{}) *RunnerSpec {
+	if inputs == nil {
+		return nil
+	}
+
+	maxLoops := 0
+	if v, ok := inputs[InputKeyRunnerMaxLoops]; ok {
+		switch val := v.(type) {
+		case float64:
+			maxLoops = int(val)
+		case int:
+			maxLoops = val
+		}
+	}
+
+	workerKind, _ := inputs[InputKeyRunnerWorkerKind].(string)
+
+	if maxLoops <= 0 && workerKind == "" {
+		return nil
+	}
+	if maxLoops <= 0 {
+		maxLoops = DefaultRunnerMaxLoops
+	}
+	if workerKind == "" {
+		workerKind = DefaultWorkerKind
+	}
+
+	return &RunnerSpec{
+		MaxLoops:   maxLoops,
+		WorkerKind: workerKind,
+	}
+}
+
+func (e *ExecutionOrchestrator) updateLegacyTask(taskID string, update func(t *Task)) {
+	if e.Repo == nil || taskID == "" {
+		return
+	}
+	store := NewTaskStore(e.Repo.BaseDir())
+	legacy, err := store.LoadTask(taskID)
+	if err != nil {
+		return
+	}
+	update(legacy)
+	if err := store.SaveTask(legacy); err != nil {
+		e.logger.Debug("failed to save legacy task",
+			slog.String("task_id", taskID),
+			slog.Any("error", err),
+		)
 	}
 }
 
@@ -508,13 +612,18 @@ func (e *ExecutionOrchestrator) HandleFailure(task *persistence.TaskState, execE
 		if taskState.Inputs == nil {
 			taskState.Inputs = make(map[string]interface{})
 		}
-		taskState.Inputs["next_retry_at"] = nextRetryAt.Format(time.RFC3339)
+		taskState.Inputs[InputKeyNextRetryAt] = nextRetryAt.Format(time.RFC3339)
 
 		if err := e.Repo.State().SaveTasks(tasksState); err != nil {
 			return fmt.Errorf("failed to save retry state: %w", err)
 		}
 
 		e.emitTaskStateChange(task.TaskID, TaskStatusFailed, TaskStatusRetryWait)
+		e.updateLegacyTask(task.TaskID, func(t *Task) {
+			t.Status = TaskStatusRetryWait
+			nr := nextRetryAt
+			t.NextRetryAt = &nr
+		})
 		return nil
 
 	case NextActionBacklog:

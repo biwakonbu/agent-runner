@@ -224,11 +224,13 @@ func (s *Scheduler) ResetRetryTasks() ([]string, error) {
 		if TaskStatus(task.Status) == TaskStatusRetryWait {
 			// Check retry time from Inputs (Workaround as models.go lacks NextRetryAt)
 			// Or just assume if it's in RETRY_WAIT for a while?
-			// For now, let's look for "next_retry_at" in Inputs if exists.
+			// For now, let's look for next retry timestamp in Inputs if exists.
 			var nextRetryAt time.Time
-			if val, ok := task.Inputs["next_retry_at"].(string); ok {
-				if t, err := time.Parse(time.RFC3339, val); err == nil {
-					nextRetryAt = t
+			if task.Inputs != nil {
+				if val, ok := task.Inputs[InputKeyNextRetryAt].(string); ok {
+					if t, err := time.Parse(time.RFC3339, val); err == nil {
+						nextRetryAt = t
+					}
 				}
 			}
 
@@ -237,7 +239,9 @@ func (s *Scheduler) ResetRetryTasks() ([]string, error) {
 				oldStatus := TaskStatus(task.Status)
 				task.Status = string(TaskStatusPending)
 				// Clear next_retry_at
-				delete(task.Inputs, "next_retry_at")
+				if task.Inputs != nil {
+					delete(task.Inputs, InputKeyNextRetryAt)
+				}
 
 				if err := s.Repo.State().SaveTasks(tasksState); err != nil {
 					s.logger.Warn("failed to reset retry task",

@@ -1,99 +1,123 @@
-# 製品要件定義書 (PRD): Multiverse IDE Agent Workflow & Architecture
+# PRD: Multiverse IDE Pragmatic MVP（Chat→WBS/Node→AgentRunner 実行）
 
-## 1. はじめに
+最終更新: 2025-12-12
 
-本 PRD は、AI ネイティブな開発環境「Multiverse IDE」の中核となる、エージェントワークフローと永続化アーキテクチャを定義します。
-従来の「静的な設計書」と「動的な実行状態」の厳密な分離（v2 理想像）から、**「IDE がワークスペースの状態を統合管理し、エージェントが自律的にタスクを消化する」** 実用的かつ堅牢なアーキテクチャ（Pragmatic MVP）への移行を定めます。
+## 1. 背景
 
-## 2. ゴールと目的
+- AgentRunner Core は `plan_task`/`next_action`/`completion_assessment` と Docker Sandbox を含む実行ループが安定稼働している（`docs/CURRENT_STATUS.md:18`、`docs/design/data-flow.md:13`）。
+- Orchestrator は file-based IPC + Scheduler + Executor を備えるが Beta 段階で、WBS/Node 中心の永続化（design/state/history）を前提とした v2 実装が途中（`docs/CURRENT_STATUS.md:20`、`docs/design/orchestrator-persistence-v2.md:11`）。
+- 現在の Chat は `decompose` を用いてタスク分解し TaskStore に Task を保存するが、design/state には反映していないため、Scheduler が依存解決できず実行に進まない（`internal/chat/handler.go:128`、`internal/orchestrator/scheduler.go:89`）。
 
-- **IDE 主導のワークフロー**: ユーザーは IDE のチャットや GUI を通じて指示を出し、IDE がそれをタスクグラフに変換して管理する。
-- **自律的な実行**: バックエンドの Orchestrator が依存関係を解決しながら、複数のエージェント（Worker）を並列に稼働させる。
-- **完全な可観測性**: タスクの生成、実行、結果、チャット履歴がすべて永続化され、IDE 上でリアルタイムに可視化される。
-- **実用的な永続化**: 複雑さを排除した「統合タスクストア」により、データの整合性と開発速度を両立する。
+## 2. 目的 / ゴール
 
-## 3. システムアーキテクチャ
+MVP の到達点は「IDE のチャット入力から、WBS/ノード計画を生成・永続化し、その計画に基づいて Orchestrator が AgentRunner を起動してタスクを順次完了させ、IDE 上に結果が表示される」こと。
 
-### 3.1 全体構成
+具体的には:
 
-```mermaid
-graph TD
-    User[Developer] -->|Chat/GUI| IDE[Multiverse IDE (Frontend)]
-    IDE -->|Wails Events| BE[Orchestrator (Backend)]
+1. チャット入力 → Meta-agent `decompose` → WBS/Node/TaskState の生成と永続化が行われる。
+2. `ExecutionOrchestrator` が依存関係を解決し、READY タスクを IPC Queue に流し、`agent-runner` を実行できる。
+3. 実行結果で TaskState / NodesRuntime / TaskStore が更新され、IDE が一覧/グラフ表示できる。
 
-    subgraph Backend
-        Chat[Chat Handler]
-        Graph[Task Graph Manager]
-        Store[Task Store (JSONL)]
-        Sched[Scheduler]
-        Exec[Executor]
-    end
+## 3. 非ゴール（MVPでは扱わない）
 
-    subgraph Workers
-        Agent1[Code Agent]
-        Agent2[Analysis Agent]
-    end
+- ログのリアルタイムストリーミング（WebSocket/gRPC などの IPC 強化）。
+- マルチノード/リモート Worker プール。
+- 高度な承認フローや差分レビュー UI。
+- アニメーションや高度な UI エフェクト。UI は「カクつかず安定して操作できる」ことを優先する。
 
-    Chat -->|Task Generation| Store
-    Store -->|Events| IDE
-    Graph -->|Ready Tasks| Sched
-    Sched -->|Job| Exec
-    Exec -->|Run| Workers
-    Workers -->|Result| Exec
-    Exec -->|Update| Store
-```
+## 4. ユーザーストーリー
 
-### 3.2 データモデル (Unified Task Model)
+- US-1: 開発者は IDE のチャットに要望を入力し、数秒〜数十秒後に WBS/ノードとタスクリストが生成される。
+- US-2: 開発者は「Run」操作で計画全体または特定ノードを実行できる。
+- US-3: IDE 上で各タスク/ノードのステータス（PENDING/READY/RUNNING/SUCCEEDED/FAILED/BLOCKED）が確認でき、生成・更新されたファイル一覧を参照できる。
 
-設計情報（WBS）と実行状態（State）を単一の **Task** エンティティとして管理し、`JSONL` で永続化します。
+## 5. アーキテクチャ方針
 
-- **Task**: 作業の最小単位。
+### 5.1 計画と実行の真実源
 
-  - `ID`: 一意な識別子 (UUID)。
-  - `Title`, `Description`: タスクの内容。
-  - `Status`: `PENDING`, `RUNNING`, `SUCCEEDED`, `FAILED` 等。
-  - `Dependencies`: 依存するタスク ID のリスト (DAG 構築用)。
-  - `PhaseName`: WBS フェーズ（概念設計, 実装, 検証 等）。
-  - `SuggestedImpl`: **[実装済]** エージェントへの具体的な実装指示（言語、変更ファイルパス、制約事項）。
-  - `Artifacts`: **[実装済]** 生成された成果物（ファイルパス、ログファイル等）。
+- 計画（WBS/NodeDesign）は `~/.multiverse/workspaces/<id>/design/` を真実源とする（`docs/design/orchestrator-persistence-v2.md:33`）。
+- 実行状態（TasksState/NodesRuntime/AgentsState）は `state/` を真実源とする。
+- `internal/orchestrator/task_store.go` の TaskStore は IDE 表示と後方互換のため当面併用し、design/state と同期させる。
 
-- **Work Breakdown Structure (WBS)**:
-  - 固定的な `wbs.json` ファイルは持たず、IDE がフラットなタスクリストから動的にツリー構造（マイルストーン > フェーズ > タスク）を導出する。
+### 5.2 Planner/TaskBuilder の配置
 
-## 4. 機能要件
+MVP では **Chat Handler が Planner/TaskBuilder の役割を兼務**する。
 
-### 4.1 エージェントワークフロー
+- `decompose` 呼び出しは現状のまま Chat Handler が行う。
+- `decompose` 結果を design/state/task_store に写像して永続化する。
 
-1. **チャットからのタスク生成**:
-   - ユーザーのチャット入力を Meta-agent (LLM) が分析。
-   - 依存関係を含む一連のタスク (`Task` オブジェクト) を生成。
-   - `SuggestedImpl` フィールドに、変更すべきファイルや技術スタックの制約を含める（`Meta` プロトコル v1.1）。
-2. **タスクグラフ管理**:
-   - バックエンドはタスクの `Dependencies` を解析し、実行可能なタスク (`Ready`) を特定。
-   - 循環参照を検出し、エラーとして報告。
-3. **実行とスケジューリング**:
-   - 利用可能な Worker プール（Codex, Test 等）に対してタスクをディスパッチ。
-   - 実行結果（成功/失敗、生成ファイル）を `Artifacts` としてタスクに記録。
+将来的には Planner を Orchestrator 側に移し、Chat は UI 層へ戻す。
 
-### 4.2 永続化と履歴
+## 6. データモデル（MVPスキーマ）
 
-- **Unified Task Store**:
-  - `~/.multiverse/workspaces/<id>/tasks/<task-id>.jsonl`
-  - 各行がタスクの状態スナップショットを表す（追記のみ）。最後の行が最新状態。
-- **Chat Session Store**:
-  - チャット履歴を `sessions/<session-id>.jsonl` に保存。タスク生成の文脈を保持。
+### 6.1 design/wbs.json
 
-### 4.3 IDE インテグレーション
+- WBS ルートのみ保持。最低限 `wbs_id`, `project_root`, `root_node_id`, `node_index` を保存する（`internal/orchestrator/persistence/models.go:9`）。
 
-- **リアルタイム同期**:
-  - バックエンドの状態変化は Wails イベントを通じて即座にフロントエンドに通知。
-- **可視化**:
-  - **Graph View**: 依存関係と実行状況をノードグラフ (`TaskNode`) として表示。「IP」インジケーターにより実装ヒントの有無を可視化。
-  - **WBS View**: タスクをフェーズごとにグループ化して進捗バーと共に表示 (`WBSNode`)。
-  - **Property Panel**: 選択したタスクの詳細（`SuggestedImpl`、`Artifacts` 含む）を表示。
+### 6.2 design/nodes/<node-id>.json
 
-## 5. 次期開発フェーズ (Next Steps)
+- `decompose.phases[].tasks[]` を 1:1 で NodeDesign として保存する。
+- NodeDesign.Dependencies は `decompose` の `dependencies` を `node_id` に解決したものを格納する。
 
-1. **Snapshot 機能**: 特定時点のワークスペース状態を保存・復元する機能（「プラン A 失敗時の巻き戻し」用）。
-2. **IPC / WebSocket 強化**: 大量のログやターミナル出力をリアルタイムに IDE にストリーミングする。
-3. **Multi-Agent Orchestration**: Code Agent と Review Agent の協調動作フローの実装。
+主要フィールド:
+
+- `node_id`: UUID または `node-<task-id>` 形式。
+- `name`, `summary`: decompose task の `title`/`description`。
+- `acceptance_criteria`: decompose task の `acceptance_criteria`。
+- `suggested_impl.file_paths/constraints`: decompose の `suggested_impl` から転記。
+
+### 6.3 state/tasks.json
+
+- 各 NodeDesign に対し少なくとも 1 つの TaskState を作成する。
+- TaskState.Kind は MVP では `implementation` 固定とし、将来 `planning`/`test` を追加する。
+- TaskState.NodeID が Scheduler の依存解決単位。
+
+### 6.4 state/nodes-runtime.json
+
+- 新規 NodeDesign 作成時に NodeRuntime を `planned` で追加する。
+- TaskState が `SUCCEEDED` になったら対応 NodeRuntime.Status を `implemented` に更新する。
+  - `test` Kind が追加された場合は `verified` へ更新する。
+
+### 6.5 tasks/<task-id>.jsonl（TaskStore）
+
+- IDE 表示用の `orchestrator.Task` を保存する既存形式を維持。
+- NodeDesign/TaskState と同一の `id` を持ち、最低限 `dependencies`, `wbsLevel`, `phaseName`, `suggestedImpl`, `artifacts` を同期する。
+
+## 7. 主要フロー
+
+### 7.1 Chat → 計画生成
+
+1. IDE Chat が `internal/chat/handler.go` にメッセージを渡す。
+2. Handler が `Meta.Decompose` を呼び、DecomposeResponse を得る（現状実装）。
+3. Handler が DecomposeResponse を永続化:
+   - WBS ルート作成/更新。
+   - NodeDesign 作成/更新。
+   - NodesRuntime へ `planned` を追加。
+   - TasksState へ `pending` の TaskState を追加。
+   - TaskStore へ Task を append し、IDE に `task.created` イベントを emit。
+
+### 7.2 Run → 実行
+
+1. IDE が Task の Run を押し、Scheduler が TaskState を READY にし IPC queue に Job を enqueue（`internal/orchestrator/scheduler.go:31`）。
+2. ExecutionOrchestrator が 2 秒ポーリングで Job を dequeue し Executor を起動する（`internal/orchestrator/execution_orchestrator.go:190`）。
+3. Executor が agent-runner に YAML を渡して実行する（`internal/orchestrator/executor.go:64`）。
+
+### 7.3 結果反映
+
+1. Executor の Attempt 結果で TaskState.Status を `SUCCEEDED/FAILED` に更新。
+2. SUCCEEDED の場合 NodeRuntime.Status を `implemented` へ更新。
+3. TaskStore の Task も同様に更新し、IDE へ stateChange/artifacts 更新イベントを emit。
+
+（将来拡張）AgentRunner の出力（Task Note や JSON サマリ）から「生成・変更されたファイル一覧」を抽出し、`Artifacts.Files` に保存して IDE で参照できるようにする。MVP では `Artifacts.Files` が空でも許容する。
+
+## 8. UX/性能方針（非リアルタイム前提）
+
+- 画面のカクつきを避けるため、バックエンドからフロントへのイベントは「状態変化単位」に限定し、ログの行単位配信は MVP では行わない。
+- Graph/WBS の再レイアウトは Task一覧のバッチ更新後に一度だけ行う。
+- 大量タスク生成時は UI 更新をスロットリング（例: 100ms 単位）する。
+
+## 9. MVP 完了条件
+
+- ゴールデン入力（例: 「TODO アプリを作成して」）で、チャット→計画→実行→結果表示がローカルで一気通しで成功する。
+- 依存関係を持つタスクが、依存ノード完了後に自動で READY になり実行される。
+- IDE で操作中に明確なカクつきやフリーズが起きない。

@@ -1,7 +1,7 @@
 
 # Complete Documentation
 
-Generated: 2025-12-11 16:22:58
+Generated: 2025-12-12 16:05:02
 
 This document consolidates all documentation from the docs/ directory for LLM context.
 
@@ -29,6 +29,7 @@ This document consolidates all documentation from the docs/ directory for LLM co
 - [README](#design-README)
 - [Architecture](#design-architecture)
 - [Ide Architecture](#design-ide-architecture)
+- [Orchestrator Persistence V2](#design-orchestrator-persistence-v2)
 - [Data Flow](#design-data-flow)
 - [Implementation Guide](#design-implementation-guide)
 - [Sandbox Policy](#design-sandbox-policy)
@@ -277,6 +278,17 @@ task:
   title: "ユーザ登録 API の実装" # 任意
   repo: "." # 任意。作業対象リポジトリのパス
 
+  # v2.0 拡張フィールド
+  description: "詳細な説明..."
+  dependencies: ["TASK-001"] # 依存タスクID
+  wbs_level: 2 # 1=概念, 2=設計, 3=実装
+  phase_name: "実装"
+
+  suggested_impl:
+    language: "typescript"
+    file_paths: ["src/components/Form.svelte"]
+    constraints: ["Use Zod for validation"]
+
   prd:
     path: "./docs/TASK-123.md" # PRD をファイルから読む場合
     # text: |                       # または PRD 本文を直接埋め込む場合
@@ -287,11 +299,12 @@ task:
     # cwd: ".-"                     # 任意。テスト実行ディレクトリ
 
 runner:
+  max_loops: 10 # 任意。最大ループ回数（未指定時のデフォルト: 10）
+
   meta:
     kind: "openai-chat" # v1 は固定想定
     model: "gpt-5.1" # 任意。プロバイダのモデルIDを直接指定
     # system_prompt: |              # 任意。Meta 用 system prompt を上書き
-    max_loops: 5 # 任意。最大ループ回数（デフォルト: 5）
 
   worker:
     kind: "codex-cli" # v1 は "codex-cli" 固定
@@ -314,9 +327,11 @@ runner:
 | `task.title`                     | `task.id` と同じ                  |
 | `task.repo`                      | `"."` (カレントディレクトリ)      |
 | `task.test`                      | 未設定（テスト自動実行なし）      |
+| `task.wbs_level`                 | 0 (未定義)                        |
+| `task.dependencies`              | [] (なし)                         |
 | `runner.meta.kind`               | `"openai-chat"`                   |
 | `runner.meta.model`              | `gpt-5.1` (プロバイダのモデル ID) |
-| `runner.meta.max_loops`          | `5`                               |
+| `runner.max_loops`              | `10`                              |
 | `runner.worker.kind`             | `"codex-cli"`                     |
 | `runner.worker.docker_image`     | デフォルトイメージ                |
 | `runner.worker.max_run_time_sec` | `1800` (30 分)                    |
@@ -337,7 +352,7 @@ runner:
 
 #### 3.1 構造
 
-TaskContext は実行中のタスク状態を保持します。
+TaskContext は実行中のタスク状態を保持します。v2.0 で拡張されました。
 
 ```go
 type TaskContext struct {
@@ -345,6 +360,14 @@ type TaskContext struct {
     Title     string        // task.title
     RepoPath  string        // task.repo の絶対パス
     State     TaskState     // FSM の現状態
+
+    // v2.0 Extensions
+    Description   string
+    Dependencies  []string
+    WBSLevel      int
+    PhaseName     string
+    SuggestedImpl *SuggestedImpl
+    Artifacts     *Artifacts    // v2.1 Extension
 
     PRDText   string        // PRD 本文
 
@@ -357,6 +380,17 @@ type TaskContext struct {
 
     StartedAt  time.Time
     FinishedAt time.Time
+}
+
+type SuggestedImpl struct {
+    Language    string
+    FilePaths   []string
+    Constraints []string
+}
+
+type Artifacts struct {
+    Files []string
+    Logs  []string
 }
 ```
 
@@ -429,9 +463,9 @@ stateDiagram-v2
 
 #### 4.4 ループ制御
 
-`runner.meta.max_loops` で最大ループ回数を制御します。
+`runner.max_loops` で最大ループ回数を制御します。
 
-- デフォルト: 5 回
+- デフォルト: 10 回
 - VALIDATING → RUNNING の遷移回数がこの値を超えると FAILED に遷移
 
 ### 5. Task Note フォーマット
@@ -829,11 +863,11 @@ Meta 呼び出しのタイムアウト設定は、使用するプロバイダに
 
 LLM の処理は時間がかかるため、より長いタイムアウトを設定しています。
 
-| 層 | デフォルト値 | 説明 |
-|----|------------|------|
-| ChatHandler | 15 分 | `chat/handler.go` の `metaTimeout` |
-| Meta-agent | 10 分 | `meta/cli_provider.go` の `DefaultMetaAgentTimeout` |
-| agenttools | 10 分 | `ExecPlan.Timeout` で指定 |
+| 層          | デフォルト値 | 説明                                                |
+| ----------- | ------------ | --------------------------------------------------- |
+| ChatHandler | 15 分        | `chat/handler.go` の `metaTimeout`                  |
+| Meta-agent  | 10 分        | `meta/cli_provider.go` の `DefaultMetaAgentTimeout` |
+| agenttools  | 10 分        | `ExecPlan.Timeout` で指定                           |
 
 **タイムアウト階層**:
 
@@ -897,6 +931,124 @@ runner:
 
 - v1 では OpenAI Chat API のみサポート
 - プロトコルバージョニングは未実装（将来拡張予定）
+
+### 9. decompose プロトコル (v2.0)
+
+#### 9.1 目的
+
+チャットインターフェースからの自然言語入力（ユーザーの要望）に基づき、タスクをフェーズに分解し、具体的な実行タスク（Acceptance Criteria 含む）を生成します。
+
+#### 9.2 入力
+
+Core は以下の情報を Meta に渡します：
+
+- ユーザーの入力メッセージ
+- 既存タスクの要約（依存関係解決のため）
+- 会話履歴（コンテキスト維持のため）
+
+#### 9.3 出力 YAML
+
+```yaml
+type: decompose
+understanding: |
+  ユーザーは「商品一覧ページ」の実装を希望しています。
+  既存の API 定義に基づき、フロントエンドの実装が必要です。
+phases:
+  - name: "実装設計"
+    milestone: "design"
+    tasks:
+      - id: "temp-task-1"
+        title: "コンポーネント設計"
+        description: "商品カードコンポーネントの Props と State を設計する"
+        wbs_level: 2
+        estimated_effort: "small"
+        acceptance_criteria:
+          - "Figma デザインと一致する Props が定義されていること"
+        suggested_impl:
+          language: "typescript"
+          file_paths: ["src/components/ProductCard.svelte"]
+
+  - name: "実装"
+    milestone: "implementation"
+    tasks:
+      - id: "temp-task-2"
+        title: "コンポーネント実装"
+        description: "設計に基づきコードを実装する"
+        dependencies: ["temp-task-1"]
+        wbs_level: 3
+        estimated_effort: "medium"
+potential_conflicts:
+  - file: "src/routes/products/+page.svelte"
+    tasks: ["TASK-001"]
+    warning: "他のタスクで変更中の可能性があります"
+```
+
+#### 9.4 フィールド定義
+
+| フィールド            | 型     | 必須 | 説明                     |
+| :-------------------- | :----- | :--- | :----------------------- |
+| `type`                | string | ✅   | 固定値: `"decompose"`    |
+| `understanding`       | string | ✅   | ユーザー意図の理解・要約 |
+| `phases`              | array  | ✅   | フェーズ別タスクリスト   |
+| `potential_conflicts` | array  | 任意 | 潜在的なコンフリクト情報 |
+
+#### 9.4.1 Phase & Task 構造
+
+**Phase**:
+
+| フィールド  | 型     | 必須 | 説明                                 |
+| :---------- | :----- | :--- | :----------------------------------- |
+| `name`      | string | ✅   | フェーズ名（例: "概念設計", "実装"） |
+| `milestone` | string | ✅   | マイルストーン ID                    |
+| `tasks`     | array  | ✅   | タスクリスト                         |
+
+**DecomposedTask**:
+
+| フィールド            | 型     | 必須 | 説明                              |
+| :-------------------- | :----- | :--- | :-------------------------------- |
+| `id`                  | string | ✅   | 一時 ID（依存関係定義用）         |
+| `title`               | string | ✅   | タスクタイトル                    |
+| `description`         | string | ✅   | 詳細説明                          |
+| `acceptance_criteria` | array  | ✅   | 達成条件リスト (string)           |
+| `dependencies`        | array  | 任意 | 依存するタスク ID（一時 ID 可）   |
+| `wbs_level`           | int    | ✅   | WBS 階層 (1=概念, 2=設計, 3=実装) |
+| `estimated_effort`    | string | ✅   | 推定工数 (small/medium/large)     |
+| `suggested_impl`      | object | 任意 | 実装ヒント                        |
+
+**SuggestedImpl**:
+
+| フィールド    | 型     | 必須 | 説明             |
+| :------------ | :----- | :--- | :--------------- |
+| `language`    | string | 任意 | 推奨言語         |
+| `file_paths`  | array  | 任意 | 関連ファイルパス |
+| `constraints` | array  | 任意 | 実装上の制約     |
+
+#### 9.5 実装例
+
+```go
+type DecomposeResponse struct {
+    Understanding      string              `yaml:"understanding"`
+    Phases             []DecomposedPhase   `yaml:"phases"`
+    PotentialConflicts []PotentialConflict `yaml:"potential_conflicts"`
+}
+
+type DecomposedPhase struct {
+    Name      string           `yaml:"name"`
+    Milestone string           `yaml:"milestone"`
+    Tasks     []DecomposedTask `yaml:"tasks"`
+}
+
+type DecomposedTask struct {
+    ID                 string         `yaml:"id"`
+    Title              string         `yaml:"title"`
+    Description        string         `yaml:"description"`
+    AcceptanceCriteria []string       `yaml:"acceptance_criteria"`
+    Dependencies       []string       `yaml:"dependencies"`
+    WBSLevel           int            `yaml:"wbs_level"`
+    EstimatedEffort    string         `yaml:"estimated_effort"`
+    SuggestedImpl      *SuggestedImpl `yaml:"suggested_impl,omitempty"`
+}
+```
 
 <a id="specifications-worker-interface"></a>
 
@@ -1230,6 +1382,16 @@ flowchart TD
 - **保存データ**:
   - `tasks/<task-id>.jsonl`: タスクのメタデータ履歴
   - `attempts/<attempt-id>.json`: 実行試行の詳細
+  - `snapshots/<snapshot-id>/`: ワークスペース状態のスナップショット (v2.0+)
+
+#### 3. Snapshot Repository (`internal/orchestrator/persistence-snapshot.go`)
+
+ワークスペースの `state/` ディレクトリのバックアップとリストアを提供します。
+
+- **機能**:
+  - `CreateSnapshot(id)`: 現在の状態を保存。
+  - `RestoreSnapshot(snapshot_id)`: 指定した時点の状態へ復元（復元前に安全のため自動バックアップを取得）。
+  - `ListSnapshots()`: 利用可能なスナップショット一覧を取得。
 
 ### IPC (Inter-Process Communication)
 
@@ -1282,7 +1444,7 @@ v0.1 ではファイルシステムベースの単純な IPC を採用してい�
 
 現在の `Executor` は簡易実装であり、以下の制限があります。
 
-- `agent-runner` への入力 YAML はコード内で生成されており、`max_loops: 5`, `worker.cli: "codex"` 等の値がハードコードされています。
+- `agent-runner` への入力 YAML はコード内で生成されており、デフォルトでは `runner.max_loops: 5` と `runner.worker.kind: "codex-cli"` が設定されます（`state/tasks.json` の `inputs.runner_max_loops` / `inputs.runner_worker_kind` で上書き可能）。
 
 <a id="specifications-logging-specification"></a>
 
@@ -1556,6 +1718,19 @@ Multiverse プロジェクトでは、システム全体の信頼性を確保し
 ```bash
 go test -v ./test/e2e/...
 ```
+
+#### 1-2. Backend V2 (Chat to Task)
+
+**配置場所**: `internal/chat/handler_test.go` (Unit/Integration)
+
+v2.0 のチャット駆動タスク生成フローは、LLM (Meta-agent) の出力に依存するため、安定した E2E テストが困難です。
+したがって、以下の戦略を採用します。
+
+- **モックベース統合テスト**: `ChatHandler` に対し、モック化された Meta-agent から固定の `DecomposeResponse` を返し、適切に `Task` が生成・保存されるかを検証します。
+- **カバレッジ**:
+  - `decompose` プロトコルによるタスク生成
+  - 依存関係（Dependency）の解決
+  - `SuggestedImpl` などの V2 フィールドの保存
 
 ---
 
@@ -2260,12 +2435,587 @@ EventsOn("task:stateChange", (event) => {
 frontend/ide/src/
 ├── lib/
 │   ├── flow/          # Svelte Flow 関連 (Nodes, Edges, Layout)
-│   ├── components/    # 共有 UI コンポーネント (Window, Button)
+│   ├── components/    # 共有 UI コンポーネント (Window, Button, PropertyPanel)
 │   └── wbs/           # WBS リストビュー
 ├── stores/            # Svelte Stores
 ├── design-system/     # CSS 変数・トークン
 └── App.svelte         # ルートコンポーネント
 ```
+
+#### 主要コンポーネント
+
+- **`UnifiedFlowCanvas.svelte`**: メインのグラフキャンバス。
+- **`TaskNode.svelte`**: タスクノード。`SuggestedImpl` の有無を示すインジケータ (IP) を持つ。
+- **`TaskPropPanel.svelte`**: 選択中のタスク詳細を表示するパネル。`SuggestedImpl` や `Artifacts` を表示。
+
+<a id="design-orchestrator-persistence-v2"></a>
+
+## Orchestrator Persistence V2
+
+**Source**: `design/orchestrator-persistence-v2.md`
+
+
+（WBS + ノード群中心のタスクスケジューラ設計書）
+
+---
+
+### 1. 目的とスコープ
+
+本ドキュメントの目的は、Multiverse IDE における以下の要素を一体として定義すること。
+
+- チャット入力 → 実行計画（WBS + ノード群）→ タスク生成 → エージェント実行 → 検証 → 状態更新
+- その全過程で生成される **設計情報・状態情報・履歴情報・コード生成物** の永続化方式
+- これらを用いて、**同じ設計（WBS + ノード群）から何度でも実装を再現できる**状態を保証すること
+
+本書は **UI には一切依存せず**、ファイル構成・データモデル・フローのみを扱う。
+
+---
+
+### 2. 全体アーキテクチャ概要
+
+IDE の中核となるコンポーネントと、ワークスペース／プロジェクト／エージェントの関係を示す。
+
+```mermaid
+graph LR
+    subgraph IDE ["Multiverse IDE Core"]
+        O[Orchestrator]
+        P["Planner / TaskBuilder"]
+        S[Scheduler]
+        E[Node Executor]
+        V[Validator]
+    end
+
+    subgraph WS ["Workspace FS (~/.multiverse/workspaces/<id>)"]
+        D["design/ (WBS + Node設計)"]
+        ST["state/ (現在の状態)"]
+        H["history/ (全アクション)"]
+        SNAP[snapshots/]
+    end
+
+    subgraph PRJ ["Project Dir (/path/to/project)"]
+        CODE[Source Code / Tests / Docs]
+    end
+
+    subgraph AGENTS ["Agent Runner(s)"]
+        A1[Code Agent]
+        A2[Test Agent]
+    end
+
+    O --> P
+    O --> S
+    S --> E
+    E --> AGENTS
+    AGENTS --> E
+    E --> V
+    V --> S
+
+    O -- 読み書き --> WS
+    S -- 読み書き --> WS
+    E -- ファイル更新 --> PRJ
+
+    P -- 設計生成/更新 --> D
+    S -- 状態更新 --> ST
+    S -- アクション記録 --> H
+```
+
+---
+
+### 3. 永続化ポリシー
+
+#### 3.1 基本原則
+
+1. **生成物（コード・テスト・ドキュメント）**
+
+   - 保存先: プロジェクトディレクトリ（例: `/path/to/project`）
+   - IDE は「どのノード／タスクがどのファイル群を生成・更新したか」をパスで紐付ける。
+
+2. **設計情報（WBS + ノード群）**
+
+   - 保存先: `~/.multiverse/workspaces/<workspace-id>/design/`
+   - ここが IDE における「設計の真実」であり、**再生成可能性の源泉**。
+
+3. **状態情報（現在の IDE ワークスペース状態）**
+
+   - 保存先: `~/.multiverse/workspaces/<workspace-id>/state/`
+   - ノードの進捗・タスクキュー・エージェント状況・テスト結果など。
+
+4. **履歴情報（アクションログ）**
+
+   - 保存先: `~/.multiverse/workspaces/<workspace-id>/history/`
+   - append-only（追記のみ）。全ての変更操作の起点は必ずここに 1 レコードが残る。
+
+5. **状態変更の順序（疑似トランザクション）**
+
+```text
+1. アクションを構築（メモリ上）
+2. history にアクションを書き込む（append）
+3. state/design の該当ファイルを atomic に書き換える
+4. 必要であればエージェント実行などの外部作用を開始する
+```
+
+---
+
+### 4. ワークスペースディレクトリ構成
+
+```text
+~/.multiverse/workspaces/<workspace-id>/
+  workspace.json              # ワークスペースメタ情報
+  design/
+    wbs.json                  # WBS ルート定義（ノードツリー）
+    nodes/
+      <node-id>.json          # 各ノードの設計定義
+  state/
+    nodes-runtime.json        # ノードごとの現在の実装・検証状態
+    tasks.json                # タスクキュー・スケジューラ状態
+    agents.json               # エージェント状態
+    tests.json                # 最新テスト結果
+  history/
+    actions-YYYYMMDD.jsonl    # アクションログ（1行1 JSON）
+  snapshots/
+    snapshot-<timestamp>.json # 任意タイミングの state スナップショット
+  logs/                       # 任意の内部ログ（実装依存）
+    scheduler.log
+    agents.log
+```
+
+これを Mermaid で俯瞰する:
+
+```mermaid
+graph TD
+  WS["workspace/<id>/"] --> WSP[workspace.json]
+
+  WS --> DESIGN["design/"]
+  DESIGN --> WBS["wbs.json"]
+  DESIGN --> DNODES["nodes/"]
+  DNODES --> DNODE1["<node-id>.json"]
+
+  WS --> STATE["state/"]
+  STATE --> S_NR["nodes-runtime.json"]
+  STATE --> S_TASK["tasks.json"]
+  STATE --> S_AG["agents.json"]
+  STATE --> S_TEST["tests.json"]
+
+  WS --> HIST["history/"]
+  HIST --> H_ACT["actions-YYYYMMDD.jsonl"]
+
+  WS --> SNAP["snapshots/"]
+  SNAP --> SNAPF["snapshot-<ts>.json"]
+
+  WS --> LOGS["logs/"]
+```
+
+---
+
+### 5. データモデル設計
+
+#### 5.1 設計情報（WBS + ノード）
+
+#### 5.1.1 WBS ルート (`design-wbs.json`)
+
+役割: 全ノードの親子関係（WBS 階層構造）を表現。
+
+```jsonc
+{
+  "wbs_id": "wbs-0001",
+  "project_root": "/absolute/path/to/project",
+  "created_at": "2025-12-11T07:00:00Z",
+  "updated_at": "2025-12-11T07:00:00Z",
+  "root_node_id": "node-root",
+  "node_index": [
+    {
+      "node_id": "node-root",
+      "parent_id": null,
+      "children": ["node-backend", "node-frontend"]
+    }
+  ]
+}
+```
+
+#### 5.1.2 ノード設計 (`design/nodes-<node-id>.json`)
+
+```jsonc
+{
+  "node_id": "node-auth",
+  "wbs_id": "wbs-0001",
+  "name": "認証機能の実装",
+  "summary": "IDE ログイン用の認証 API とトークン管理を実装する",
+  "kind": "feature",
+  "priority": "high",
+  "estimate": {
+    "story_points": 5,
+    "difficulty": "medium"
+  },
+  "dependencies": ["node-api-design"],
+  "acceptance_criteria": [
+    "OAuth2 によるログインが成功すること",
+    "失敗時のエラーコードとメッセージが定義されていること"
+  ],
+  "design_notes": ["トークンは短命アクセストークン + リフレッシュトークン方針"],
+  "suggested_impl": {
+    "language": "go",
+    "framework": "gin",
+    "module_paths": ["cmd/api/main.go", "internal/auth/"]
+  },
+  "created_at": "2025-12-11T07:01:00Z",
+  "updated_at": "2025-12-11T07:01:00Z",
+  "created_by": "agent:planner"
+}
+```
+
+#### 5.1.3 設計モデルの関係 (Mermaid classDiagram)
+
+```mermaid
+classDiagram
+    class WBS {
+      string wbs_id
+      string project_root
+      string root_node_id
+      NodeIndex[] node_index
+      time created_at
+      time updated_at
+    }
+
+    class NodeIndex {
+      string node_id
+      string parent_id
+      string[] children
+    }
+
+    class NodeDesign {
+      string node_id
+      string wbs_id
+      string name
+      string summary
+      string kind
+      string priority
+      Estimate estimate
+      string[] dependencies
+      string[] acceptance_criteria
+      string[] design_notes
+      SuggestedImpl suggested_impl
+      time created_at
+      time updated_at
+      string created_by
+    }
+
+    class Estimate {
+      int story_points
+      string difficulty
+    }
+
+    class SuggestedImpl {
+      string language
+      string framework
+      string[] module_paths
+    }
+
+    WBS "1" --> "many" NodeIndex
+    NodeDesign "1" --> "1" Estimate
+    NodeDesign "1" --> "0..1" SuggestedImpl
+```
+
+---
+
+#### 5.2 状態情報 (`state-`)
+
+#### 5.2.1 ノード実行状態 (`state-nodes-runtime.json`)
+
+```jsonc
+{
+  "nodes": [
+    {
+      "node_id": "node-auth",
+      "status": "implemented", // planned / in_progress / implemented / verified / blocked / obsolete
+      "implementation": {
+        "files": ["internal/auth/service.go", "internal/auth/handler.go"],
+        "last_modified_at": "2025-12-11T08:00:00Z",
+        "last_modified_by": "agent:codex"
+      },
+      "verification": {
+        "status": "passed", // not_tested / passed / failed / flaky
+        "last_test_task_id": "task-1235",
+        "last_test_at": "2025-12-11T08:10:00Z"
+      },
+      "notes": [
+        {
+          "at": "2025-12-11T08:05:00Z",
+          "by": "agent:codex",
+          "text": "トークンの有効期限を 15 分に設定"
+        }
+      ]
+    }
+  ]
+}
+```
+
+#### 5.2.2 タスク状態 (`state-tasks.json`)
+
+```jsonc
+{
+  "tasks": [
+    {
+	      "task_id": "task-1234",
+	      "node_id": "node-auth",
+	      "kind": "implementation", // planning / implementation / test / refactor / analysis ...
+	      "status": "PENDING", // PENDING / READY / RUNNING / SUCCEEDED / FAILED / CANCELED / SKIPPED / BLOCKED / RETRY_WAIT
+	      "created_at": "2025-12-11T07:05:00Z",
+	      "updated_at": "2025-12-11T07:05:00Z",
+	      "scheduled_by": "scheduler",
+	      "assigned_agent": "agent:codex",
+	      "priority": 100,
+	      "inputs": {
+	        "goal": "node-auth を acceptance_criteria を満たすよう実装・テストすること",
+	        "attempt_count": 0,
+	        "runner_max_loops": 5,
+	        "runner_worker_kind": "codex-cli",
+	        "constraints": [
+	          "既存 API 構成を変更しないこと",
+	          "ユニットテストを追加すること"
+	        ]
+	      },
+	      "outputs": {
+	        "status": "unknown",
+	        "artifacts": {}
+	      }
+	    }
+	  ],
+  "queue_meta": {
+    "last_scheduled_at": "2025-12-11T07:05:00Z",
+    "next_task_id_seq": 1235
+  }
+}
+```
+
+**inputs の予約キー（実装準拠）**:
+
+- `attempt_count`: 試行回数（`ExecutionOrchestrator` が開始時にインクリメント）。
+- `next_retry_at`: 次回リトライ予定時刻（`RETRY_WAIT` 時に設定）。
+- `runner_max_loops`: Executor が生成する TaskConfig YAML の `runner.max_loops` の上書き。
+- `runner_worker_kind`: Executor が生成する TaskConfig YAML の `runner.worker.kind` の上書き。
+
+#### 5.2.3 エージェント状態 (`state-agents.json`)
+
+```jsonc
+{
+  "agents": [
+    {
+      "agent_id": "agent:codex",
+      "kind": "code",
+      "max_parallel": 2,
+      "running_tasks": ["task-1234"],
+      "capabilities": ["go", "typescript", "test", "refactor"]
+    }
+  ]
+}
+```
+
+#### 5.2.4 テスト状態 (`state-tests.json`)
+
+```jsonc
+{
+  "node_tests": [
+    {
+      "node_id": "node-auth",
+      "last_result": {
+        "status": "passed",
+        "test_task_id": "task-1235",
+        "coverage": {
+          "lines": 0.78,
+          "branches": 0.65
+        },
+        "summary": "認証成功/失敗パターンを網羅"
+      }
+    }
+  ]
+}
+```
+
+---
+
+#### 5.3 履歴情報 (`history-actions-YYYYMMDD.jsonl`)
+
+1 行 1 JSON アクション:
+
+```jsonc
+{"id":"act-0001","at":"2025-12-11T07:00:00Z","kind":"workspace.created","workspace_id":"ws-abc","payload":{"project_root":"/path/to/project"}}
+{"id":"act-0002","at":"2025-12-11T07:01:00Z","kind":"node.created","workspace_id":"ws-abc","node_id":"node-auth","by":"agent:planner"}
+{"id":"act-0003","at":"2025-12-11T07:05:00Z","kind":"task.created","workspace_id":"ws-abc","task_id":"task-1234","node_id":"node-auth","kind_detail":"implementation"}
+{"id":"act-0004","at":"2025-12-11T07:06:00Z","kind":"task.started","workspace_id":"ws-abc","task_id":"task-1234","agent_id":"agent:codex"}
+{"id":"act-0005","at":"2025-12-11T08:00:00Z","kind":"task.succeeded","workspace_id":"ws-abc","task_id":"task-1234","artifacts":{"files":["internal/auth/service.go"]}}
+{"id":"act-0006","at":"2025-12-11T08:01:00Z","kind":"node.status_updated","workspace_id":"ws-abc","node_id":"node-auth","from":"planned","to":"implemented"}
+{"id":"act-0007","at":"2025-12-11T08:10:00Z","kind":"test.run","workspace_id":"ws-abc","task_id":"task-1235","node_id":"node-auth","result":"passed"}
+```
+
+---
+
+### 6. 実行フロー設計
+
+#### 6.1 チャット入力からタスク実行までのシーケンス
+
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant O as Orchestrator
+    participant P as "Planner/TaskBuilder"
+    participant DR as DesignRepo
+    participant SR as StateRepo
+    participant HR as HistoryRepo
+    participant S as Scheduler
+    participant E as Executor
+    participant AG as AgentRunner
+
+    U ->> O: チャット入力（"TODOアプリを作成して"）
+    O ->> HR: append(chat.message)
+    O ->> P: 現在のWBS/ノード + チャットを渡す
+
+    P ->> DR: WBS/Nodeを参照
+    P -->> O: ノード追加/更新の提案
+
+    O ->> HR: append(node.created / node.updated ...)
+    O ->> DR: design/wbs.json, nodes/*.json 更新
+
+    O ->> S: ノード変更通知
+
+    S ->> SR: state/tasks.json から pending タスク取得
+    S ->> SR: state/nodes-runtime.json / state/agents.json 参照
+    S -->> O: 実行候補タスク
+
+    O ->> HR: append(task.started)
+    O ->> SR: tasks.json (status=running) 更新
+
+    O ->> E: 実行タスク情報を渡す
+    E ->> AG: コード生成/編集タスク実行
+    AG ->> PRJ: プロジェクトにファイル生成・更新
+    AG -->> E: 実行結果(NodeResult)
+
+    E -->> O: NodeResult
+    O ->> HR: append(task.succeeded / task.failed)
+    O ->> SR: tasks.json, nodes-runtime.json 更新
+```
+
+---
+
+#### 6.2 スケジューラのタスク選択フロー
+
+```mermaid
+flowchart TD
+    A["開始"] --> B["pendingタスク一覧取得<br/>state/tasks.json"]
+    B --> C{"依存ノードは<br/>すべてimplemented以上か?"}
+    C -->|No| D["候補から除外"]
+    C -->|Yes| E["候補に追加"]
+
+    E --> F{"候補タスク残っている?"}
+    D --> F
+
+    F -->|No| G["スケジュール対象なし<br/>待機"]
+    F -->|Yes| H["優先度計算<br/>task.priority + 補正"]
+
+    H --> I["エージェント選択<br/>state/agents.json"]
+    I --> J{"空きスロットあり?"}
+    J -->|No| G
+    J -->|Yes| K["ディスパッチ決定"]
+
+    K --> L["historyにtask.startedをappend"]
+    L --> M["state/tasks.json更新<br/>status=running"]
+    M --> N["Executorへ実行指示"]
+    N --> G
+```
+
+---
+
+### 7. 再現性・リカバリ設計
+
+#### 7.1 状態再構築
+
+```mermaid
+stateDiagram-v2
+    [*] --> LoadSnapshot
+    LoadSnapshot --> ReplayActions
+    ReplayActions --> RebuildState
+    RebuildState --> [*]
+
+    state LoadSnapshot {
+        [*] --> FromLatestSnapshot
+        FromLatestSnapshot --> SnapshotLoaded
+    }
+
+    state ReplayActions {
+        [*] --> ReadActions
+        ReadActions --> ApplyAction
+        ApplyAction --> ReadActions
+    }
+```
+
+- 最新スナップショット (`snapshots/*.json`) をロード。
+- スナップショット以降の `history/actions-*.jsonl` を時系列に適用。
+- `design/`・`state/` を復元。
+
+#### 7.2 クラッシュ・途中終了時の取扱い
+
+- `task.started` まで記録されていて `task.succeeded/failed` が無いタスクは、再起動時に **不明状態** として扱い、再実行候補に載せる（実装ポリシーで「再スケジュール」か「手動介入待ち」かは決める）。
+
+---
+
+### 8. リポジトリ層インタフェース（実装指針）
+
+#### 8.1 概念インタフェース
+
+```mermaid
+classDiagram
+    class WorkspaceRepository {
+      +load_workspace(workspace_id) WorkspaceMeta
+      +save_workspace_meta(meta) void
+    }
+
+    class DesignRepository {
+      +get_wbs() WBS
+      +save_wbs(WBS) void
+      +get_node(node_id) NodeDesign
+      +create_node(NodeDesign) void
+      +update_node(NodeDesign) void
+    }
+
+    class StateRepository {
+      +get_nodes_runtime() NodesRuntime
+      +save_nodes_runtime(NodesRuntime) void
+      +get_tasks() TasksState
+      +save_tasks(TasksState) void
+      +get_agents() AgentsState
+      +save_agents(AgentsState) void
+      +get_tests() TestsState
+      +save_tests(TestsState) void
+    }
+
+    class HistoryRepository {
+      +append_action(Action) void
+      +list_actions(from,to) Action[]
+    }
+
+    WorkspaceRepository --> DesignRepository
+    WorkspaceRepository --> StateRepository
+    WorkspaceRepository --> HistoryRepository
+```
+
+#### 8.2 ファイル書き込みポリシー
+
+- 全ての JSON 書き込みは以下の手順で行う:
+  1. `<file>.tmp` に書き出し
+  2. `fsync` 相当で flush
+  3. `rename(<file>.tmp, <file>)`（atomic rename）
+
+---
+
+### 9. MVP スコープ（実装開始に向けた最小セット）
+
+実装の第一歩として、以下を「MVP」とする案:
+
+1. `design/wbs.json` + `design/nodes/*.json` による WBS / ノード設計の永続化
+2. `state/nodes-runtime.json` / `state/tasks.json` / `state/agents.json` の最小実装
+3. `history/actions-*.jsonl` によるアクション記録
+4. 単一エージェント・単一タスク種別（implementation）のみを対象としたスケジューラ
+5. スナップショット無し（`state/` をそのままロード）での状態復元
+
+この上に、テスト統合・RePlan・複数エージェント等を段階的に載せる。
 
 <a id="design-data-flow"></a>
 
@@ -3176,7 +3926,7 @@ networks:
 **Source**: `task-builder-and-golden-test-design.md`
 
 
-本ドキュメントは、Multiverse IDE における「チャット入力 → TaskConfig YAML 生成 → AgentRunner 実行 → 結果反映」までの最小パイプラインと、ゴールデンテスト（`TODO アプリを作成して`）の仕様を定義する。
+本ドキュメントは、Multiverse IDE における「チャット入力 → decompose（WBS/Node/TaskState 生成） → TaskConfig YAML 生成 → AgentRunner 実行 → 結果反映」までの最小パイプラインと、ゴールデンテスト（`TODO アプリを作成して`）の仕様を定義する。
 
 実装時の指示書として利用することを前提とする。
 
@@ -3190,9 +3940,9 @@ networks:
 - Phase 0 のゴールは、以下の 1 本のパイプラインが「ローカルで一気通しで動作すること」である。
 
 > Chat（`TODO アプリを作成して`）  
-> → Task Builder（LLM）で TaskConfig YAML を生成  
-> → AgentRunner でタスク分析 / 実装 / ファイル生成 / 検証を実行  
-> → Orchestrator 経由で結果が IDE に表示される
+> → Meta decompose により WBS/NodeDesign/TaskState を生成（ChatHandler）  
+> → Orchestrator が依存解決し Executor で TaskConfig YAML を生成 → AgentRunner 実行  
+> → 結果が IDE に表示される
 
 TODO アプリの仕様・技術スタック・テスト戦略などは **一切固定しない**。  
 本ドキュメントの範囲は「パイプラインとしての契約と責務」のみを定義する。
@@ -3204,36 +3954,28 @@ TODO アプリの仕様・技術スタック・テスト戦略などは **一切
 #### 2.1 IDE (Chat Layer)
 
 - ユーザーと対話するフロントエンド。
-- ユーザー入力（自然文）を `raw_prompt` として TaskStore に保存する。
-- Task の一覧表示、ステータス表示、結果サマリの表示を行う。
+- ユーザー入力（自然文）をバックエンドの ChatHandler に送信する。
+- Task の一覧表示、ステータス表示、結果サマリの表示を行う（TaskStore / state の反映を受け取る）。
 
 #### 2.2 Orchestrator
 
 - Workspace / TaskStore / IPC の管理を行うバックエンドコンポーネント。
 - 主な責務:
-  - Task 作成時に TaskStore レコードを生成。
-  - Task 実行要求を IPC queue にジョブとして登録。
-  - **Task Builder**（LLM）を呼び出し、`raw_prompt` から TaskConfig YAML を生成。
-  - TaskConfig YAML を AgentRunner に渡して実行。
-  - AgentRunner の結果を受け取り、TaskAttempt として保存し、IPC 結果を IDE に露出。
+  - `state/tasks.json` / `state/nodes-runtime.json` / `design/nodes/*.json` を読み、依存関係を解決して READY タスクを選ぶ（Scheduler）。
+  - READY タスクを IPC queue にジョブとして登録し、ExecutionOrchestrator が消費する。
+  - Executor がタスクから TaskConfig YAML を生成し、`agent-runner` に stdin で渡して実行する。
+  - 実行結果を `state/` と TaskStore に反映し、IDE にイベントとして露出する。
 
-#### 2.3 Task Builder（CLI プロバイダ）
+#### 2.3 Task Builder（CLI プロバイダ - 将来拡張）
 
-- Orchestrator から呼び出される CLI ベースのコンポーネント（Codex CLI 等）。
-- 入力:
-  - Workspace 情報（root_dir 等）
-  - ユーザー入力の自然文（`raw_prompt`）
-- 出力:
-  - AgentRunner に渡す **TaskConfig YAML**（本ドキュメントでフォーマットを定義）。
-- 実装:
-  - `codex chat` コマンドを実行し、JSON 形式で応答を受信
-  - CLI セッションの検証とエラーハンドリングを実装
+将来的に、`raw_prompt` から TaskConfig YAML を LLM で生成するコンポーネントを想定する。  
+現行 MVP では Task Builder は未使用で、TaskConfig YAML は Executor が決定的に生成する。
 
 #### 2.4 AgentRunner
 
 - Meta / Worker エージェントのランタイム。
 - 入力:
-  - TaskConfig YAML（Task Builder の出力をそのまま受け取る）
+  - TaskConfig YAML（Executor の出力をそのまま受け取る）
 - 処理:
   - タスク分析・プランニング
   - コード編集・新規ファイル生成
@@ -3263,24 +4005,24 @@ TODO アプリの仕様・技術スタック・テスト戦略などは **一切
 
 #### 3.1 TaskStore: Task レコード
 
-IDE から作成されるタスクの最小レコード定義。
+ChatHandler により作成されるタスクの最小レコード定義（実体は `orchestrator.Task` の JSONL 追記）。
 
 ```jsonc
 // ~/.multiverse/workspaces/<workspace-id>/tasks/<task-id>.jsonl
 {
   "id": "golden-todo-001",
-  "workspace_id": "abcd1234ef56",
   "title": "TODO アプリを作成して",
-  "raw_prompt": "TODO アプリを作成して",
-  "created_at": "2025-12-07T08:00:00Z"
+  "description": "TODO アプリを作成して。技術スタックや実装方針、検証方法はあなたの判断に任せます。",
+  "status": "PENDING",
+  "dependencies": [],
+  "wbsLevel": 1,
+  "phaseName": "Implementation",
+  "milestone": "implementation",
+  "acceptanceCriteria": ["アプリが起動すること"]
 }
 ```
 
-- `title`
-  - UI 表示用。初期値は `raw_prompt` と同一でよい。
-- `raw_prompt`
-  - ユーザーがチャットで入力した自然文。
-  - Task Builder の入力として利用する。
+※ ユーザーの自然文入力そのものは TaskStore ではなく ChatSessionStore に保存される。
 
 ※ Phase 0 では `test_command` 等は持たない。検証戦略は AgentRunner 側に委譲する。
 
@@ -3298,40 +4040,34 @@ IDE からの「実行してほしい」要求は、Orchestrator に対して IP
 
 - Orchestrator は queue ディレクトリをポーリングし、Job を検出して処理する。
 
-#### 3.3 TaskConfig YAML（Task Builder 出力 - AgentRunner 入力）
+#### 3.3 TaskConfig YAML（Executor 出力 - AgentRunner 入力）
 
-Task Builder により生成され、AgentRunner に渡される YAML の最小スキーマを定義する。
+Executor が生成し、AgentRunner に渡される YAML の最小スキーマを定義する（`pkg/config/config.go` に準拠）。
 
 ```yaml
+version: 1
+
 task:
   id: "golden-todo-001"
   title: "TODO アプリを作成して"
-  instructions: |
-    TODO アプリを作成して。
-    技術スタックや実装方針、検証方法はあなたの判断に任せます。
-    必要に応じて、コードや設定ファイル、テストコードなどを自由に生成してください。
-  project:
-    root_dir: "/path/to/workspace"
+  repo: "."
+  prd:
+    text: |
+      TODO アプリを作成して。
 
 runner:
-  meta:
-    model: "gpt-4.1"
-    temperature: 0.2
+  max_loops: 5
   worker:
-    type: "docker_codex_cli"
-    # 必要に応じて image / mount - env 等を拡張
+    kind: "codex-cli"
+    # 必要に応じて docker_image - env 等を拡張
 ```
 
 必須フィールド:
 
-- `task.id`（TaskStore の `id` と一致）
-- `task.title`
-- `task.instructions`
-- `task.project.root_dir`
-- `runner.meta.model`
-- `runner.worker.type`
+- `version`（値は `1`）
+- `task.prd`（`path` または `text` のいずれか）
 
-Task Builder 実装は、このスキーマを満たすように LLM 出力を誘導する。
+Executor 実装は、このスキーマを満たす YAML を決定的に生成する。
 
 #### 3.4 AgentRunner 結果 JSON
 
@@ -3378,30 +4114,25 @@ Orchestrator は、本 JSON を TaskAttempt（JSONL）に埋め込み、IDE か�
 
    > `TODO アプリを作成して`
 
-2. IDE は以下を行う。
-   - Workspace を選択中であることを前提に、`workspace_id` を決定。
-   - 新規 Task を作成し、`title` と `raw_prompt` に上記の文言を保存。
-   - TaskStore の `tasks/<task-id>.jsonl` に Task レコードを append。
+2. バックエンドの ChatHandler が Meta decompose を呼び出し、Task 群を生成する。
+3. ChatHandler が以下を永続化する:
+   - `design/wbs.json`, `design/nodes/*.json`
+   - `state/tasks.json`, `state/nodes-runtime.json`
+   - TaskStore の `tasks/<task-id>.jsonl`
 
-3. ユーザーは Task 一覧画面で、`TODO アプリを作成して` タスクを確認できる。
+4. ユーザーは Task 一覧画面で生成されたタスクを確認できる。
 
 #### 4.2 Task 実行要求 → Orchestrator
 
 1. ユーザーが IDE 上で Task の「Run」ボタンを押下。
-2. IDE は IPC queue に Job JSON を作成する（3.2 参照）。
-3. Orchestrator は queue ディレクトリを監視し、Job を検出。
+2. IDE はバックエンドに実行要求を送信し、Scheduler が IPC queue に Job JSON を作成する（3.2 参照）。
+3. ExecutionOrchestrator が queue ディレクトリを監視し、Job を検出。
 
-#### 4.3 Task Builder 呼び出し
+#### 4.3 Executor による TaskConfig YAML 生成
 
-1. Orchestrator は TaskStore から `task_id` に対応する Task をロード。
-2. Orchestrator は CLI プロバイダ（Task Builder）に以下の情報を渡して呼び出す。
-
-   - Workspace 情報（例）
-     - `root_dir: "/path/to/workspace"`
-   - `raw_prompt: "TODO アプリを作成して"`
-
-3. Task Builder（Codex CLI 等）は、`codex chat` コマンドを実行し、3.3 の TaskConfig スキーマに従う YAML を生成する。
-4. Orchestrator は生成された YAML を TaskConfig として検証する。
+1. ExecutionOrchestrator は `state/tasks.json` と `design/nodes/*.json` から Task をロードする。
+2. Executor が Task から TaskConfig YAML を生成する（3.3 に準拠）。
+3. ExecutionOrchestrator が YAML を `agent-runner` に stdin で渡して実行する。
    - YAML としてパース可能か
    - 必須フィールドが存在するか
 5. 検証に失敗した場合、または CLI セッションが無い場合は、その時点で TaskAttempt を `failed` として記録し、結果を IDE に返す。
@@ -3439,28 +4170,28 @@ Orchestrator は、本 JSON を TaskAttempt（JSONL）に埋め込み、IDE か�
 - TODO アプリの解釈・技術スタック・設計・テスト戦略に関するルールは **一切課さない**。
 - 検証対象は「アプリとして妥当か」ではなく、「パイプラインとして正しく通るか」である。
 
-#### 5.2 GT-1: Chat → TaskConfig（Task Builder テスト）
+#### 5.2 GT-1: Chat → TaskConfig（Executor テスト）
 
 目的:
 
-- `raw_prompt = "TODO アプリを作成して"` から **有効な TaskConfig YAML** が生成されることを確認する。
+- `TODO アプリを作成して` の decompose 結果から **有効な TaskConfig YAML** が生成されることを確認する。
 
 前提条件:
 
-- Codex CLI がインストールされ、有効なセッションが存在すること
+- Meta decompose をモックできること（LLM 実行は不要）
 
 テスト手順（ロジック）:
 
 1. テスト用 Workspace を作成（空 or ほぼ空でよい）。
-2. Task を作成し、`raw_prompt = "TODO アプリを作成して"` を設定。
-3. Orchestrator 経由で Task Builder（Codex CLI）を呼び出し、TaskConfig YAML を取得。
+2. ChatHandler に `TODO アプリを作成して` を入力し、Task を生成。
+3. Executor を起動し、TaskConfig YAML を取得。
 4. アサーション:
    - YAML としてパース可能。
    - `task.id` が TaskStore の `id` と一致。
    - `task.title` が `TODO アプリを作成して` を含む。
-   - `task.instructions` に `TODO アプリを作成して` の文言が含まれる。
-   - `task.project.root_dir` が Workspace のパスと一致。
-   - `runner.meta.model` / `runner.worker.type` が存在。
+   - `task.repo` が `"."`。
+   - `task.prd.text` に `TODO アプリを作成して` と Acceptance Criteria が含まれる。
+   - `runner.max_loops` と `runner.worker.kind` が存在。
 
 #### 5.3 GT-2: TaskConfig → AgentRunner（実行テスト）
 
@@ -3490,7 +4221,7 @@ Orchestrator は、本 JSON を TaskAttempt（JSONL）に埋め込み、IDE か�
 
 ※ Phase 0 の時点では、`status = failed` であっても、「パイプラインとして最後まで処理され、結果が返る」ことを成功条件としてよい。
 
-#### 5.4 GT-3: E2E（Chat → TaskConfig → AgentRunner → 結果）
+#### 5.4 GT-3: E2E（Chat → decompose → TaskConfig → AgentRunner → 結果）
 
 目的:
 
@@ -3502,7 +4233,8 @@ Orchestrator は、本 JSON を TaskAttempt（JSONL）に埋め込み、IDE か�
    - Chat に `TODO アプリを作成して` を入力し、Task 作成。
    - Task の「Run」ボタンを押下。
 2. バックグラウンドで:
-   - Orchestrator が Job 処理 → Task Builder → TaskConfig YAML 生成 → AgentRunner 実行 → 結果 JSON 生成。
+   - ChatHandler が decompose → design/state/task_store 永続化を実行。
+   - Orchestrator が依存解決 → Executor による TaskConfig YAML 生成 → AgentRunner 実行 → 結果 JSON 生成。
 3. IDE で Task 詳細画面を開き、以下を確認:
    - ステータスが `SUCCEEDED` または `FAILED` のいずれか。
    - summary が表示されている。
@@ -3514,20 +4246,20 @@ Orchestrator は、本 JSON を TaskAttempt（JSONL）に埋め込み、IDE か�
 
 実装順序の推奨:
 
-1. Workspace / TaskStore / IPC（queue/results）の基盤実装。
+1. Workspace / design / state / TaskStore / IPC（queue/results）の基盤実装。
 2. IDE:
    - Workspace 選択 UI
-   - Task 作成 UI（Chat 入力 → TaskStore に `raw_prompt` 保存）
-3. Orchestrator:
-   - Job queue 処理
-   - TaskBuilder 呼び出し（LLM API ラッパ）
-   - TaskConfig YAML 検証
-4. AgentRunner 連携:
-   - TaskConfig YAML を stdin で渡す Executor 実装
-   - 結果 JSON の受信と TaskAttempt への保存
-5. IDE:
-   - IPC results の監視
-   - Task ステータスと結果サマリの表示
+   - Chat 入力 UI と Task 表示 UI
+   - Task 実行要求 UI（Run ボタン）
+3. ChatHandler:
+   - Meta decompose 呼び出し
+   - `design/`・`state/`・TaskStore の永続化
+4. Orchestrator:
+   - Scheduler による依存解決と Job enqueue
+   - ExecutionOrchestrator による Job 実行と状態更新
+5. Executor / AgentRunner 連携:
+   - TaskConfig YAML 生成（Executor）
+   - `agent-runner` 実行と結果 JSON の保存
 6. ゴールデンテスト（GT-1 / GT-2 / GT-3）の追加
 
 本設計書は Phase 0 の最小スコープを対象とする。  

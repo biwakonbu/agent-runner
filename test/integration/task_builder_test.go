@@ -70,7 +70,7 @@ func TestTaskBuilder_Golden(t *testing.T) {
 	metaClient := &MockMetaClient{}
 
 	// Create a dummy event emitter (can be nil or mock if needed)
-	handler := chat.NewHandler(metaClient, taskStore, sessionStore, wsID, projectRoot, nil)
+	handler := chat.NewHandler(metaClient, taskStore, sessionStore, wsID, projectRoot, nil, nil)
 
 	// 3. Setup Executor with Capture Script
 	captureScriptPath := filepath.Join(tempDir, "capture_runner.sh")
@@ -131,5 +131,6 @@ func TestTaskBuilder_Golden(t *testing.T) {
 	require.True(t, ok)
 	workerMap, ok := runnerMap["worker"].(map[string]interface{})
 	require.True(t, ok)
-	assert.Equal(t, "codex", workerMap["cli"])
+	assert.EqualValues(t, 5, runnerMap["max_loops"])
+	assert.Equal(t, "codex-cli", workerMap["kind"])
 }

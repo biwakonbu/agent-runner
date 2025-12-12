@@ -12,6 +12,7 @@ import (
 	"github.com/biwakonbu/agent-runner/internal/logging"
 	"github.com/biwakonbu/agent-runner/internal/meta"
 	"github.com/biwakonbu/agent-runner/internal/orchestrator"
+	"github.com/biwakonbu/agent-runner/internal/orchestrator/persistence"
 	"github.com/google/uuid"
 )
 
@@ -35,6 +36,7 @@ type ChatResponse struct {
 // Handler はチャットメッセージを処理するハンドラ
 type Handler struct {
 	Meta         MetaClient
+	Repo         persistence.WorkspaceRepository
 	TaskStore    *orchestrator.TaskStore
 	SessionStore *ChatSessionStore
 	WorkspaceID  string
@@ -51,10 +53,12 @@ func NewHandler(
 	sessionStore *ChatSessionStore,
 	workspaceID string,
 	projectRoot string,
+	repo persistence.WorkspaceRepository,
 	events orchestrator.EventEmitter,
 ) *Handler {
 	return &Handler{
 		Meta:         metaClient,
+		Repo:         repo,
 		TaskStore:    taskStore,
 		SessionStore: sessionStore,
 		WorkspaceID:  workspaceID,
@@ -121,8 +125,10 @@ func (h *Handler) HandleMessage(ctx context.Context, sessionID, message string) 
 		return nil, fmt.Errorf("failed to list existing tasks: %w", err)
 	}
 	existingTaskIDs := make(map[string]struct{}, len(existingTasks))
+	existingTasksByID := make(map[string]orchestrator.Task, len(existingTasks))
 	for _, t := range existingTasks {
 		existingTaskIDs[t.ID] = struct{}{}
+		existingTasksByID[t.ID] = t
 	}
 
 	// 2. コンテキスト情報を収集 (Event: analyzing)
@@ -156,7 +162,7 @@ func (h *Handler) HandleMessage(ctx context.Context, sessionID, message string) 
 
 	// 4. タスクを永続化 (Event: persisting)
 	emitProgress("Persisting", fmt.Sprintf("%d 個のタスクを保存中...", countTotalTasks(decomposeResp)))
-	generatedTasks, err := h.persistTasks(ctx, sessionID, decomposeResp, existingTaskIDs)
+	generatedTasks, err := h.persistTasks(ctx, sessionID, decomposeResp, existingTaskIDs, existingTasksByID)
 	if err != nil {
 		emitFailed(fmt.Sprintf("タスク保存に失敗しました: %v", err))
 		return nil, fmt.Errorf("failed to persist tasks: %w", err)
@@ -233,7 +239,13 @@ func (h *Handler) buildDecomposeRequest(sessionID, message string, existingTasks
 }
 
 // persistTasks は分解されたタスクを永続化する
-func (h *Handler) persistTasks(ctx context.Context, sessionID string, resp *meta.DecomposeResponse, existingTaskIDs map[string]struct{}) ([]orchestrator.Task, error) {
+func (h *Handler) persistTasks(
+	ctx context.Context,
+	sessionID string,
+	resp *meta.DecomposeResponse,
+	existingTaskIDs map[string]struct{},
+	existingTasksByID map[string]orchestrator.Task,
+) ([]orchestrator.Task, error) {
 	logger := logging.WithTraceID(h.logger, ctx)
 
 	// 一時ID → 正式ID のマッピング
@@ -284,6 +296,10 @@ func (h *Handler) persistTasks(ctx context.Context, sessionID string, resp *meta
 				Milestone:          phase.Milestone,
 				SourceChatID:       &sessionID,
 				AcceptanceCriteria: decomposedTask.AcceptanceCriteria,
+				Runner: &orchestrator.RunnerSpec{
+					MaxLoops:   orchestrator.DefaultRunnerMaxLoops,
+					WorkerKind: orchestrator.DefaultWorkerKind,
+				},
 			}
 
 			if decomposedTask.SuggestedImpl != nil {
@@ -314,6 +330,11 @@ func (h *Handler) persistTasks(ctx context.Context, sessionID string, resp *meta
 		return nil, fmt.Errorf("unresolved dependencies: %s", strings.Join(unique, ", "))
 	}
 
+	if err := h.persistDesignAndState(ctx, sessionID, tasksToSave, existingTasksByID); err != nil {
+		logger.Error("failed to persist design/state", slog.Any("error", err))
+		return nil, fmt.Errorf("failed to persist design/state: %w", err)
+	}
+
 	for _, task := range tasksToSave {
 		if err := h.TaskStore.SaveTask(&task); err != nil {
 			logger.Error("failed to save task",
@@ -339,6 +360,250 @@ func (h *Handler) persistTasks(ctx context.Context, sessionID string, resp *meta
 	}
 
 	return allTasks, nil
+}
+
+// persistDesignAndState は decompose されたタスクを design/state に反映する（Repo が nil の場合はスキップ）。
+func (h *Handler) persistDesignAndState(
+	ctx context.Context,
+	sessionID string,
+	tasks []orchestrator.Task,
+	existingTasksByID map[string]orchestrator.Task,
+) error {
+	if h.Repo == nil {
+		return nil
+	}
+	logger := logging.WithTraceID(h.logger, ctx)
+
+	if err := h.Repo.Init(); err != nil {
+		return fmt.Errorf("failed to init workspace repo: %w", err)
+	}
+
+	now := time.Now()
+
+	// Load or create WBS root
+	wbs, err := h.Repo.Design().LoadWBS()
+	if err != nil {
+		if os.IsNotExist(err) {
+			wbs = &persistence.WBS{
+				WBSID:       uuid.New().String(),
+				ProjectRoot: h.ProjectRoot,
+				CreatedAt:   now,
+				UpdatedAt:   now,
+				RootNodeID:  "node-root",
+				NodeIndex:   []persistence.NodeIndex{},
+			}
+		} else {
+			return fmt.Errorf("failed to load wbs: %w", err)
+		}
+	}
+
+	if wbs.WBSID == "" {
+		wbs.WBSID = uuid.New().String()
+		wbs.CreatedAt = now
+	}
+	if wbs.ProjectRoot == "" {
+		wbs.ProjectRoot = h.ProjectRoot
+	}
+	if wbs.RootNodeID == "" {
+		wbs.RootNodeID = "node-root"
+	}
+	wbs.UpdatedAt = now
+
+	// Index lookup (store positions to avoid slice pointer invalidation).
+	indexPosByID := make(map[string]int)
+	for i := range wbs.NodeIndex {
+		indexPosByID[wbs.NodeIndex[i].NodeID] = i
+	}
+	rootPos, ok := indexPosByID[wbs.RootNodeID]
+	if !ok {
+		rootID := wbs.RootNodeID
+		wbs.NodeIndex = append(wbs.NodeIndex, persistence.NodeIndex{
+			NodeID:   rootID,
+			ParentID: nil,
+			Children: []string{},
+		})
+		rootPos = len(wbs.NodeIndex) - 1
+		indexPosByID[rootID] = rootPos
+	}
+
+	contains := func(xs []string, x string) bool {
+		for _, v := range xs {
+			if v == x {
+				return true
+			}
+		}
+		return false
+	}
+
+	// Track new nodes for dependency handling
+	newNodeIDs := make(map[string]struct{}, len(tasks))
+
+	// Save NodeDesign for each task and update WBS index
+	for _, t := range tasks {
+		newNodeIDs[t.ID] = struct{}{}
+
+		suggested := persistence.SuggestedImpl{}
+		if t.SuggestedImpl != nil {
+			paths := make([]string, 0, len(t.SuggestedImpl.FilePaths))
+			for _, p := range t.SuggestedImpl.FilePaths {
+				paths = append(paths, strings.TrimSuffix(p, " (New File)"))
+			}
+			suggested.Language = t.SuggestedImpl.Language
+			suggested.FilePaths = paths
+			suggested.Constraints = t.SuggestedImpl.Constraints
+		}
+
+		node := &persistence.NodeDesign{
+			NodeID:             t.ID,
+			WBSID:              wbs.WBSID,
+			Name:               t.Title,
+			Summary:            t.Description,
+			Kind:               "feature",
+			Priority:           "medium",
+			Estimate:           persistence.Estimate{},
+			Dependencies:       t.Dependencies,
+			AcceptanceCriteria: t.AcceptanceCriteria,
+			DesignNotes:        []string{},
+			SuggestedImpl:      suggested,
+			CreatedAt:          now,
+			UpdatedAt:          now,
+			CreatedBy:          "agent:planner",
+		}
+
+		if err := h.Repo.Design().SaveNode(node); err != nil {
+			return fmt.Errorf("failed to save node %s: %w", node.NodeID, err)
+		}
+
+		if _, exists := indexPosByID[t.ID]; !exists {
+			parentID := wbs.RootNodeID
+			wbs.NodeIndex = append(wbs.NodeIndex, persistence.NodeIndex{
+				NodeID:   t.ID,
+				ParentID: &parentID,
+				Children: []string{},
+			})
+			pos := len(wbs.NodeIndex) - 1
+			indexPosByID[t.ID] = pos
+			if !contains(wbs.NodeIndex[rootPos].Children, t.ID) {
+				wbs.NodeIndex[rootPos].Children = append(wbs.NodeIndex[rootPos].Children, t.ID)
+			}
+		}
+	}
+
+	if err := h.Repo.Design().SaveWBS(wbs); err != nil {
+		return fmt.Errorf("failed to save wbs: %w", err)
+	}
+
+	// Load state
+	nodesRuntime, err := h.Repo.State().LoadNodesRuntime()
+	if err != nil {
+		return fmt.Errorf("failed to load nodes runtime: %w", err)
+	}
+	tasksState, err := h.Repo.State().LoadTasks()
+	if err != nil {
+		return fmt.Errorf("failed to load tasks state: %w", err)
+	}
+
+	runtimeByID := make(map[string]*persistence.NodeRuntime)
+	for i := range nodesRuntime.Nodes {
+		runtimeByID[nodesRuntime.Nodes[i].NodeID] = &nodesRuntime.Nodes[i]
+	}
+
+	taskByID := make(map[string]struct{})
+	for _, ts := range tasksState.Tasks {
+		taskByID[ts.TaskID] = struct{}{}
+	}
+
+	// Ensure runtime entries for existing dependency nodes to avoid permanent blocking.
+	for _, t := range tasks {
+		for _, depID := range t.Dependencies {
+			if _, isNew := newNodeIDs[depID]; isNew {
+				continue
+			}
+			if _, exists := runtimeByID[depID]; exists {
+				continue
+			}
+			existing, ok := existingTasksByID[depID]
+			if !ok {
+				continue
+			}
+			status := "planned"
+			if existing.Status == orchestrator.TaskStatusSucceeded || existing.Status == orchestrator.TaskStatusCompleted {
+				status = "implemented"
+			}
+			nodesRuntime.Nodes = append(nodesRuntime.Nodes, persistence.NodeRuntime{
+				NodeID: depID,
+				Status: status,
+				Implementation: persistence.NodeImplementation{
+					Files:          []string{},
+					LastModifiedAt: now,
+					LastModifiedBy: "chat-handler",
+				},
+				Verification: persistence.NodeVerification{
+					Status: "not_tested",
+				},
+				Notes: []persistence.NodeNote{
+					{At: now, By: "chat-handler", Text: "imported from existing task"},
+				},
+			})
+			runtimeByID[depID] = &nodesRuntime.Nodes[len(nodesRuntime.Nodes)-1]
+		}
+	}
+
+	// Upsert runtime/tasks for new nodes.
+	for _, t := range tasks {
+		if _, exists := runtimeByID[t.ID]; !exists {
+			nodesRuntime.Nodes = append(nodesRuntime.Nodes, persistence.NodeRuntime{
+				NodeID: t.ID,
+				Status: "planned",
+				Implementation: persistence.NodeImplementation{
+					Files:          []string{},
+					LastModifiedAt: now,
+					LastModifiedBy: "chat-handler",
+				},
+				Verification: persistence.NodeVerification{
+					Status: "not_tested",
+				},
+				Notes: []persistence.NodeNote{
+					{At: now, By: "chat-handler", Text: fmt.Sprintf("created from chat session %s", sessionID)},
+				},
+			})
+			runtimeByID[t.ID] = &nodesRuntime.Nodes[len(nodesRuntime.Nodes)-1]
+		}
+
+		if _, exists := taskByID[t.ID]; !exists {
+			tasksState.Tasks = append(tasksState.Tasks, persistence.TaskState{
+				TaskID:        t.ID,
+				NodeID:        t.ID,
+				Kind:          "implementation",
+				Status:        string(orchestrator.TaskStatusPending),
+				CreatedAt:     now,
+				UpdatedAt:     now,
+				ScheduledBy:   "chat-handler",
+				AssignedAgent: "",
+				Priority:      0,
+				Inputs: map[string]interface{}{
+					orchestrator.InputKeyAttemptCount:     0,
+					orchestrator.InputKeyRunnerMaxLoops:   orchestrator.DefaultRunnerMaxLoops,
+					orchestrator.InputKeyRunnerWorkerKind: orchestrator.DefaultWorkerKind,
+				},
+				Outputs: persistence.TaskOutputs{},
+			})
+			taskByID[t.ID] = struct{}{}
+		}
+	}
+
+	if err := h.Repo.State().SaveNodesRuntime(nodesRuntime); err != nil {
+		return fmt.Errorf("failed to save nodes runtime: %w", err)
+	}
+	if err := h.Repo.State().SaveTasks(tasksState); err != nil {
+		return fmt.Errorf("failed to save tasks state: %w", err)
+	}
+
+	logger.Debug("persisted design/state from chat",
+		slog.Int("nodes", len(tasks)),
+	)
+
+	return nil
 }
 
 // buildResponseContent はアシスタント応答メッセージを構築する

@@ -280,6 +280,17 @@ func (e *Executor) generateTaskYAML(task *Task) string {
 	// Dependencies
 	dependenciesYAML := fmt.Sprintf("dependencies: [%s]", quoteList(task.Dependencies))
 
+	runnerMaxLoops := DefaultRunnerMaxLoops
+	workerKind := DefaultWorkerKind
+	if task.Runner != nil {
+		if task.Runner.MaxLoops > 0 {
+			runnerMaxLoops = task.Runner.MaxLoops
+		}
+		if task.Runner.WorkerKind != "" {
+			workerKind = task.Runner.WorkerKind
+		}
+	}
+
 	return fmt.Sprintf(`version: "1"
 task:
   id: %s
@@ -293,10 +304,10 @@ task:
   prd:
     text: |
 %srunner:
-  max_loops: 5
+  max_loops: %d
   worker:
-    cli: "codex"
-`, task.ID, task.Title, task.Description, task.WBSLevel, task.PhaseName, dependenciesYAML, suggestedImplYAML, promptTextIndented)
+    kind: %q
+`, task.ID, task.Title, task.Description, task.WBSLevel, task.PhaseName, dependenciesYAML, suggestedImplYAML, promptTextIndented, runnerMaxLoops, workerKind)
 }
 
 func quoteList(items []string) string {

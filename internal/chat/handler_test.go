@@ -28,7 +28,7 @@ func TestHandler_NewHandler(t *testing.T) {
 	sessionStore := NewChatSessionStore(tmpDir)
 	mockMeta := &MockMetaClient{}
 
-	handler := NewHandler(mockMeta, taskStore, sessionStore, "workspace-1", "/project", nil)
+	handler := NewHandler(mockMeta, taskStore, sessionStore, "workspace-1", "/project", nil, nil)
 
 	if handler.Meta != mockMeta {
 		t.Error("Meta client not set correctly")
@@ -53,7 +53,7 @@ func TestHandler_CreateSession(t *testing.T) {
 	sessionStore := NewChatSessionStore(tmpDir)
 	mockMeta := &MockMetaClient{}
 
-	handler := NewHandler(mockMeta, taskStore, sessionStore, "workspace-1", "/project", nil)
+	handler := NewHandler(mockMeta, taskStore, sessionStore, "workspace-1", "/project", nil, nil)
 
 	ctx := context.Background()
 	session, err := handler.CreateSession(ctx)
@@ -127,7 +127,7 @@ func TestHandler_HandleMessage_Success(t *testing.T) {
 		},
 	}
 
-	handler := NewHandler(mockMeta, taskStore, sessionStore, "workspace-1", "/project", nil)
+	handler := NewHandler(mockMeta, taskStore, sessionStore, "workspace-1", "/project", nil, nil)
 
 	ctx := context.Background()
 
@@ -204,7 +204,7 @@ func TestHandler_HandleMessage_MetaError(t *testing.T) {
 		},
 	}
 
-	handler := NewHandler(mockMeta, taskStore, sessionStore, "workspace-1", "/project", nil)
+	handler := NewHandler(mockMeta, taskStore, sessionStore, "workspace-1", "/project", nil, nil)
 
 	ctx := context.Background()
 
@@ -260,7 +260,7 @@ func TestHandler_HandleMessage_WithExistingTasks(t *testing.T) {
 		},
 	}
 
-	handler := NewHandler(mockMeta, taskStore, sessionStore, "workspace-1", "/project", nil)
+	handler := NewHandler(mockMeta, taskStore, sessionStore, "workspace-1", "/project", nil, nil)
 
 	ctx := context.Background()
 
@@ -306,7 +306,7 @@ func TestHandler_HandleMessage_WithConversationHistory(t *testing.T) {
 		},
 	}
 
-	handler := NewHandler(mockMeta, taskStore, sessionStore, "workspace-1", "/project", nil)
+	handler := NewHandler(mockMeta, taskStore, sessionStore, "workspace-1", "/project", nil, nil)
 
 	ctx := context.Background()
 
@@ -373,7 +373,7 @@ func TestHandler_HandleMessage_PotentialConflicts(t *testing.T) {
 		},
 	}
 
-	handler := NewHandler(mockMeta, taskStore, sessionStore, "workspace-1", "/project", nil)
+	handler := NewHandler(mockMeta, taskStore, sessionStore, "workspace-1", "/project", nil, nil)
 
 	ctx := context.Background()
 
@@ -411,7 +411,7 @@ func TestHandler_GetHistory(t *testing.T) {
 		},
 	}
 
-	handler := NewHandler(mockMeta, taskStore, sessionStore, "workspace-1", "/project", nil)
+	handler := NewHandler(mockMeta, taskStore, sessionStore, "workspace-1", "/project", nil, nil)
 
 	ctx := context.Background()
 
@@ -524,7 +524,7 @@ func TestHandler_HandleMessage_WithSuggestedImpl(t *testing.T) {
 		},
 	}
 
-	handler := NewHandler(mockMeta, taskStore, sessionStore, "workspace-1", "/project", nil)
+	handler := NewHandler(mockMeta, taskStore, sessionStore, "workspace-1", "/project", nil, nil)
 	ctx := context.Background()
 	session, _ := handler.CreateSession(ctx)
 

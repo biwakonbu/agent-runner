@@ -135,6 +135,24 @@ func (e *executorV2Impl) generateTaskYAML(task persistence.TaskState) string {
 		promptTextIndented += fmt.Sprintf("      %s\n", line)
 	}
 
+	runnerMaxLoops := DefaultRunnerMaxLoops
+	workerKind := DefaultWorkerKind
+	if task.Inputs != nil {
+		switch v := task.Inputs[InputKeyRunnerMaxLoops].(type) {
+		case float64:
+			if int(v) > 0 {
+				runnerMaxLoops = int(v)
+			}
+		case int:
+			if v > 0 {
+				runnerMaxLoops = v
+			}
+		}
+		if kind, ok := task.Inputs[InputKeyRunnerWorkerKind].(string); ok && kind != "" {
+			workerKind = kind
+		}
+	}
+
 	return fmt.Sprintf(`version: "1"
 task:
   id: %s
@@ -143,8 +161,8 @@ task:
   prd:
     text: |
 %srunner:
-  max_loops: 5
+  max_loops: %d
   worker:
-    cli: "codex"
-`, task.TaskID, task.TaskID, promptTextIndented)
+    kind: %q
+`, task.TaskID, task.TaskID, promptTextIndented, runnerMaxLoops, workerKind)
 }

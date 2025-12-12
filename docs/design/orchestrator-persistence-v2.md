@@ -299,34 +299,44 @@ classDiagram
 {
   "tasks": [
     {
-      "task_id": "task-1234",
-      "node_id": "node-auth",
-      "kind": "implementation", // planning / implementation / test / refactor / analysis ...
-      "status": "pending", // pending / running / succeeded / failed / cancelled / skipped
-      "created_at": "2025-12-11T07:05:00Z",
-      "updated_at": "2025-12-11T07:05:00Z",
-      "scheduled_by": "scheduler",
-      "assigned_agent": "agent:codex",
-      "priority": 100,
-      "inputs": {
-        "goal": "node-auth を acceptance_criteria を満たすよう実装・テストすること",
-        "constraints": [
-          "既存 API 構成を変更しないこと",
-          "ユニットテストを追加すること"
-        ]
-      },
-      "outputs": {
-        "status": "unknown",
-        "artifacts": []
-      }
-    }
-  ],
+	      "task_id": "task-1234",
+	      "node_id": "node-auth",
+	      "kind": "implementation", // planning / implementation / test / refactor / analysis ...
+	      "status": "PENDING", // PENDING / READY / RUNNING / SUCCEEDED / FAILED / CANCELED / SKIPPED / BLOCKED / RETRY_WAIT
+	      "created_at": "2025-12-11T07:05:00Z",
+	      "updated_at": "2025-12-11T07:05:00Z",
+	      "scheduled_by": "scheduler",
+	      "assigned_agent": "agent:codex",
+	      "priority": 100,
+	      "inputs": {
+	        "goal": "node-auth を acceptance_criteria を満たすよう実装・テストすること",
+	        "attempt_count": 0,
+	        "runner_max_loops": 5,
+	        "runner_worker_kind": "codex-cli",
+	        "constraints": [
+	          "既存 API 構成を変更しないこと",
+	          "ユニットテストを追加すること"
+	        ]
+	      },
+	      "outputs": {
+	        "status": "unknown",
+	        "artifacts": {}
+	      }
+	    }
+	  ],
   "queue_meta": {
     "last_scheduled_at": "2025-12-11T07:05:00Z",
     "next_task_id_seq": 1235
   }
 }
 ```
+
+**inputs の予約キー（実装準拠）**:
+
+- `attempt_count`: 試行回数（`ExecutionOrchestrator` が開始時にインクリメント）。
+- `next_retry_at`: 次回リトライ予定時刻（`RETRY_WAIT` 時に設定）。
+- `runner_max_loops`: Executor が生成する TaskConfig YAML の `runner.max_loops` の上書き。
+- `runner_worker_kind`: Executor が生成する TaskConfig YAML の `runner.worker.kind` の上書き。
 
 #### 5.2.3 エージェント状態 (`state/agents.json`)
 

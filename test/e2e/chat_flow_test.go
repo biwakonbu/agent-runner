@@ -60,7 +60,7 @@ func TestChatFlow(t *testing.T) {
 	eventEmitter := &MockEventEmitter{}
 
 	// Initialize ChatHandler
-	handler := chat.NewHandler(metaClient, taskStore, sessionStore, wsID, projectRoot, eventEmitter)
+	handler := chat.NewHandler(metaClient, taskStore, sessionStore, wsID, projectRoot, nil, eventEmitter)
 
 	// 3. Create Session
 	ctx := context.Background()

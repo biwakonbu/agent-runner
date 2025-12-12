@@ -69,9 +69,9 @@ func TestRetryPersistence_Integration(t *testing.T) {
 		// Check processJob or HandleFailure implementation.
 		// If implementation sets it in Outputs or Inputs?
 		// Let's assume implementation logic.
-		// Wait, handled failure logic sets inputs["next_retry_at"].
+		// Wait, handled failure logic sets inputs[next_retry_at].
 
-		val, ok := loadedTask.Inputs["next_retry_at"]
+		val, ok := loadedTask.Inputs[InputKeyNextRetryAt]
 		assert.True(t, ok, "next_retry_at input missing")
 		retryTimeStr, ok := val.(string)
 		assert.True(t, ok)
@@ -92,14 +92,14 @@ func TestRetryPersistence_Integration(t *testing.T) {
 				NodeID:    "node-2",
 				Status:    string(TaskStatusRetryWait),
 				CreatedAt: now,
-				Inputs:    map[string]interface{}{"next_retry_at": pastTime.Format(time.RFC3339)},
+				Inputs:    map[string]interface{}{InputKeyNextRetryAt: pastTime.Format(time.RFC3339)},
 			},
 			{
 				TaskID:    "task-retry-future",
 				NodeID:    "node-future",
 				Status:    string(TaskStatusRetryWait),
 				CreatedAt: now,
-				Inputs:    map[string]interface{}{"next_retry_at": futureTime.Format(time.RFC3339)},
+				Inputs:    map[string]interface{}{InputKeyNextRetryAt: futureTime.Format(time.RFC3339)},
 			},
 		}, nil)
 		saveDesign(t, repo, []persistence.NodeDesign{{NodeID: "node-2"}, {NodeID: "node-future"}})
@@ -123,13 +123,13 @@ func TestRetryPersistence_Integration(t *testing.T) {
 
 		readyTask := taskMap["task-retry-2"]
 		assert.Equal(t, string(TaskStatusPending), readyTask.Status)
-		_, ok := readyTask.Inputs["next_retry_at"]
+		_, ok := readyTask.Inputs[InputKeyNextRetryAt]
 		assert.False(t, ok, "next_retry_at should be cleared")
 
 		// Verify DB state for future task
 		futureTask := taskMap["task-retry-future"]
 		assert.Equal(t, string(TaskStatusRetryWait), futureTask.Status)
-		_, ok = futureTask.Inputs["next_retry_at"]
+		_, ok = futureTask.Inputs[InputKeyNextRetryAt]
 		assert.True(t, ok, "next_retry_at should stay")
 	})
 }

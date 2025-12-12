@@ -57,7 +57,7 @@
 
 ### Executor / AgentRunner
 
-- **ハードコードされた設定**: `Executor` が生成する Task YAML の `max_loops` (5) や `worker.cli` ("codex") は現在コード内に固定されています (`internal/orchestrator/executor.go`)。
+- **デフォルト設定**: `Executor` が生成する Task YAML はデフォルトで `runner.max_loops: 5` と `runner.worker.kind: "codex-cli"` を設定します（`state/tasks.json` の `inputs.runner_max_loops` / `inputs.runner_worker_kind` で上書き可能）。
 - **Worker 環境**: 現在は Docker ベースの実行のみサポート。
 
 ### IPC

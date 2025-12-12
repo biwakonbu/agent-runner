@@ -74,11 +74,12 @@ task:
     # cwd: "./"                     # 任意。テスト実行ディレクトリ
 
 runner:
+  max_loops: 10 # 任意。最大ループ回数（未指定時のデフォルト: 10）
+
   meta:
     kind: "openai-chat" # v1 は固定想定
     model: "gpt-5.1" # 任意。プロバイダのモデルIDを直接指定
     # system_prompt: |              # 任意。Meta 用 system prompt を上書き
-    max_loops: 5 # 任意。最大ループ回数（デフォルト: 5）
 
   worker:
     kind: "codex-cli" # v1 は "codex-cli" 固定
@@ -105,7 +106,7 @@ runner:
 | `task.dependencies`              | [] (なし)                         |
 | `runner.meta.kind`               | `"openai-chat"`                   |
 | `runner.meta.model`              | `gpt-5.1` (プロバイダのモデル ID) |
-| `runner.meta.max_loops`          | `5`                               |
+| `runner.max_loops`              | `10`                              |
 | `runner.worker.kind`             | `"codex-cli"`                     |
 | `runner.worker.docker_image`     | デフォルトイメージ                |
 | `runner.worker.max_run_time_sec` | `1800` (30 分)                    |
@@ -237,9 +238,9 @@ stateDiagram-v2
 
 ### 4.4 ループ制御
 
-`runner.meta.max_loops` で最大ループ回数を制御します。
+`runner.max_loops` で最大ループ回数を制御します。
 
-- デフォルト: 5 回
+- デフォルト: 10 回
 - VALIDATING → RUNNING の遷移回数がこの値を超えると FAILED に遷移
 
 ## 5. Task Note フォーマット
