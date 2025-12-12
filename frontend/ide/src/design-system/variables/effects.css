@@ -111,6 +111,7 @@
      テキストシャドウ（セマンティック）
      ======================================== */
   --mv-text-shadow-base: 0 0 2px rgba(0, 0, 0, 0.8);
+  --mv-text-shadow-title: 0 1px 2px rgba(0, 0, 0, 0.5);
   --mv-text-shadow-base-white: var(--mv-text-shadow-base),
     0 0 12px rgba(255, 255, 255, 0.1);
   --mv-text-shadow-hover-white: 0 0 1px rgba(0, 0, 0, 0.5),

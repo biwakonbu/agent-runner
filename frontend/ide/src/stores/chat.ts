@@ -166,7 +166,7 @@ const chatStore = {
             try {
                 const history = await GetChatHistory(sessionId!) as unknown as ChatMessage[];
                 chatMessages.setMessages(history);
-            } catch (ignore) {}
+            } catch {}
             return null;
         } finally {
             isChatLoading.set(false);

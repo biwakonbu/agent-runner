@@ -342,7 +342,7 @@
     color: var(--mv-color-text-primary);
     line-height: var(--mv-line-height-normal);
     flex: 1;
-    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+    text-shadow: var(--mv-text-shadow-title);
 
     /* 3行まで表示してclamp */
     display: -webkit-box;
