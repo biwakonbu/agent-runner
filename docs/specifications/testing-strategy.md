@@ -51,9 +51,9 @@ go test -v ./test/e2e/...
 v2.0 のチャット駆動タスク生成フローは、LLM (Meta-agent) の出力に依存するため、安定した E2E テストが困難です。
 したがって、以下の戦略を採用します。
 
-- **モックベース統合テスト**: `ChatHandler` に対し、モック化された Meta-agent から固定の `DecomposeResponse` を返し、適切に `Task` が生成・保存されるかを検証します。
+- **モックベース統合テスト**: `ChatHandler` に対し、モック化された Meta-agent から固定の `PlanPatchResponse` を返し、適切に `Task` が生成・保存されるかを検証します。
 - **カバレッジ**:
-  - `decompose` プロトコルによるタスク生成
+  - `plan_patch` プロトコルによるタスク生成/更新
   - 依存関係（Dependency）の解決
   - `SuggestedImpl` などの V2 フィールドの保存
 

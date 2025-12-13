@@ -13,136 +13,155 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// CLIProvider は CLI ベースの LLM プロバイダを抽象化するインターフェース
-type CLIProvider interface {
-	Name() string
-	Decompose(ctx context.Context, req *DecomposeRequest) (*DecomposeResponse, error)
-	PlanTask(ctx context.Context, prdText string) (*PlanTaskResponse, error)
-	NextAction(ctx context.Context, taskSummary *TaskSummary) (*NextActionResponse, error)
-	CompletionAssessment(ctx context.Context, taskSummary *TaskSummary) (*CompletionAssessmentResponse, error)
-	TestConnection(ctx context.Context) error
-}
-
-// DefaultMetaAgentTimeout は Meta-agent 用のデフォルトタイムアウト（10分）
-// Codex CLI での LLM 処理は時間がかかるため、十分な時間を確保する
+// DefaultMetaAgentTimeout is 10 minutes for Meta processing
 const DefaultMetaAgentTimeout = 10 * time.Minute
 
-// CodexCLIProvider は Codex CLI を使用するプロバイダ
-type CodexCLIProvider struct {
+// CLIProvider supports generic LLM CLIs (codex, claude) using agenttools
+type CLIProvider struct {
+	kind         string // "codex-cli", "claude-cli" or just "claude"
+	cliPath      string // executable name or path
 	model        string
 	systemPrompt string
 	logger       *slog.Logger
 }
 
-// NewCodexCLIProvider は新しい Codex CLI プロバイダを作成する
-func NewCodexCLIProvider(model, systemPrompt string) *CodexCLIProvider {
-	return &CodexCLIProvider{
+// Ensure CLIProvider implements Provider interface
+var _ Provider = (*CLIProvider)(nil)
+
+// NewCLIProvider creates a new CLI provider
+func NewCLIProvider(kind, model, systemPrompt string) *CLIProvider {
+	// Determine CLI path based on kind
+	cliPath := "codex"
+	if strings.Contains(kind, "claude") {
+		cliPath = "claude"
+	}
+
+	// Default models if empty
+	if model == "" {
+		if strings.Contains(kind, "claude") {
+			model = agenttools.DefaultClaudeModel
+		} else {
+			model = "gpt-5.2" // fallback for codex
+		}
+	}
+
+	return &CLIProvider{
+		kind:         kind,
+		cliPath:      cliPath,
 		model:        model,
 		systemPrompt: systemPrompt,
-		logger:       logging.WithComponent(slog.Default(), "meta-codex-cli"),
+		logger:       logging.WithComponent(slog.Default(), "meta-cli-"+kind),
 	}
 }
 
-// SetLogger はカスタムロガーを設定する
-func (p *CodexCLIProvider) SetLogger(logger *slog.Logger) {
-	p.logger = logging.WithComponent(logger, "meta-codex-cli")
+// SetLogger sets custom logger
+func (p *CLIProvider) SetLogger(logger *slog.Logger) {
+	p.logger = logging.WithComponent(logger, "meta-cli-"+p.kind)
 }
 
-// Name はプロバイダ名を返す
-func (p *CodexCLIProvider) Name() string {
-	return "codex-cli"
+// Name returns provider Kind
+func (p *CLIProvider) Name() string {
+	return p.kind
 }
 
-// TestConnection は Codex CLI セッションの存在を検証する
-func (p *CodexCLIProvider) TestConnection(ctx context.Context) error {
+// TestConnection verifies CLI availability
+func (p *CLIProvider) TestConnection(ctx context.Context) error {
 	logger := logging.WithTraceID(p.logger, ctx)
 
-	// codex --version または codex auth status でセッション確認
-	cmd := exec.CommandContext(ctx, "codex", "--version")
+	// Check version to verify installation and session (sometimes version check is enough, sometimes need auth status)
+	// For now, version check is safe.
+	cmd := exec.CommandContext(ctx, p.cliPath, "--version")
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		logger.Error("codex CLI not found or not authenticated",
+		logger.Error("CLI not found or error",
+			slog.String("command", p.cliPath),
 			slog.String("output", string(output)),
 			slog.Any("error", err),
 		)
-		return fmt.Errorf("codex CLI セッションが見つかりません: %w (出力: %s)", err, string(output))
+		return fmt.Errorf("%s CLI session check failed: %w (Output: %s)", p.cliPath, err, string(output))
 	}
 
-	logger.Info("codex CLI session verified", slog.String("version_output", strings.TrimSpace(string(output))))
+	logger.Info("CLI session verified",
+		slog.String("provider", p.kind),
+		slog.String("version_output", strings.TrimSpace(string(output))))
 	return nil
 }
 
-// callCodexExec は codex exec コマンドを実行し、YAML 応答を取得する
-// agenttools パッケージを使用して共通のフラグ構築ロジックを適用する。
-func (p *CodexCLIProvider) callCodexExec(ctx context.Context, systemPrompt, userPrompt string) (string, error) {
+// callExec calls the CLI using agenttools wrapper
+func (p *CLIProvider) callExec(ctx context.Context, systemPrompt, userPrompt string) (string, error) {
 	logger := logging.WithTraceID(p.logger, ctx)
 	start := time.Now()
 
-	// システムプロンプトとユーザープロンプトを結合
+	// Combine system and user prompt for CLI
 	fullPrompt := systemPrompt + "\n\n" + userPrompt
-
-	// agenttools を使用して ExecPlan を生成
-	model := p.model
-	if model == "" {
-		model = agenttools.DefaultMetaModel // Meta-agent 用デフォルト
-	}
 
 	req := agenttools.Request{
 		Prompt:          fullPrompt,
-		Model:           model,
+		Model:           p.model,
 		ReasoningEffort: agenttools.DefaultReasoningEffort,
-		Timeout:         DefaultMetaAgentTimeout, // LLM 処理に十分な時間を確保
-		UseStdin:        true,                    // 長いプロンプトは stdin で渡す
+		Timeout:         DefaultMetaAgentTimeout,
+		UseStdin:        true,
 		ToolSpecific: map[string]interface{}{
-			"docker_mode": false, // ホスト上で直接実行
-			"json_output": false, // Meta-agent は YAML 出力を期待
+			"docker_mode": false,
 		},
 	}
 
-	provider := agenttools.NewCodexProvider(agenttools.ProviderConfig{
-		Kind:  "codex-cli",
-		Model: model,
-	})
-
-	plan, err := provider.Build(ctx, req)
-	if err != nil {
-		logger.Error("failed to build exec plan", slog.Any("error", err))
-		return "", fmt.Errorf("ExecPlan 構築失敗: %w", err)
+	// Determine provider kind for agenttools
+	// If kind contains "claude", use "claude-code" for agenttools mapping
+	// If kind contains "codex", use "codex-cli"
+	agentToolKind := "codex-cli"
+	if strings.Contains(p.kind, "claude") {
+		agentToolKind = "claude-code"
 	}
 
-	logger.Info("calling codex CLI",
+	providerConfig := agenttools.ProviderConfig{
+		Kind:    agentToolKind,
+		Model:   p.model,
+		CLIPath: p.cliPath,
+	}
+
+	// Create tool provider
+	var toolProvider agenttools.AgentToolProvider
+	if agentToolKind == "claude-code" {
+		toolProvider = agenttools.NewClaudeProvider(providerConfig)
+	} else {
+		toolProvider = agenttools.NewCodexProvider(providerConfig)
+	}
+
+	plan, err := toolProvider.Build(ctx, req)
+	if err != nil {
+		logger.Error("failed to build exec plan", slog.Any("error", err))
+		return "", fmt.Errorf("ExecPlan build failed: %w", err)
+	}
+
+	logger.Info("calling CLI",
+		slog.String("command", p.cliPath),
 		slog.Int("prompt_length", len(fullPrompt)),
-		slog.String("model", model),
-	)
-	logger.Debug("codex exec plan",
-		slog.String("command", plan.Command),
-		slog.Any("args", plan.Args),
+		slog.String("model", p.model),
 	)
 
-	// agenttools.Execute を使用してコマンドを実行
 	result := agenttools.Execute(ctx, plan)
 	if result.Error != nil {
-		logger.Error("codex CLI call failed",
+		logger.Error("CLI call failed",
 			slog.String("output", result.Output),
 			slog.Int("exit_code", result.ExitCode),
 			slog.Any("error", result.Error),
 			logging.LogDuration(start),
 		)
-		return "", fmt.Errorf("codex CLI 呼び出し失敗: %w (出力: %s)", result.Error, result.Output)
+		return "", fmt.Errorf("CLI call failed: %w (Output: %s)", result.Error, result.Output)
 	}
 
 	response := strings.TrimSpace(result.Output)
-	logger.Info("codex CLI call completed",
+	logger.Info("CLI call completed",
 		slog.Int("response_length", len(response)),
 		logging.LogDuration(start),
 	)
-	logger.Debug("codex CLI response", slog.String("response", response))
 
 	return response, nil
 }
 
-// Decompose はユーザー入力からタスクを分解する
-func (p *CodexCLIProvider) Decompose(ctx context.Context, req *DecomposeRequest) (*DecomposeResponse, error) {
+// Decompose delegates to callExec and extracts response
+func (p *CLIProvider) Decompose(ctx context.Context, req *DecomposeRequest) (*DecomposeResponse, error) {
 	logger := logging.WithTraceID(p.logger, ctx)
 
 	systemPrompt := decomposeSystemPrompt
@@ -151,20 +170,12 @@ func (p *CodexCLIProvider) Decompose(ctx context.Context, req *DecomposeRequest)
 	}
 	userPrompt := buildDecomposeUserPrompt(req)
 
-	logger.Info("calling codex CLI for decompose",
-		slog.String("user_input_length", fmt.Sprintf("%d", len(req.UserInput))),
-		slog.Int("existing_tasks", len(req.Context.ExistingTasks)),
-	)
-
-	resp, err := p.callCodexExec(ctx, systemPrompt, userPrompt)
+	resp, err := p.callExec(ctx, systemPrompt, userPrompt)
 	if err != nil {
-		return nil, fmt.Errorf("codex CLI call failed: %w", err)
+		return nil, err
 	}
 
-	// JSON を抽出（Codex CLI は JSON を出力する）
 	jsonStr := extractJSON(resp)
-
-	// JSON を YAML に変換して既存のパースロジックを使用
 	yamlStr, err := jsonToYAML(jsonStr)
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert JSON to YAML: %w\nJSON: %s", err, jsonStr)
@@ -187,14 +198,56 @@ func (p *CodexCLIProvider) Decompose(ctx context.Context, req *DecomposeRequest)
 
 	logger.Info("decompose completed",
 		slog.Int("phases", len(decompose.Phases)),
-		slog.Int("potential_conflicts", len(decompose.PotentialConflicts)),
 	)
 
 	return &decompose, nil
 }
 
-// PlanTask は PRD から受け入れ条件を生成する
-func (p *CodexCLIProvider) PlanTask(ctx context.Context, prdText string) (*PlanTaskResponse, error) {
+// PlanPatch delegates to callExec
+func (p *CLIProvider) PlanPatch(ctx context.Context, req *PlanPatchRequest) (*PlanPatchResponse, error) {
+	logger := logging.WithTraceID(p.logger, ctx)
+
+	systemPrompt := planPatchSystemPrompt
+	if p.systemPrompt != "" {
+		systemPrompt = p.systemPrompt
+	}
+	userPrompt := buildPlanPatchUserPrompt(req)
+
+	resp, err := p.callExec(ctx, systemPrompt, userPrompt)
+	if err != nil {
+		return nil, err
+	}
+
+	jsonStr := extractJSON(resp)
+	yamlStr, err := jsonToYAML(jsonStr)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert JSON to YAML: %w\nJSON: %s", err, jsonStr)
+	}
+
+	var msg MetaMessage
+	if err := yaml.Unmarshal([]byte(yamlStr), &msg); err != nil {
+		return nil, fmt.Errorf("failed to parse YAML: %w\nYAML: %s", err, yamlStr)
+	}
+
+	payloadBytes, err := yaml.Marshal(msg.Payload)
+	if err != nil {
+		return nil, err
+	}
+
+	var patch PlanPatchResponse
+	if err := yaml.Unmarshal(payloadBytes, &patch); err != nil {
+		return nil, fmt.Errorf("failed to parse plan_patch response: %w", err)
+	}
+
+	logger.Info("plan_patch completed",
+		slog.Int("operations", len(patch.Operations)),
+	)
+
+	return &patch, nil
+}
+
+// PlanTask delegates to callExec
+func (p *CLIProvider) PlanTask(ctx context.Context, prdText string) (*PlanTaskResponse, error) {
 	systemPrompt := `You are a Meta-agent that plans software development tasks.
 Your goal is to read a PRD and break it down into Acceptance Criteria.
 Output MUST be a YAML block with the following structure:
@@ -213,12 +266,11 @@ payload:
 	}
 	userPrompt := fmt.Sprintf("PRD:\n%s\n\nGenerate the plan.", prdText)
 
-	resp, err := p.callCodexExec(ctx, systemPrompt, userPrompt)
+	resp, err := p.callExec(ctx, systemPrompt, userPrompt)
 	if err != nil {
 		return nil, err
 	}
 
-	// Extract YAML from response
 	resp = extractYAML(resp)
 
 	var msg MetaMessage
@@ -238,8 +290,8 @@ payload:
 	return &plan, nil
 }
 
-// NextAction は次のアクションを決定する
-func (p *CodexCLIProvider) NextAction(ctx context.Context, taskSummary *TaskSummary) (*NextActionResponse, error) {
+// NextAction delegates to callExec
+func (p *CLIProvider) NextAction(ctx context.Context, taskSummary *TaskSummary) (*NextActionResponse, error) {
 	systemPrompt := `You are a Meta-agent that orchestrates a coding task.
 Decide the next action based on the current context.
 Output MUST be a YAML block with type: next_action.
@@ -252,12 +304,11 @@ Output MUST be a YAML block with type: next_action.
 
 	userPrompt := fmt.Sprintf("Context:\n%s\n\nDecide next action.", contextSummary)
 
-	resp, err := p.callCodexExec(ctx, systemPrompt, userPrompt)
+	resp, err := p.callExec(ctx, systemPrompt, userPrompt)
 	if err != nil {
 		return nil, err
 	}
 
-	// Extract YAML from response
 	resp = extractYAML(resp)
 
 	var msg MetaMessage
@@ -277,34 +328,21 @@ Output MUST be a YAML block with type: next_action.
 	return &action, nil
 }
 
-// CompletionAssessment はタスク完了を評価する
-func (p *CodexCLIProvider) CompletionAssessment(ctx context.Context, taskSummary *TaskSummary) (*CompletionAssessmentResponse, error) {
+// CompletionAssessment delegates to callExec
+func (p *CLIProvider) CompletionAssessment(ctx context.Context, taskSummary *TaskSummary) (*CompletionAssessmentResponse, error) {
 	systemPrompt := `You are a Meta-agent evaluating task completion.
 Review the Acceptance Criteria and Worker execution results.
 Output MUST be a YAML block with type: completion_assessment.
-
-Example format:
-type: completion_assessment
-version: 1
-payload:
-  all_criteria_satisfied: true
-  summary: "All acceptance criteria met"
-  by_criterion:
-    - id: "AC-1"
-      status: "passed"
-      comment: "Feature X successfully implemented"
 `
 	if p.systemPrompt != "" {
 		systemPrompt = p.systemPrompt
 	}
 
-	// Format acceptance criteria for LLM
 	acText := ""
 	for _, ac := range taskSummary.AcceptanceCriteria {
 		acText += fmt.Sprintf("- %s: %s\n", ac.ID, ac.Description)
 	}
 
-	// Format worker runs for LLM
 	workerText := ""
 	for _, run := range taskSummary.WorkerRuns {
 		workerText += fmt.Sprintf("- Run %s: exit_code=%d, summary=%s\n", run.ID, run.ExitCode, run.Summary)
@@ -322,12 +360,11 @@ Worker Execution Results:
 Evaluate whether all acceptance criteria are satisfied.`,
 		taskSummary.Title, taskSummary.State, acText, workerText)
 
-	resp, err := p.callCodexExec(ctx, systemPrompt, userPrompt)
+	resp, err := p.callExec(ctx, systemPrompt, userPrompt)
 	if err != nil {
 		return nil, err
 	}
 
-	// Extract YAML from response
 	resp = extractYAML(resp)
 
 	var msg MetaMessage

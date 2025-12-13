@@ -20,22 +20,28 @@ import (
 type MockMetaClient struct{}
 
 func (m *MockMetaClient) Decompose(ctx context.Context, req *meta.DecomposeRequest) (*meta.DecomposeResponse, error) {
-	// Simulate decomposing "TODO アプリを作成して"
-	return &meta.DecomposeResponse{
+	return nil, fmt.Errorf("not implemented")
+}
+
+func (m *MockMetaClient) PlanPatch(ctx context.Context, req *meta.PlanPatchRequest) (*meta.PlanPatchResponse, error) {
+	title := "TODO アプリを作成して"
+	desc := "TODO アプリを作成して。技術スタックや実装方針、検証方法はあなたの判断に任せます。"
+	wbs := 1
+	phase := "Implementation"
+	milestone := "M1"
+	return &meta.PlanPatchResponse{
 		Understanding: "TODO アプリ作成の依頼を理解しました。",
-		Phases: []meta.DecomposedPhase{
+		Operations: []meta.PlanOperation{
 			{
-				Name: "Implementation",
-				Tasks: []meta.DecomposedTask{
-					{
-						ID:          "temp-task-1",
-						Title:       "TODO アプリを作成して",
-						Description: "TODO アプリを作成して。技術スタックや実装方針、検証方法はあなたの判断に任せます。",
-						WBSLevel:    1,
-						AcceptanceCriteria: []string{
-							"アプリが起動すること",
-						},
-					},
+				Op:          meta.PlanOpCreate,
+				TempID:      "temp-task-1",
+				Title:       &title,
+				Description: &desc,
+				WBSLevel:    &wbs,
+				PhaseName:   &phase,
+				Milestone:   &milestone,
+				AcceptanceCriteria: []string{
+					"アプリが起動すること",
 				},
 			},
 		},

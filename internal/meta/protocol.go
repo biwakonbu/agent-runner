@@ -103,6 +103,9 @@ type ExistingTaskSummary struct {
 	Status       string   `yaml:"status" json:"status"`
 	Dependencies []string `yaml:"dependencies,omitempty" json:"dependencies,omitempty"`
 	PhaseName    string   `yaml:"phase_name,omitempty" json:"phase_name,omitempty"`
+	Milestone    string   `yaml:"milestone,omitempty" json:"milestone,omitempty"`
+	WBSLevel     int      `yaml:"wbs_level,omitempty" json:"wbs_level,omitempty"`
+	ParentID     *string  `yaml:"parent_id,omitempty" json:"parent_id,omitempty"`
 }
 
 // ConversationMessage はチャット履歴の1メッセージ
@@ -149,4 +152,81 @@ type PotentialConflict struct {
 	File    string   `yaml:"file" json:"file"`       // 対象ファイル
 	Tasks   []string `yaml:"tasks" json:"tasks"`     // 関連タスクID
 	Warning string   `yaml:"warning" json:"warning"` // 警告メッセージ
+}
+
+// ============================================================================
+// Plan Patch Protocol (v1.0): 既存計画のCRUD/移動
+// ============================================================================
+
+// PlanPatchRequest は既存の計画（タスク/WBS）に対する変更を要求するリクエスト
+type PlanPatchRequest struct {
+	UserInput string           `yaml:"user_input" json:"user_input"`
+	Context   PlanPatchContext `yaml:"context" json:"context"`
+}
+
+// PlanPatchContext は計画更新時のコンテキスト情報
+type PlanPatchContext struct {
+	WorkspacePath       string                `yaml:"workspace_path" json:"workspace_path"`
+	ExistingTasks       []ExistingTaskSummary `yaml:"existing_tasks" json:"existing_tasks"`
+	ExistingWBS         *WBSOverview          `yaml:"existing_wbs,omitempty" json:"existing_wbs,omitempty"`
+	ConversationHistory []ConversationMessage `yaml:"conversation_history" json:"conversation_history"`
+}
+
+// WBSOverview は Meta に渡すWBSの最小表現
+type WBSOverview struct {
+	RootNodeID string         `yaml:"root_node_id" json:"root_node_id"`
+	NodeIndex  []WBSNodeIndex `yaml:"node_index" json:"node_index"`
+}
+
+type WBSNodeIndex struct {
+	NodeID   string   `yaml:"node_id" json:"node_id"`
+	ParentID *string  `yaml:"parent_id" json:"parent_id"`
+	Children []string `yaml:"children" json:"children"`
+}
+
+// PlanPatchResponse は計画更新の結果
+type PlanPatchResponse struct {
+	Understanding      string              `yaml:"understanding" json:"understanding"`
+	Operations         []PlanOperation     `yaml:"operations" json:"operations"`
+	PotentialConflicts []PotentialConflict `yaml:"potential_conflicts" json:"potential_conflicts"`
+}
+
+type PlanOperationType string
+
+const (
+	PlanOpCreate PlanOperationType = "create"
+	PlanOpUpdate PlanOperationType = "update"
+	PlanOpDelete PlanOperationType = "delete"
+	PlanOpMove   PlanOperationType = "move"
+)
+
+// PlanOperation は計画に対する単一の変更操作
+//
+// - create: temp_id を使い、実際のID割当は Core 側で行う
+// - update/delete/move: task_id は既存のIDを指定する
+type PlanOperation struct {
+	Op     PlanOperationType `yaml:"op" json:"op"`
+	TempID string            `yaml:"temp_id,omitempty" json:"temp_id,omitempty"`
+	TaskID string            `yaml:"task_id,omitempty" json:"task_id,omitempty"`
+
+	Title              *string        `yaml:"title,omitempty" json:"title,omitempty"`
+	Description        *string        `yaml:"description,omitempty" json:"description,omitempty"`
+	AcceptanceCriteria []string       `yaml:"acceptance_criteria,omitempty" json:"acceptance_criteria,omitempty"`
+	Dependencies       []string       `yaml:"dependencies,omitempty" json:"dependencies,omitempty"`
+	WBSLevel           *int           `yaml:"wbs_level,omitempty" json:"wbs_level,omitempty"`
+	PhaseName          *string        `yaml:"phase_name,omitempty" json:"phase_name,omitempty"`
+	Milestone          *string        `yaml:"milestone,omitempty" json:"milestone,omitempty"`
+	SuggestedImpl      *SuggestedImpl `yaml:"suggested_impl,omitempty" json:"suggested_impl,omitempty"`
+
+	ParentID *string      `yaml:"parent_id,omitempty" json:"parent_id,omitempty"`
+	Position *WBSPosition `yaml:"position,omitempty" json:"position,omitempty"`
+	Cascade  bool         `yaml:"cascade,omitempty" json:"cascade,omitempty"`
+}
+
+// WBSPosition は siblings 内での挿入位置を表す
+// index/before/after は排他的（いずれか1つのみ指定）。
+type WBSPosition struct {
+	Index  *int   `yaml:"index,omitempty" json:"index,omitempty"`
+	Before string `yaml:"before,omitempty" json:"before,omitempty"`
+	After  string `yaml:"after,omitempty" json:"after,omitempty"`
 }

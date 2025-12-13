@@ -7,7 +7,9 @@ import (
 
 // DefaultClaudeModel defines the default model for Claude Code.
 // 参照: https://docs.anthropic.com/en/docs/claude-code
-const DefaultClaudeModel = "claude-3-5-sonnet-20241022"
+// DefaultClaudeModel defines the default model for Claude Code.
+// 参照: https://docs.anthropic.com/en/docs/claude-code
+const DefaultClaudeModel = "claude-3-5-haiku-20241022"
 
 // ClaudeProvider builds ExecPlan for Claude Code CLI.
 // Wrapper for `claude-code` or `claude` CLI.
@@ -37,7 +39,7 @@ func (p *ClaudeProvider) Capabilities() Capability {
 		Kind:          p.Kind(),
 		DefaultModel:  nonEmpty(p.model, DefaultClaudeModel),
 		SupportsStdin: true,
-		Notes:         "Claude Code CLI wrapper. Assumes `claude [prompt]` interface.",
+		Notes:         "Claude Code CLI wrapper. Assumes `claude -p [prompt]` interface.",
 	}
 }
 
@@ -58,19 +60,14 @@ func (p *ClaudeProvider) Build(_ context.Context, req Request) (ExecPlan, error)
 		return ExecPlan{}, fmt.Errorf("%w: %s (only 'exec' is supported)", ErrUnsupportedMode, mode)
 	}
 
+	// CLI実行フラグ構築
+	// 重要: 非対話型で実行するために -p (--print) が必須
 	args := []string{}
 
-	// Claude Code CLIは--jsonフラグをサポートしていない
-	// 出力を構造化する場合は --output-format json を使用
-
 	// Model specification
-	if p.model != "" || req.Model != "" {
-		model := nonEmpty(req.Model, p.model)
-		args = append(args, "--model", model)
-	}
-
-	// Temperature: Claude Code CLIは --temperature フラグをサポートしていない
-	// system prompt: --system-prompt / --append-system-prompt
+	// デフォルトモデルも明示的に渡す（CLI側のデフォルトが変わっても影響を受けないように）
+	model := nonEmpty(req.Model, p.model, DefaultClaudeModel)
+	args = append(args, "--model", model)
 
 	// Extra flags
 	args = append(args, p.flags...)
@@ -78,7 +75,6 @@ func (p *ClaudeProvider) Build(_ context.Context, req Request) (ExecPlan, error)
 
 	plan := ExecPlan{
 		Command: p.cliPath,
-		Args:    args,
 		Env:     mergeEnv(p.env, req.ExtraEnv),
 		Workdir: req.Workdir,
 		Timeout: req.Timeout,
@@ -86,14 +82,16 @@ func (p *ClaudeProvider) Build(_ context.Context, req Request) (ExecPlan, error)
 
 	// Prompt handling
 	if req.UseStdin {
-		// Piped input
-		// echo "prompt" | claude
+		// Piped prompt (stdin).
+		// Conventions across providers: pass "-" as a placeholder and stream the prompt via stdin.
+		args = append(args, "-p", "-")
 		plan.Stdin = req.Prompt
-		// args usually don't need "-" for simplified CLIs, but depends.
-		// If claude-code detects stdin, it uses it.
 	} else {
-		plan.Args = append(plan.Args, req.Prompt)
+		// Normal argument execution
+		args = append(args, "-p", req.Prompt)
 	}
+
+	plan.Args = args
 
 	return plan, nil
 }

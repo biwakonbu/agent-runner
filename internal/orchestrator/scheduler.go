@@ -106,7 +106,9 @@ func (s *Scheduler) allDependenciesSatisfied(task *persistence.TaskState) bool {
 
 	completedNodes := make(map[string]bool)
 	for _, nr := range nodesRuntime.Nodes {
-		if nr.Status == "implemented" || nr.Status == "verified" {
+		// 定数を使用してステータス比較（スペルミス防止）
+		status := persistence.NodeRuntimeStatus(nr.Status)
+		if status.IsCompleted() {
 			completedNodes[nr.NodeID] = true
 		}
 	}

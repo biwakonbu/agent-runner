@@ -38,6 +38,28 @@ Go 言語での実装ガイドを提供します。
   - データ変換
   - エラーフロー
 
+### [task-execution-and-visual-grouping.md](task-execution-and-visual-grouping.md)
+
+タスクの「計画→実行」遷移と、IDE 上での多軸グルーピング/フィルタリング設計を説明します。
+
+- **対象読者**: 実装者、UI/UX 設計者
+- **内容**:
+  - Planning と Execution の責務分離
+  - 分類メタデータ（Facet）設計
+  - Backend API / Frontend 表示方針
+  - 既存ワークスペースの互換・移行方針
+
+### [chat-autopilot.md](chat-autopilot.md)
+
+自然な会話だけで「計画→実行→質問→継続」を回すための Chat Autopilot 設計です。
+
+- **対象読者**: 実装者、プロダクト設計者
+- **内容**:
+  - Autopilot の責務とデータフロー
+  - 自然言語での停止/再開/状況確認
+  - 質問（Backlog）を会話に統合する方針
+  - 既存 Orchestrator/Runner との整合
+
 ## 設計の読み方
 
 1. [architecture.md](architecture.md) でシステム全体像を把握

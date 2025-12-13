@@ -181,18 +181,31 @@ func (e *Executor) Start(ctx context.Context) error {
 	}
 
 	// Verify Codex CLI session before starting container
-	if err := e.verifyCodexSession(ctx); err != nil {
-		logger.Error("codex CLI session verification failed",
-			slog.Any("error", err),
-			slog.String("hint", "codex login で認証するか ~/.codex/auth.json を用意してください"),
-		)
-		// セッションなしは致命的とみなし、IDE 側に伝播させる
-		return fmt.Errorf("Codex CLI セッションがありません: %w", err)
+	if e.Config.Kind == "claude-code" {
+		if err := e.verifyClaudeSession(ctx); err != nil {
+			logger.Error("claude session verification failed",
+				slog.Any("error", err),
+				slog.String("hint", "claude login で認証してください"),
+			)
+			return fmt.Errorf("Claude Code セッションがありません: %w", err)
+		}
+	} else if e.Config.Kind == "codex-cli" || e.Config.Kind == "" {
+		if err := e.verifyCodexSession(ctx); err != nil {
+			logger.Error("codex CLI session verification failed",
+				slog.Any("error", err),
+				slog.String("hint", "codex login で認証するか ~/.codex/auth.json を用意してください"),
+			)
+			return fmt.Errorf("Codex CLI セッションがありません: %w", err)
+		}
 	}
 
 	image := e.Config.DockerImage
 	if image == "" {
-		image = "ghcr.io/biwakonbu/agent-runner-codex:latest" // Default
+		if e.Config.Kind == "claude-code" {
+			image = "ghcr.io/biwakonbu/agent-runner-claude:latest"
+		} else {
+			image = "ghcr.io/biwakonbu/agent-runner-codex:latest"
+		}
 	}
 
 	// Resolve RepoPath to absolute path
@@ -213,7 +226,13 @@ func (e *Executor) Start(ctx context.Context) error {
 	)
 
 	start := time.Now()
-	containerID, err := e.Sandbox.StartContainer(ctx, image, repoPath, nil)
+	// Pass internal auth path via env if configured
+	startEnv := make(map[string]string)
+	if e.Config.AuthPath != "" {
+		startEnv["__INTERNAL_CLAUDE_AUTH_PATH"] = e.Config.AuthPath
+	}
+
+	containerID, err := e.Sandbox.StartContainer(ctx, image, repoPath, startEnv)
 	if err != nil {
 		logger.Error("failed to start container",
 			slog.String("image", image),
@@ -262,6 +281,46 @@ func (e *Executor) verifyCodexSession(ctx context.Context) error {
 
 	// CLI は存在するが、セッション情報が不明
 	return fmt.Errorf("codex CLI セッションが検出できません。`codex login` で認証を完了してください。出力: %s", strings.TrimSpace(string(output)))
+}
+
+// verifyClaudeSession checks for Claude Code session existence
+func (e *Executor) verifyClaudeSession(ctx context.Context) error {
+	// 1. Check for Config path
+	homeDir, err := os.UserHomeDir()
+	foundConfig := false
+	if err == nil {
+		configPath := ""
+		if e.Config.AuthPath != "" {
+			// user configured path
+			if filepath.IsAbs(e.Config.AuthPath) {
+				configPath = e.Config.AuthPath
+			} else {
+				configPath = filepath.Join(homeDir, e.Config.AuthPath)
+			}
+		} else {
+			// default path: ~/.config/claude
+			configPath = filepath.Join(homeDir, ".config", "claude")
+		}
+
+		if _, err := os.Stat(configPath); err == nil {
+			foundConfig = true
+		}
+	}
+
+	if foundConfig {
+		return nil
+	}
+
+	// 2. Check claude --version
+	cmd := exec.CommandContext(ctx, "claude", "--version")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("claude CLI not found: %w", err)
+	}
+
+	// CLI exists but no auth file found.
+	// Since we rely on mounting the auth directory, we strictly need the directory.
+	return fmt.Errorf("claude authentication directory not found. Please run `claude login`. (claude version: %s)", strings.TrimSpace(string(output)))
 }
 
 // Stop stops the persistent container

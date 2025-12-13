@@ -26,6 +26,9 @@ type NodeDesign struct {
 	WBSID              string        `json:"wbs_id"`
 	Name               string        `json:"name"`
 	Summary            string        `json:"summary"`
+	PhaseName          string        `json:"phase_name,omitempty"`
+	Milestone          string        `json:"milestone,omitempty"`
+	WBSLevel           int           `json:"wbs_level,omitempty"`
 	Kind               string        `json:"kind"` // feature, refactor, bugfix, ...
 	Priority           string        `json:"priority"`
 	Estimate           Estimate      `json:"estimate"`
@@ -52,6 +55,23 @@ type SuggestedImpl struct {
 }
 
 // --- State Models ---
+
+// NodeRuntimeStatus はノードの実行時ステータスを表す定数
+type NodeRuntimeStatus string
+
+const (
+	NodeRuntimeStatusPlanned     NodeRuntimeStatus = "planned"
+	NodeRuntimeStatusInProgress  NodeRuntimeStatus = "in_progress"
+	NodeRuntimeStatusImplemented NodeRuntimeStatus = "implemented"
+	NodeRuntimeStatusVerified    NodeRuntimeStatus = "verified"
+	NodeRuntimeStatusBlocked     NodeRuntimeStatus = "blocked"
+	NodeRuntimeStatusObsolete    NodeRuntimeStatus = "obsolete"
+)
+
+// IsCompleted は依存解決に使える完了状態かどうかを返す
+func (s NodeRuntimeStatus) IsCompleted() bool {
+	return s == NodeRuntimeStatusImplemented || s == NodeRuntimeStatusVerified
+}
 
 type NodesRuntime struct {
 	Nodes []NodeRuntime `json:"nodes"`
@@ -104,7 +124,9 @@ type TaskState struct {
 
 type TaskOutputs struct {
 	Status    string                 `json:"status"`
-	Artifacts map[string]interface{} `json:"artifacts"` // Flexible artifacts
+	Artifacts map[string]interface{} `json:"artifacts"`       // Flexible artifacts
+	Files     []string               `json:"files,omitempty"` // 生成・変更されたファイルパス
+	Logs      []string               `json:"logs,omitempty"`  // 関連ログファイルパス
 }
 
 type QueueMeta struct {

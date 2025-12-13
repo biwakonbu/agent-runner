@@ -81,7 +81,7 @@ func (e *ExecutionOrchestrator) Start(ctx context.Context) error {
 	e.stateMu.Lock()
 	if e.state == ExecutionStateRunning {
 		e.stateMu.Unlock()
-		return fmt.Errorf("already running")
+		return nil // 冪等性: 既に実行中なら成功扱い
 	}
 	oldState := e.state
 	// 再スタートに備え stopCh を作り直す
@@ -395,21 +395,58 @@ func (e *ExecutionOrchestrator) processJob(ctx context.Context, job *ipc.Job) {
 				finishedAt = &finished
 			}
 			if attempt.Status == AttemptStatusSucceeded {
-				task.Status = string(TaskStatusSucceeded)
-				if err := e.markNodeImplemented(task.NodeID); err != nil {
-					e.logger.Warn("failed to update node runtime on success",
-						slog.String("node_id", task.NodeID),
+				// 依存解決前に現在の状態を保存
+				if err := e.Repo.State().SaveTasks(tasksState); err != nil {
+					e.logger.Error("failed to save tasks before dependency resolution",
+						slog.String("task_id", task.TaskID),
 						slog.Any("error", err),
 					)
 				}
-				e.updateLegacyTask(task.TaskID, func(t *Task) {
-					t.Status = TaskStatusSucceeded
-					t.DoneAt = finishedAt
-					t.AttemptCount = attemptCount
+
+				// ノードの実行時ステータスを更新（依存解決に必要）
+				if err := e.markNodeImplemented(task.NodeID); err != nil {
+					// ノード更新に失敗した場合、後続タスクが永遠にブロックされる
+					// 重大なエラーとして記録し、タスクをFAILEDにする
+					e.logger.Error("critical: failed to update node runtime on success, marking task as failed",
+						slog.String("node_id", task.NodeID),
+						slog.String("task_id", task.TaskID),
+						slog.Any("error", err),
+					)
+					task.Status = string(TaskStatusFailed)
+					e.updateLegacyTask(task.TaskID, func(t *Task) {
+						t.Status = TaskStatusFailed
+						t.DoneAt = finishedAt
+						t.AttemptCount = attemptCount
+					})
+				} else {
+					task.Status = string(TaskStatusSucceeded)
+					task.Outputs.Status = string(TaskStatusSucceeded) // 表記統一: "SUCCEEDED" に統一
+					// Artifacts を persistence.TaskState にも同期
 					if taskDTO.Artifacts != nil {
-						t.Artifacts = taskDTO.Artifacts
+						task.Outputs.Files = taskDTO.Artifacts.Files
+						task.Outputs.Logs = taskDTO.Artifacts.Logs
 					}
-				})
+					e.updateLegacyTask(task.TaskID, func(t *Task) {
+						t.Status = TaskStatusSucceeded
+						t.DoneAt = finishedAt
+						t.AttemptCount = attemptCount
+						if taskDTO.Artifacts != nil {
+							t.Artifacts = taskDTO.Artifacts
+						}
+					})
+
+					// task の変更内容を persistence に保存（dependencyResolution前）
+					// ここで保存することで、task.Status = SUCCEEDED が永続化される
+					if err := e.Repo.State().SaveTasks(tasksState); err != nil {
+						e.logger.Error("failed to save tasks before dependency resolution",
+							slog.String("task_id", task.TaskID),
+							slog.Any("error", err),
+						)
+					}
+
+					// 成功時：依存解決を即時実行して後続タスクを迅速に開始
+					e.triggerDependencyResolution()
+				}
 			} else if attempt.Status == AttemptStatusFailed {
 				task.Status = string(TaskStatusFailed)
 				e.updateLegacyTask(task.TaskID, func(t *Task) {
@@ -420,11 +457,13 @@ func (e *ExecutionOrchestrator) processJob(ctx context.Context, job *ipc.Job) {
 			}
 		}
 
-		if oldStatus != TaskStatus(task.Status) {
+		if task != nil && oldStatus != TaskStatus(task.Status) {
 			e.emitTaskStateChange(task.TaskID, oldStatus, TaskStatus(task.Status))
 		}
 
-		// Save
+		// 状態を保存
+		// 注: reload後の場合は taskポインターが古いメモリを指すため、
+		// task変更内容を反映させるため、ここで保存する
 		_ = e.Repo.State().SaveTasks(tasksState)
 	}
 
@@ -488,7 +527,7 @@ func (e *ExecutionOrchestrator) markNodeImplemented(nodeID string) error {
 
 	for i := range nodesRuntime.Nodes {
 		if nodesRuntime.Nodes[i].NodeID == nodeID {
-			nodesRuntime.Nodes[i].Status = "implemented"
+			nodesRuntime.Nodes[i].Status = string(persistence.NodeRuntimeStatusImplemented)
 			nodesRuntime.Nodes[i].Implementation.LastModifiedAt = now
 			nodesRuntime.Nodes[i].Implementation.LastModifiedBy = "agent-runner"
 			if nodesRuntime.Nodes[i].Implementation.Files == nil {
@@ -500,7 +539,7 @@ func (e *ExecutionOrchestrator) markNodeImplemented(nodeID string) error {
 
 	nodesRuntime.Nodes = append(nodesRuntime.Nodes, persistence.NodeRuntime{
 		NodeID: nodeID,
-		Status: "implemented",
+		Status: string(persistence.NodeRuntimeStatusImplemented),
 		Implementation: persistence.NodeImplementation{
 			Files:          []string{},
 			LastModifiedAt: now,
@@ -565,6 +604,32 @@ func (e *ExecutionOrchestrator) updateLegacyTask(taskID string, update func(t *T
 			slog.String("task_id", taskID),
 			slog.Any("error", err),
 		)
+	}
+}
+
+// triggerDependencyResolution はタスク成功時に依存解決を即時実行する
+// これにより後続タスクがポーリング間隔を待たずに開始できる
+func (e *ExecutionOrchestrator) triggerDependencyResolution() {
+	if e.Scheduler == nil {
+		return
+	}
+
+	// BLOCKED → PENDING（依存が満たされたタスク）
+	if unblocked, err := e.Scheduler.UpdateBlockedTasks(); err != nil {
+		e.logger.Warn("failed to update blocked tasks after success", slog.Any("error", err))
+	} else {
+		// emit は削除（Scheduler 側で L168 で発火済み）
+		if len(unblocked) > 0 {
+			e.logger.Info("unblocked tasks after dependency resolution",
+				slog.Int("count", len(unblocked)),
+				slog.Any("task_ids", unblocked),
+			)
+		}
+	}
+
+	// PENDING → READY → Queue（実行可能なタスク）
+	if _, err := e.Scheduler.ScheduleReadyTasks(); err != nil {
+		e.logger.Warn("failed to schedule ready tasks after success", slog.Any("error", err))
 	}
 }
 

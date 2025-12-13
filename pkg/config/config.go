@@ -61,5 +61,6 @@ type WorkerConfig struct {
 	Kind          string            `yaml:"kind"`
 	DockerImage   string            `yaml:"docker_image"`
 	MaxRunTimeSec int               `yaml:"max_run_time_sec"`
+	AuthPath      string            `yaml:"auth_path"`
 	Env           map[string]string `yaml:"env"`
 }

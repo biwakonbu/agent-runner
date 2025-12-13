@@ -512,13 +512,14 @@ classDiagram
       +save_workspace_meta(meta) void
     }
 
-    class DesignRepository {
-      +get_wbs() WBS
-      +save_wbs(WBS) void
-      +get_node(node_id) NodeDesign
-      +create_node(NodeDesign) void
-      +update_node(NodeDesign) void
-    }
+	    class DesignRepository {
+	      +get_wbs() WBS
+	      +save_wbs(WBS) void
+	      +get_node(node_id) NodeDesign
+	      +create_node(NodeDesign) void
+	      +update_node(NodeDesign) void
+	      +delete_node(node_id) void
+	    }
 
     class StateRepository {
       +get_nodes_runtime() NodesRuntime

@@ -448,3 +448,106 @@ type DecomposedTask struct {
     SuggestedImpl      *SuggestedImpl `yaml:"suggested_impl,omitempty"`
 }
 ```
+
+## 10. plan_patch プロトコル (v1.0)
+
+### 10.1 目的
+
+チャット入力に基づき、既存の計画（タスク一覧 + WBS）を **差分更新**するためのプロトコルです。
+
+- タスク整理に必要な **作成/更新/削除/移動**を 1 回の応答で表現する。
+- 既存タスクの重複生成を避ける（「再計画=追加」ではなく「再計画=編集」）。
+
+### 10.2 入力
+
+Core は以下の情報を Meta に渡します：
+
+- ユーザーの入力メッセージ
+- 既存タスク要約（ID/ステータス/依存/phase/milestone/wbs_level/parent_id）
+- 既存 WBS の概要（`root_node_id` + `node_index`）
+- 会話履歴
+
+### 10.3 出力 JSON
+
+```json
+{
+  "type": "plan_patch",
+  "version": 1,
+  "payload": {
+    "understanding": "ユーザーは不要タスクを削除し、順序を整理したい",
+    "operations": [
+      {
+        "op": "create",
+        "temp_id": "temp-001",
+        "title": "新しいタスク",
+        "description": "新規追加する作業",
+        "acceptance_criteria": ["完了条件が満たされる"],
+        "dependencies": [],
+        "wbs_level": 2,
+        "phase_name": "実装設計",
+        "milestone": "M1-Example",
+        "suggested_impl": {
+          "language": "go",
+          "file_paths": ["internal/example/new.go"],
+          "constraints": ["Keep backward compatibility"]
+        },
+        "parent_id": "node-root",
+        "position": { "after": "existing-task-id" }
+      },
+      {
+        "op": "update",
+        "task_id": "existing-task-id",
+        "title": "タイトルを更新"
+      },
+      {
+        "op": "move",
+        "task_id": "existing-task-id",
+        "parent_id": "node-root",
+        "position": { "index": 0 }
+      },
+      {
+        "op": "delete",
+        "task_id": "obsolete-task-id",
+        "cascade": false
+      }
+    ],
+    "potential_conflicts": []
+  }
+}
+```
+
+### 10.4 フィールド定義
+
+| フィールド | 型 | 必須 | 説明 |
+| --- | --- | --- | --- |
+| `type` | string | ✅ | 固定値: `"plan_patch"` |
+| `version` | int | ✅ | 固定値: `1` |
+| `payload.understanding` | string | ✅ | ユーザー意図の要約 |
+| `payload.operations` | array | ✅ | 計画変更操作の配列 |
+| `payload.potential_conflicts` | array | 任意 | 潜在的なコンフリクト情報 |
+
+**PlanOperation**:
+
+| フィールド | 型 | 必須 | 説明 |
+| --- | --- | --- | --- |
+| `op` | string | ✅ | `"create" / "update" / "delete" / "move"` |
+| `temp_id` | string | create のみ | 一時 ID（依存関係定義用）。Core 側で正式 ID を割り当てる |
+| `task_id` | string | update/delete/move のみ | 既存タスク ID |
+| `title` | string | create は推奨 | タイトル（update は部分更新） |
+| `description` | string | 任意 | 詳細説明（update は部分更新） |
+| `acceptance_criteria` | array | 任意 | 達成条件（update で指定された場合は **全置換**） |
+| `dependencies` | array | 任意 | 依存（update で指定された場合は **全置換**。空配列でクリア） |
+| `phase_name` | string | 任意 | フェーズ（facet） |
+| `milestone` | string | 任意 | マイルストーン（facet） |
+| `wbs_level` | int | 任意 | WBS レベル（facet） |
+| `suggested_impl` | object | 任意 | 実装ヒント |
+| `parent_id` | string | 任意 | WBS 親ノード ID（move/create） |
+| `position` | object | 任意 | siblings 内の位置（`index`/`before`/`after` のいずれか） |
+| `cascade` | bool | 任意 | delete の場合に子孫も削除するか |
+
+### 10.5 適用セマンティクス（MVP）
+
+- `create`: WBS/NodeDesign/TasksState を作成し、TaskStore に同期する。
+- `update`: NodeDesign/TaskStore を更新する。`dependencies`/`acceptance_criteria` は「指定された場合は全置換」。
+- `move`: WBS の `node_index` を更新し、並び・親子を反映する（IDE は WBS 順で表示できる）。
+- `delete`: **soft delete**（WBS と `state/tasks.json` から除外し、他ノードの依存から参照を除去）。履歴/監査のため NodeDesign/TaskStore は残り得る。

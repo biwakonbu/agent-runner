@@ -1,6 +1,6 @@
 # Task Builder & Golden Test 設計書
 
-本ドキュメントは、Multiverse IDE における「チャット入力 → decompose（WBS/Node/TaskState 生成） → TaskConfig YAML 生成 → AgentRunner 実行 → 結果反映」までの最小パイプラインと、ゴールデンテスト（`TODO アプリを作成して`）の仕様を定義する。
+本ドキュメントは、Multiverse IDE における「チャット入力 → plan_patch（WBS/Node/TaskState の作成・更新） → TaskConfig YAML 生成 → AgentRunner 実行 → 結果反映」までの最小パイプラインと、ゴールデンテスト（`TODO アプリを作成して`）の仕様を定義する。
 
 実装時の指示書として利用することを前提とする。
 
@@ -14,7 +14,7 @@
 - Phase 0 のゴールは、以下の 1 本のパイプラインが「ローカルで一気通しで動作すること」である。
 
 > Chat（`TODO アプリを作成して`）  
-> → Meta decompose により WBS/NodeDesign/TaskState を生成（ChatHandler）  
+> → Meta plan_patch により WBS/NodeDesign/TaskState を生成/更新（ChatHandler）  
 > → Orchestrator が依存解決し Executor で TaskConfig YAML を生成 → AgentRunner 実行  
 > → 結果が IDE に表示される
 
@@ -188,7 +188,7 @@ Orchestrator は、本 JSON を TaskAttempt（JSONL）に埋め込み、IDE か�
 
    > `TODO アプリを作成して`
 
-2. バックエンドの ChatHandler が Meta decompose を呼び出し、Task 群を生成する。
+2. バックエンドの ChatHandler が Meta plan_patch を呼び出し、Task 群を生成/更新する。
 3. ChatHandler が以下を永続化する:
    - `design/wbs.json`, `design/nodes/*.json`
    - `state/tasks.json`, `state/nodes-runtime.json`
@@ -248,11 +248,11 @@ Orchestrator は、本 JSON を TaskAttempt（JSONL）に埋め込み、IDE か�
 
 目的:
 
-- `TODO アプリを作成して` の decompose 結果から **有効な TaskConfig YAML** が生成されることを確認する。
+- `TODO アプリを作成して` の plan_patch 結果から **有効な TaskConfig YAML** が生成されることを確認する。
 
 前提条件:
 
-- Meta decompose をモックできること（LLM 実行は不要）
+- Meta plan_patch をモックできること（LLM 実行は不要）
 
 テスト手順（ロジック）:
 
@@ -295,7 +295,7 @@ Orchestrator は、本 JSON を TaskAttempt（JSONL）に埋め込み、IDE か�
 
 ※ Phase 0 の時点では、`status = failed` であっても、「パイプラインとして最後まで処理され、結果が返る」ことを成功条件としてよい。
 
-### 5.4 GT-3: E2E（Chat → decompose → TaskConfig → AgentRunner → 結果）
+### 5.4 GT-3: E2E（Chat → plan_patch → TaskConfig → AgentRunner → 結果）
 
 目的:
 
@@ -307,7 +307,7 @@ Orchestrator は、本 JSON を TaskAttempt（JSONL）に埋め込み、IDE か�
    - Chat に `TODO アプリを作成して` を入力し、Task 作成。
    - Task の「Run」ボタンを押下。
 2. バックグラウンドで:
-   - ChatHandler が decompose → design/state/task_store 永続化を実行。
+   - ChatHandler が plan_patch → design/state/task_store 永続化を実行。
    - Orchestrator が依存解決 → Executor による TaskConfig YAML 生成 → AgentRunner 実行 → 結果 JSON 生成。
 3. IDE で Task 詳細画面を開き、以下を確認:
    - ステータスが `SUCCEEDED` または `FAILED` のいずれか。
@@ -326,7 +326,7 @@ Orchestrator は、本 JSON を TaskAttempt（JSONL）に埋め込み、IDE か�
    - Chat 入力 UI と Task 表示 UI
    - Task 実行要求 UI（Run ボタン）
 3. ChatHandler:
-   - Meta decompose 呼び出し
+   - Meta plan_patch 呼び出し
    - `design/`・`state/`・TaskStore の永続化
 4. Orchestrator:
    - Scheduler による依存解決と Job enqueue

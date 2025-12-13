@@ -81,6 +81,7 @@ type TaskLogEvent struct {
 // ProcessMetaUpdateEvent represents a meta-agent state update
 type ProcessMetaUpdateEvent struct {
 	TaskID    string    `json:"taskId"`
+	TaskTitle string    `json:"taskTitle,omitempty"`
 	State     string    `json:"state"`  // e.g. "THINKING", "PLANNING", "ACTING", "OBSERVING"
 	Detail    string    `json:"detail"` // e.g. "Analyzing dependencies..."
 	Timestamp time.Time `json:"timestamp"`

@@ -15,15 +15,25 @@ import (
 // NewMockClient creates a Client that simulates the old mock behavior using a custom Transport.
 // This allows removing "if kind == mock" checks from the main logic while keeping tests passing.
 func NewMockClient() *Client {
-	return &Client{
-		kind:   "mock",
-		apiKey: "",
-		model:  "mock",
+	// Use OpenAIProvider with a mock Transport to simulate responses
+	provider := &OpenAIProvider{
+		apiKey:       "MOCK_KEY", // Dummy key to pass validation in Provider
+		model:        "mock",
+		systemPrompt: "",
 		client: &http.Client{
 			Timeout:   60 * time.Second,
 			Transport: &shimMockRoundTripper{},
 		},
-		logger: logging.WithComponent(slog.Default(), "meta-client-mock"),
+		logger: logging.WithComponent(slog.Default(), "meta-openai-mock"),
+	}
+
+	return &Client{
+		kind:         "mock",
+		apiKey:       "MOCK_KEY",
+		model:        "mock",
+		systemPrompt: "",
+		provider:     provider,
+		logger:       logging.WithComponent(slog.Default(), "meta-client-mock"),
 	}
 }
 
@@ -98,6 +108,45 @@ payload:
       status: "passed"
       comment: "Mock assessment: passed"
 `
+	} else if strings.Contains(bodyStr, "\"type\": \"plan_patch\"") || strings.Contains(bodyStr, "plan_patch operations") || strings.Contains(bodyStr, "maintains and edits a development plan") {
+		// PlanPatch
+		content = `{
+  "type": "plan_patch",
+  "version": 1,
+  "payload": {
+    "understanding": "Mock: ユーザーの要求を理解しました",
+    "operations": [
+      {
+        "op": "create",
+        "temp_id": "temp-001",
+        "title": "Mock概念設計タスク",
+        "description": "モック用の概念設計タスクです",
+        "acceptance_criteria": ["設計ドキュメントが作成されている"],
+        "dependencies": [],
+        "wbs_level": 1,
+        "phase_name": "概念設計",
+        "milestone": "M1-Mock-Design"
+      },
+      {
+        "op": "create",
+        "temp_id": "temp-002",
+        "title": "Mock実装タスク",
+        "description": "モック用の実装タスクです",
+        "acceptance_criteria": ["機能が実装されている", "テストが通過している"],
+        "dependencies": ["temp-001"],
+        "wbs_level": 3,
+        "phase_name": "実装",
+        "milestone": "M2-Mock-Impl",
+        "suggested_impl": {
+          "language": "go",
+          "file_paths": ["internal/mock/mock.go"],
+          "constraints": ["Keep backward compatibility"]
+        }
+      }
+    ],
+    "potential_conflicts": []
+  }
+}`
 	} else if strings.Contains(bodyStr, "decomposes user requests") || strings.Contains(bodyStr, "decompose this request") {
 		// Decompose (system prompt contains "decomposes user requests" or user prompt contains "decompose this request")
 		content = `{

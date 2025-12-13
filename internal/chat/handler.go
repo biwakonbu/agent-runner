@@ -23,6 +23,7 @@ const DefaultChatMetaTimeout = 15 * time.Minute
 // MetaClient は Meta-agent クライアントのインターフェース
 type MetaClient interface {
 	Decompose(ctx context.Context, req *meta.DecomposeRequest) (*meta.DecomposeResponse, error)
+	PlanPatch(ctx context.Context, req *meta.PlanPatchRequest) (*meta.PlanPatchResponse, error)
 }
 
 // ChatResponse はチャット応答を表す
@@ -124,6 +125,27 @@ func (h *Handler) HandleMessage(ctx context.Context, sessionID, message string) 
 		emitFailed(fmt.Sprintf("既存タスクの取得に失敗しました: %v", err))
 		return nil, fmt.Errorf("failed to list existing tasks: %w", err)
 	}
+	if h.Repo != nil {
+		// design/state を真実源として扱い、state/tasks.json に存在するタスクのみを
+		// 既存タスクとして Meta へ渡す（削除済みタスクの再登場を防ぐ）。
+		if err := h.Repo.Init(); err == nil {
+			if tasksState, err := h.Repo.State().LoadTasks(); err == nil && tasksState != nil {
+				activeIDs := make(map[string]struct{}, len(tasksState.Tasks))
+				for _, ts := range tasksState.Tasks {
+					if ts.TaskID != "" {
+						activeIDs[ts.TaskID] = struct{}{}
+					}
+				}
+				filtered := make([]orchestrator.Task, 0, len(existingTasks))
+				for _, t := range existingTasks {
+					if _, ok := activeIDs[t.ID]; ok {
+						filtered = append(filtered, t)
+					}
+				}
+				existingTasks = filtered
+			}
+		}
+	}
 	existingTaskIDs := make(map[string]struct{}, len(existingTasks))
 	existingTasksByID := make(map[string]orchestrator.Task, len(existingTasks))
 	for _, t := range existingTasks {
@@ -133,52 +155,52 @@ func (h *Handler) HandleMessage(ctx context.Context, sessionID, message string) 
 
 	// 2. コンテキスト情報を収集 (Event: analyzing)
 	emitProgress("Analyzing", "コンテキスト情報を収集中...")
-	decomposeReq := h.buildDecomposeRequest(sessionID, message, existingTasks)
+	planPatchReq := h.buildPlanPatchRequest(sessionID, message, existingTasks)
 
-	// 3. Meta-agent を呼び出してタスク分解 (Event: decomposing)
-	emitProgress("Decomposing", "Meta-agent がタスクを分解中...")
-	logger.Debug("calling meta-agent for decompose")
+	// 3. Meta-agent を呼び出して計画更新 (Event: planning)
+	emitProgress("Planning", "Meta-agent が計画を更新中...")
+	logger.Debug("calling meta-agent for plan_patch")
 	metaCtx, cancel := context.WithTimeout(ctx, h.metaTimeout)
 	defer cancel()
 
-	decomposeResp, err := h.Meta.Decompose(metaCtx, decomposeReq)
+	patchResp, err := h.Meta.PlanPatch(metaCtx, planPatchReq)
 	if err != nil {
-		emitFailed(fmt.Sprintf("タスク分解に失敗しました: %v", err))
+		emitFailed(fmt.Sprintf("計画更新に失敗しました: %v", err))
 		// エラー時もアシスタントメッセージを返す
 		errMsg := &ChatMessage{
 			ID:        uuid.New().String(),
 			SessionID: sessionID,
 			Role:      "assistant",
-			Content:   fmt.Sprintf("申し訳ありません。タスク分解中にエラーが発生しました: %v", err),
+			Content:   fmt.Sprintf("申し訳ありません。計画更新中にエラーが発生しました: %v", err),
 			Timestamp: time.Now(),
 		}
 		if appendErr := h.SessionStore.AppendMessage(errMsg); appendErr != nil {
-			return nil, fmt.Errorf("meta-agent decompose failed: %v (assistant message save failed: %w)", err, appendErr)
+			return nil, fmt.Errorf("meta-agent plan_patch failed: %v (assistant message save failed: %w)", err, appendErr)
 		}
 		return &ChatResponse{
 			Message: *errMsg,
-		}, fmt.Errorf("meta-agent decompose failed: %w", err)
+		}, fmt.Errorf("meta-agent plan_patch failed: %w", err)
 	}
 
-	// 4. タスクを永続化 (Event: persisting)
-	emitProgress("Persisting", fmt.Sprintf("%d 個のタスクを保存中...", countTotalTasks(decomposeResp)))
-	generatedTasks, err := h.persistTasks(ctx, sessionID, decomposeResp, existingTaskIDs, existingTasksByID)
+	// 4. 計画変更を永続化 (Event: persisting)
+	emitProgress("Persisting", fmt.Sprintf("%d 個の変更を保存中...", len(patchResp.Operations)))
+	applyRes, err := h.applyPlanPatch(ctx, sessionID, patchResp, existingTaskIDs, existingTasksByID)
 	if err != nil {
-		emitFailed(fmt.Sprintf("タスク保存に失敗しました: %v", err))
-		return nil, fmt.Errorf("failed to persist tasks: %w", err)
+		emitFailed(fmt.Sprintf("計画変更の保存に失敗しました: %v", err))
+		return nil, fmt.Errorf("failed to apply plan patch: %w", err)
 	}
 
 	// Filter potential conflicts against actual workspace files.
-	filteredConflicts := h.filterPotentialConflicts(decomposeResp.PotentialConflicts)
-	if len(filteredConflicts) != len(decomposeResp.PotentialConflicts) {
-		decomposeResp.PotentialConflicts = filteredConflicts
+	filteredConflicts := h.filterPotentialConflicts(patchResp.PotentialConflicts)
+	if len(filteredConflicts) != len(patchResp.PotentialConflicts) {
+		patchResp.PotentialConflicts = filteredConflicts
 	}
 
 	// 5. アシスタント応答メッセージを作成 (Event: completed)
 	emitProgress("Completed", "処理が完了しました。")
-	responseContent := h.buildResponseContent(decomposeResp, generatedTasks)
-	taskIDs := make([]string, len(generatedTasks))
-	for i, t := range generatedTasks {
+	responseContent := h.buildPlanPatchResponseContent(patchResp, applyRes)
+	taskIDs := make([]string, len(applyRes.CreatedTasks))
+	for i, t := range applyRes.CreatedTasks {
 		taskIDs[i] = t.ID
 	}
 
@@ -195,20 +217,20 @@ func (h *Handler) HandleMessage(ctx context.Context, sessionID, message string) 
 	}
 
 	logger.Info("chat message handled",
-		slog.Int("generated_tasks", len(generatedTasks)),
+		slog.Int("created_tasks", len(applyRes.CreatedTasks)),
 		logging.LogDuration(start),
 	)
 
 	return &ChatResponse{
 		Message:        *assistantMsg,
-		GeneratedTasks: generatedTasks,
-		Understanding:  decomposeResp.Understanding,
+		GeneratedTasks: applyRes.CreatedTasks,
+		Understanding:  patchResp.Understanding,
 		Conflicts:      filteredConflicts,
 	}, nil
 }
 
-// buildDecomposeRequest は Meta-agent への分解リクエストを構築する
-func (h *Handler) buildDecomposeRequest(sessionID, message string, existingTasks []orchestrator.Task) *meta.DecomposeRequest {
+// BuildDecomposeRequest は Meta-agent への分解リクエストを構築する
+func (h *Handler) BuildDecomposeRequest(sessionID, message string, existingTasks []orchestrator.Task) *meta.DecomposeRequest {
 	taskSummaries := make([]meta.ExistingTaskSummary, len(existingTasks))
 	for i, t := range existingTasks {
 		taskSummaries[i] = meta.ExistingTaskSummary{
@@ -217,6 +239,9 @@ func (h *Handler) buildDecomposeRequest(sessionID, message string, existingTasks
 			Status:       string(t.Status),
 			Dependencies: t.Dependencies,
 			PhaseName:    t.PhaseName,
+			Milestone:    t.Milestone,
+			WBSLevel:     t.WBSLevel,
+			ParentID:     t.ParentID,
 		}
 	}
 
@@ -244,8 +269,8 @@ func (h *Handler) buildDecomposeRequest(sessionID, message string, existingTasks
 	}
 }
 
-// persistTasks は分解されたタスクを永続化する
-func (h *Handler) persistTasks(
+// PersistTasks は分解されたタスクを永続化する
+func (h *Handler) PersistTasks(
 	ctx context.Context,
 	sessionID string,
 	resp *meta.DecomposeResponse,
@@ -464,6 +489,9 @@ func (h *Handler) persistDesignAndState(
 			WBSID:              wbs.WBSID,
 			Name:               t.Title,
 			Summary:            t.Description,
+			PhaseName:          t.PhaseName,
+			Milestone:          t.Milestone,
+			WBSLevel:           t.WBSLevel,
 			Kind:               "feature",
 			Priority:           "medium",
 			Estimate:           persistence.Estimate{},
@@ -669,8 +697,8 @@ func (h *Handler) GetHistory(ctx context.Context, sessionID string) ([]ChatMessa
 	return h.SessionStore.LoadMessages(sessionID)
 }
 
-// countTotalTasks counts tasks across all phases
-func countTotalTasks(resp *meta.DecomposeResponse) int {
+// CountTotalTasks counts tasks across all phases
+func CountTotalTasks(resp *meta.DecomposeResponse) int {
 	count := 0
 	for _, p := range resp.Phases {
 		count += len(p.Tasks)

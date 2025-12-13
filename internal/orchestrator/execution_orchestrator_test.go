@@ -36,9 +36,10 @@ func TestExecutionOrchestrator_StateTransitions(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, ExecutionStateRunning, orch.State())
 
-	// Start again (should fail)
+	// Start again (should succeed due to idempotency)
 	err = orch.Start(ctx)
-	assert.Error(t, err)
+	assert.NoError(t, err)
+	assert.Equal(t, ExecutionStateRunning, orch.State())
 
 	// Pause
 	err = orch.Pause()
@@ -139,9 +140,10 @@ func TestExecutionOrchestrator_InvalidTransitions(t *testing.T) {
 	_ = orch.Start(ctx)
 
 	t.Run("start from running", func(t *testing.T) {
+		// Start は冪等なので、既に実行中でも成功する
 		err := orch.Start(ctx)
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "already running")
+		assert.NoError(t, err)
+		assert.Equal(t, ExecutionStateRunning, orch.State())
 	})
 
 	t.Run("resume from running", func(t *testing.T) {

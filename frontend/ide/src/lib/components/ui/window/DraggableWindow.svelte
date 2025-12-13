@@ -58,6 +58,7 @@
 
     isDragging = true;
     (windowEl as HTMLElement).style.cursor = "grabbing";
+    window.addEventListener("mousemove", onMouseMove);
     window.addEventListener("mouseup", stopDrag);
     onclick?.();
   }
@@ -79,6 +80,7 @@
   function stopDrag() {
     isDragging = false;
     if (windowEl) (windowEl as HTMLElement).style.cursor = "";
+    window.removeEventListener("mousemove", onMouseMove);
     window.removeEventListener("mouseup", stopDrag);
     ondragend?.(position);
   }
@@ -106,8 +108,6 @@
     onclick?.();
   }
 </script>
-
-<svelte:window onmousemove={onMouseMove} />
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div

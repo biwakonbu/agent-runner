@@ -53,7 +53,13 @@ func (s *SandboxManager) StartContainer(ctx context.Context, image string, repoP
 	}
 
 	var envSlice []string
+	var customAuthPath string
+
 	for k, v := range env {
+		if k == "__INTERNAL_CLAUDE_AUTH_PATH" {
+			customAuthPath = v
+			continue
+		}
 		val := v
 		if len(v) > 4 && v[:4] == "env:" {
 			val = os.Getenv(v[4:])
@@ -81,6 +87,28 @@ func (s *SandboxManager) StartContainer(ctx context.Context, image string, repoP
 				Type:     mount.TypeBind,
 				Source:   codexAuthPath,
 				Target:   "/root/.codex/auth.json",
+				ReadOnly: true,
+			})
+		}
+
+		// Mount Claude Code auth if it exists
+		var claudeConfigPath string
+		if customAuthPath != "" {
+			if filepath.IsAbs(customAuthPath) {
+				claudeConfigPath = customAuthPath
+			} else {
+				claudeConfigPath = filepath.Join(homeDir, customAuthPath)
+			}
+		} else {
+			// Default path: ~/.config/claude
+			claudeConfigPath = filepath.Join(homeDir, ".config", "claude")
+		}
+
+		if _, err := os.Stat(claudeConfigPath); err == nil {
+			mounts = append(mounts, mount.Mount{
+				Type:     mount.TypeBind,
+				Source:   claudeConfigPath,
+				Target:   "/root/.config/claude",
 				ReadOnly: true,
 			})
 		}

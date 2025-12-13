@@ -16,6 +16,7 @@ import (
 // MockMetaClient は MetaClient のモック実装
 type MockMetaClient struct {
 	DecomposeFunc func(ctx context.Context, req *meta.DecomposeRequest) (*meta.DecomposeResponse, error)
+	PlanPatchFunc func(ctx context.Context, req *meta.PlanPatchRequest) (*meta.PlanPatchResponse, error)
 }
 
 func (m *MockMetaClient) Decompose(ctx context.Context, req *meta.DecomposeRequest) (*meta.DecomposeResponse, error) {
@@ -23,6 +24,13 @@ func (m *MockMetaClient) Decompose(ctx context.Context, req *meta.DecomposeReque
 		return m.DecomposeFunc(ctx, req)
 	}
 	return nil, errors.New("DecomposeFunc not set")
+}
+
+func (m *MockMetaClient) PlanPatch(ctx context.Context, req *meta.PlanPatchRequest) (*meta.PlanPatchResponse, error) {
+	if m.PlanPatchFunc != nil {
+		return m.PlanPatchFunc(ctx, req)
+	}
+	return nil, errors.New("PlanPatchFunc not set")
 }
 
 func TestHandler_NewHandler(t *testing.T) {
@@ -92,37 +100,43 @@ func TestHandler_HandleMessage_Success(t *testing.T) {
 	sessionStore := NewChatSessionStore(tmpDir)
 
 	mockMeta := &MockMetaClient{
-		DecomposeFunc: func(ctx context.Context, req *meta.DecomposeRequest) (*meta.DecomposeResponse, error) {
-			return &meta.DecomposeResponse{
+		PlanPatchFunc: func(ctx context.Context, req *meta.PlanPatchRequest) (*meta.PlanPatchResponse, error) {
+			title1 := "認証フロー設計"
+			desc1 := "ログイン/ログアウトフローを設計"
+			phase1 := "概念設計"
+			milestone1 := "M1-Auth"
+			wbs1 := 1
+
+			title2 := "ログイン画面実装"
+			desc2 := "ログイン画面のUI実装"
+			phase2 := "実装"
+			milestone2 := "M2-Auth"
+			wbs2 := 2
+
+			return &meta.PlanPatchResponse{
 				Understanding: "ユーザーは認証機能の実装を要求しています。",
-				Phases: []meta.DecomposedPhase{
+				Operations: []meta.PlanOperation{
 					{
-						Name:      "概念設計",
-						Milestone: "M1-Auth",
-						Tasks: []meta.DecomposedTask{
-							{
-								ID:                 "temp-task-1",
-								Title:              "認証フロー設計",
-								Description:        "ログイン/ログアウトフローを設計",
-								AcceptanceCriteria: []string{"フロー図が作成される"},
-								Dependencies:       []string{},
-								WBSLevel:           1,
-							},
-						},
+						Op:                 meta.PlanOpCreate,
+						TempID:             "temp-task-1",
+						Title:              &title1,
+						Description:        &desc1,
+						AcceptanceCriteria: []string{"フロー図が作成される"},
+						Dependencies:       []string{},
+						WBSLevel:           &wbs1,
+						PhaseName:          &phase1,
+						Milestone:          &milestone1,
 					},
 					{
-						Name:      "実装",
-						Milestone: "M2-Auth",
-						Tasks: []meta.DecomposedTask{
-							{
-								ID:                 "temp-task-2",
-								Title:              "ログイン画面実装",
-								Description:        "ログイン画面のUI実装",
-								AcceptanceCriteria: []string{"ログイン画面が表示される"},
-								Dependencies:       []string{"temp-task-1"},
-								WBSLevel:           2,
-							},
-						},
+						Op:                 meta.PlanOpCreate,
+						TempID:             "temp-task-2",
+						Title:              &title2,
+						Description:        &desc2,
+						AcceptanceCriteria: []string{"ログイン画面が表示される"},
+						Dependencies:       []string{"temp-task-1"},
+						WBSLevel:           &wbs2,
+						PhaseName:          &phase2,
+						Milestone:          &milestone2,
 					},
 				},
 				PotentialConflicts: []meta.PotentialConflict{},
@@ -211,35 +225,41 @@ func TestHandler_HandleMessage_PersistsDesignAndState(t *testing.T) {
 	}
 
 	mockMeta := &MockMetaClient{
-		DecomposeFunc: func(ctx context.Context, req *meta.DecomposeRequest) (*meta.DecomposeResponse, error) {
-			return &meta.DecomposeResponse{
+		PlanPatchFunc: func(ctx context.Context, req *meta.PlanPatchRequest) (*meta.PlanPatchResponse, error) {
+			title1 := "設計タスク"
+			desc1 := "設計の説明"
+			phase1 := "概念設計"
+			milestone1 := "M1"
+			wbs1 := 1
+
+			title2 := "実装タスク"
+			desc2 := "実装の説明"
+			phase2 := "実装"
+			milestone2 := "M2"
+			wbs2 := 2
+
+			return &meta.PlanPatchResponse{
 				Understanding: "理解しました",
-				Phases: []meta.DecomposedPhase{
+				Operations: []meta.PlanOperation{
 					{
-						Name:      "概念設計",
-						Milestone: "M1",
-						Tasks: []meta.DecomposedTask{
-							{
-								ID:           "temp-task-1",
-								Title:        "設計タスク",
-								Description:  "設計の説明",
-								Dependencies: []string{},
-								WBSLevel:     1,
-							},
-						},
+						Op:           meta.PlanOpCreate,
+						TempID:       "temp-task-1",
+						Title:        &title1,
+						Description:  &desc1,
+						Dependencies: []string{},
+						WBSLevel:     &wbs1,
+						PhaseName:    &phase1,
+						Milestone:    &milestone1,
 					},
 					{
-						Name:      "実装",
-						Milestone: "M2",
-						Tasks: []meta.DecomposedTask{
-							{
-								ID:           "temp-task-2",
-								Title:        "実装タスク",
-								Description:  "実装の説明",
-								Dependencies: []string{"temp-task-1"},
-								WBSLevel:     2,
-							},
-						},
+						Op:           meta.PlanOpCreate,
+						TempID:       "temp-task-2",
+						Title:        &title2,
+						Description:  &desc2,
+						Dependencies: []string{"temp-task-1"},
+						WBSLevel:     &wbs2,
+						PhaseName:    &phase2,
+						Milestone:    &milestone2,
 					},
 				},
 			}, nil
@@ -334,7 +354,7 @@ func TestHandler_HandleMessage_MetaError(t *testing.T) {
 	sessionStore := NewChatSessionStore(tmpDir)
 
 	mockMeta := &MockMetaClient{
-		DecomposeFunc: func(ctx context.Context, req *meta.DecomposeRequest) (*meta.DecomposeResponse, error) {
+		PlanPatchFunc: func(ctx context.Context, req *meta.PlanPatchRequest) (*meta.PlanPatchResponse, error) {
 			return nil, errors.New("API error")
 		},
 	}
@@ -384,13 +404,13 @@ func TestHandler_HandleMessage_WithExistingTasks(t *testing.T) {
 		t.Fatalf("SaveTask failed: %v", err)
 	}
 
-	var capturedReq *meta.DecomposeRequest
+	var capturedReq *meta.PlanPatchRequest
 	mockMeta := &MockMetaClient{
-		DecomposeFunc: func(ctx context.Context, req *meta.DecomposeRequest) (*meta.DecomposeResponse, error) {
+		PlanPatchFunc: func(ctx context.Context, req *meta.PlanPatchRequest) (*meta.PlanPatchResponse, error) {
 			capturedReq = req
-			return &meta.DecomposeResponse{
+			return &meta.PlanPatchResponse{
 				Understanding: "理解しました",
-				Phases:        []meta.DecomposedPhase{},
+				Operations:    []meta.PlanOperation{},
 			}, nil
 		},
 	}
@@ -428,15 +448,15 @@ func TestHandler_HandleMessage_WithConversationHistory(t *testing.T) {
 	taskStore := orchestrator.NewTaskStore(tmpDir)
 	sessionStore := NewChatSessionStore(tmpDir)
 
-	var capturedReq *meta.DecomposeRequest
+	var capturedReq *meta.PlanPatchRequest
 	callCount := 0
 	mockMeta := &MockMetaClient{
-		DecomposeFunc: func(ctx context.Context, req *meta.DecomposeRequest) (*meta.DecomposeResponse, error) {
+		PlanPatchFunc: func(ctx context.Context, req *meta.PlanPatchRequest) (*meta.PlanPatchResponse, error) {
 			capturedReq = req
 			callCount++
-			return &meta.DecomposeResponse{
+			return &meta.PlanPatchResponse{
 				Understanding: "理解しました",
-				Phases:        []meta.DecomposedPhase{},
+				Operations:    []meta.PlanOperation{},
 			}, nil
 		},
 	}
@@ -489,21 +509,10 @@ func TestHandler_HandleMessage_PotentialConflicts(t *testing.T) {
 	}
 
 	mockMeta := &MockMetaClient{
-		DecomposeFunc: func(ctx context.Context, req *meta.DecomposeRequest) (*meta.DecomposeResponse, error) {
-			return &meta.DecomposeResponse{
+		PlanPatchFunc: func(ctx context.Context, req *meta.PlanPatchRequest) (*meta.PlanPatchResponse, error) {
+			return &meta.PlanPatchResponse{
 				Understanding: "理解しました",
-				Phases: []meta.DecomposedPhase{
-					{
-						Name: "実装",
-						Tasks: []meta.DecomposedTask{
-							{
-								ID:          "temp-task-1",
-								Title:       "タスク1",
-								Description: "説明",
-							},
-						},
-					},
-				},
+				Operations:    []meta.PlanOperation{},
 				PotentialConflicts: []meta.PotentialConflict{
 					{
 						File:    "src/auth/login.ts",
@@ -545,10 +554,10 @@ func TestHandler_GetHistory(t *testing.T) {
 	taskStore := orchestrator.NewTaskStore(tmpDir)
 	sessionStore := NewChatSessionStore(tmpDir)
 	mockMeta := &MockMetaClient{
-		DecomposeFunc: func(ctx context.Context, req *meta.DecomposeRequest) (*meta.DecomposeResponse, error) {
-			return &meta.DecomposeResponse{
+		PlanPatchFunc: func(ctx context.Context, req *meta.PlanPatchRequest) (*meta.PlanPatchResponse, error) {
+			return &meta.PlanPatchResponse{
 				Understanding: "理解しました",
-				Phases:        []meta.DecomposedPhase{},
+				Operations:    []meta.PlanOperation{},
 			}, nil
 		},
 	}
@@ -642,23 +651,27 @@ func TestHandler_HandleMessage_WithSuggestedImpl(t *testing.T) {
 	sessionStore := NewChatSessionStore(tmpDir)
 
 	mockMeta := &MockMetaClient{
-		DecomposeFunc: func(ctx context.Context, req *meta.DecomposeRequest) (*meta.DecomposeResponse, error) {
-			return &meta.DecomposeResponse{
+		PlanPatchFunc: func(ctx context.Context, req *meta.PlanPatchRequest) (*meta.PlanPatchResponse, error) {
+			title := "Impl Task"
+			desc := "Do code"
+			wbs := 3
+			phase := "実装"
+			milestone := "M1"
+			return &meta.PlanPatchResponse{
 				Understanding: "AI understands impl request",
-				Phases: []meta.DecomposedPhase{
+				Operations: []meta.PlanOperation{
 					{
-						Name: "実装",
-						Tasks: []meta.DecomposedTask{
-							{
-								ID:          "temp-1",
-								Title:       "Impl Task",
-								Description: "Do code",
-								SuggestedImpl: &meta.SuggestedImpl{
-									Language:    "go",
-									FilePaths:   []string{"app/main.go"},
-									Constraints: []string{"use context"},
-								},
-							},
+						Op:          meta.PlanOpCreate,
+						TempID:      "temp-1",
+						Title:       &title,
+						Description: &desc,
+						WBSLevel:    &wbs,
+						PhaseName:   &phase,
+						Milestone:   &milestone,
+						SuggestedImpl: &meta.SuggestedImpl{
+							Language:    "go",
+							FilePaths:   []string{"app/main.go"},
+							Constraints: []string{"use context"},
 						},
 					},
 				},

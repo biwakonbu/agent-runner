@@ -80,6 +80,17 @@ func (e *Executor) ExecuteTask(ctx context.Context, task *Task) (*Attempt, error
 
 	// Execute agent-runner
 	logger.Info("executing agent-runner", slog.String("binary_path", e.AgentRunnerPath))
+
+	// Notify start of execution
+	if e.events != nil {
+		e.events.Emit(EventProcessMetaUpdate, ProcessMetaUpdateEvent{
+			TaskID:    task.ID,
+			TaskTitle: task.Title,
+			State:     "RUNNING",
+			Detail:    "Initializing agent-runner...",
+			Timestamp: time.Now(),
+		})
+	}
 	cmd := exec.CommandContext(ctx, e.AgentRunnerPath)
 	cmd.Dir = e.ProjectRoot
 
@@ -115,7 +126,7 @@ func (e *Executor) ExecuteTask(ctx context.Context, task *Task) (*Attempt, error
 				// Try parsing as structured log/event
 				var entry map[string]interface{}
 				if err := json.Unmarshal([]byte(line), &entry); err == nil {
-					e.handleStructuredLog(task.ID, entry)
+					e.handleStructuredLog(task.ID, task.Title, entry)
 				}
 
 				e.events.Emit(EventTaskLog, TaskLogEvent{
@@ -189,6 +200,16 @@ func (e *Executor) ExecuteTask(ctx context.Context, task *Task) (*Attempt, error
 			logging.LogDuration(start),
 		)
 		logger.Debug("agent-runner output", slog.String("output", string(output)))
+
+		if e.events != nil {
+			e.events.Emit(EventProcessMetaUpdate, ProcessMetaUpdateEvent{
+				TaskID:    task.ID,
+				TaskTitle: task.Title,
+				State:     "DONE",
+				Detail:    "Task completed successfully",
+				Timestamp: time.Now(),
+			})
+		}
 	}
 
 	// Save updated attempt and task -> REMOVED (Caller responsibility)
@@ -219,6 +240,16 @@ func (e *Executor) handleExecutionError(attempt *Attempt, task *Task, err error)
 
 	// _ = e.TaskStore.SaveAttempt(attempt)
 	// _ = e.TaskStore.SaveTask(task)
+
+	if e.events != nil {
+		e.events.Emit(EventProcessMetaUpdate, ProcessMetaUpdateEvent{
+			TaskID:    task.ID,
+			TaskTitle: task.Title,
+			State:     "ERROR",
+			Detail:    fmt.Sprintf("Execution failed: %v", err),
+			Timestamp: time.Now(),
+		})
+	}
 
 	return attempt, err
 }
@@ -318,7 +349,7 @@ func quoteList(items []string) string {
 	return strings.Join(quoted, ", ")
 }
 
-func (e *Executor) handleStructuredLog(taskID string, entry map[string]interface{}) {
+func (e *Executor) handleStructuredLog(taskID, taskTitle string, entry map[string]interface{}) {
 	eventType, ok := entry["event_type"].(string)
 	if !ok {
 		return
@@ -336,6 +367,7 @@ func (e *Executor) handleStructuredLog(taskID string, entry map[string]interface
 		detail, _ := entry["detail"].(string)
 		e.events.Emit(EventProcessMetaUpdate, ProcessMetaUpdateEvent{
 			TaskID:    taskID,
+			TaskTitle: taskTitle,
 			State:     "THINKING",
 			Detail:    detail,
 			Timestamp: timestamp,

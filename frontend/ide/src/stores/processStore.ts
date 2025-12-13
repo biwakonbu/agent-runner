@@ -112,6 +112,10 @@ export function initProcessEvents() {
             const newNodes = JSON.parse(JSON.stringify(nodes));
             const meta = getMetaNode(newNodes, event.taskId);
             
+            if (event.taskTitle) {
+                meta.name = event.taskTitle;
+            }
+            
             meta.status = event.state as ResourceStatus; // e.g. THINKING, ACTING
             meta.detail = event.detail;
 

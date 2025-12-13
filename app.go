@@ -33,6 +33,15 @@ type App struct {
 	eventEmitter          orchestrator.EventEmitter
 }
 
+func safeRuntimeLogErrorf(ctx context.Context, format string, args ...any) {
+	defer func() {
+		if recover() != nil {
+			_, _ = fmt.Fprintf(os.Stderr, format+"\n", args...)
+		}
+	}()
+	runtime.LogErrorf(ctx, format, args...)
+}
+
 // NewApp creates a new App application struct
 func NewApp() *App {
 	homeDir, err := os.UserHomeDir()
@@ -278,51 +287,142 @@ func (a *App) ListTasks() []orchestrator.Task {
 		return []orchestrator.Task{}
 	}
 
-	var tasks []orchestrator.Task
-	// node_id ごとに Design ノード名をキャッシュし、ディスクアクセスを最小化する。
-	nodeTitleCache := make(map[string]string)
+	// Load WBS for ordering / parent info (best-effort).
+	var wbs *persistence.WBS
+	parentByID := map[string]*string{}
+	childrenByID := map[string][]string{}
+	if loaded, err := a.repo.Design().LoadWBS(); err == nil && loaded != nil {
+		wbs = loaded
+		for i := range wbs.NodeIndex {
+			n := wbs.NodeIndex[i]
+			parentByID[n.NodeID] = n.ParentID
+			childrenByID[n.NodeID] = n.Children
+		}
+	}
+
+	// task_id -> TaskState (preserve original order for fallback).
+	taskStateByID := make(map[string]persistence.TaskState, len(tasksState.Tasks))
+	originalOrder := make([]string, 0, len(tasksState.Tasks))
 	for _, t := range tasksState.Tasks {
+		taskStateByID[t.TaskID] = t
+		originalOrder = append(originalOrder, t.TaskID)
+	}
+
+	// Determine ordered task IDs (WBS DFS order -> fallback).
+	orderedTaskIDs := make([]string, 0, len(tasksState.Tasks))
+	seen := make(map[string]struct{}, len(tasksState.Tasks))
+	if wbs != nil && wbs.RootNodeID != "" {
+		var stack []string
+		stack = append(stack, wbs.RootNodeID)
+		for len(stack) > 0 {
+			// pop
+			n := stack[len(stack)-1]
+			stack = stack[:len(stack)-1]
+
+			if _, ok := taskStateByID[n]; ok {
+				if _, dup := seen[n]; !dup {
+					seen[n] = struct{}{}
+					orderedTaskIDs = append(orderedTaskIDs, n)
+				}
+			}
+
+			children := childrenByID[n]
+			// push reversed for stable order
+			for i := len(children) - 1; i >= 0; i-- {
+				stack = append(stack, children[i])
+			}
+		}
+	}
+	for _, id := range originalOrder {
+		if _, ok := seen[id]; ok {
+			continue
+		}
+		seen[id] = struct{}{}
+		orderedTaskIDs = append(orderedTaskIDs, id)
+	}
+
+	// NodeDesign cache to minimize disk access.
+	nodeCache := make(map[string]*persistence.NodeDesign)
+	loadNode := func(nodeID string) *persistence.NodeDesign {
+		if nodeID == "" {
+			return nil
+		}
+		if cached, ok := nodeCache[nodeID]; ok {
+			return cached
+		}
+		node, err := a.repo.Design().GetNode(nodeID)
+		if err != nil {
+			nodeCache[nodeID] = nil
+			return nil
+		}
+		nodeCache[nodeID] = node
+		return node
+	}
+
+	tasks := make([]orchestrator.Task, 0, len(orderedTaskIDs))
+	for _, id := range orderedTaskIDs {
+		ts, ok := taskStateByID[id]
+		if !ok {
+			continue
+		}
+
 		title := ""
-		// Inputs に title があれば最優先で使う（manualタスク等）。
-		if t.Inputs != nil {
-			if raw, ok := t.Inputs["title"]; ok {
+		poolID := "default"
+		if ts.Inputs != nil {
+			if raw, ok := ts.Inputs["title"]; ok {
 				if s, ok := raw.(string); ok && s != "" {
 					title = s
 				}
 			}
-		}
-
-		// NodeDesign があれば Name をタイトルとして使う。
-		if title == "" && t.NodeID != "" {
-			if cached, ok := nodeTitleCache[t.NodeID]; ok {
-				title = cached
-			} else {
-				if node, err := a.repo.Design().GetNode(t.NodeID); err == nil && node.Name != "" {
-					title = node.Name
+			if raw, ok := ts.Inputs["pool_id"]; ok {
+				if s, ok := raw.(string); ok && s != "" {
+					poolID = s
 				}
-				if title == "" {
-					title = t.Kind + ": " + t.NodeID // Fallback
-				}
-				nodeTitleCache[t.NodeID] = title
 			}
 		}
 
+		node := loadNode(ts.NodeID)
 		if title == "" {
-			title = t.Kind + ": " + t.NodeID // Fallback
+			if node != nil && node.Name != "" {
+				title = node.Name
+			} else if ts.NodeID != "" {
+				title = ts.Kind + ": " + ts.NodeID
+			} else {
+				title = ts.Kind + ": " + ts.TaskID
+			}
 		}
-		// Map persistence.TaskState to orchestrator.Task
+
 		task := orchestrator.Task{
-			ID:        t.TaskID,
+			ID:        ts.TaskID,
 			Title:     title,
-			Status:    orchestrator.TaskStatus(t.Status),
-			PoolID:    "default", // Missing in TaskState
-			CreatedAt: t.CreatedAt,
-			UpdatedAt: t.UpdatedAt,
-			// Attempts: not populated
+			Status:    orchestrator.TaskStatus(ts.Status),
+			PoolID:    poolID,
+			CreatedAt: ts.CreatedAt,
+			UpdatedAt: ts.UpdatedAt,
 		}
-		// Try to load Node info for Title refinement? Expensive in loop.
+
+		// Best-effort enrich from NodeDesign.
+		if node != nil {
+			task.Description = node.Summary
+			task.Dependencies = append([]string{}, node.Dependencies...)
+			task.WBSLevel = node.WBSLevel
+			task.PhaseName = node.PhaseName
+			task.Milestone = node.Milestone
+			task.AcceptanceCriteria = append([]string{}, node.AcceptanceCriteria...)
+			task.SuggestedImpl = &orchestrator.SuggestedImpl{
+				Language:    node.SuggestedImpl.Language,
+				FilePaths:   append([]string{}, node.SuggestedImpl.FilePaths...),
+				Constraints: append([]string{}, node.SuggestedImpl.Constraints...),
+			}
+		}
+
+		if p, ok := parentByID[task.ID]; ok {
+			task.ParentID = p
+		}
+
 		tasks = append(tasks, task)
 	}
+
 	return tasks
 }
 
@@ -440,6 +540,34 @@ func (a *App) SendChatMessage(sessionID string, message string) *ChatResponseDTO
 	if err != nil {
 		return &ChatResponseDTO{
 			Error: err.Error(),
+		}
+	}
+
+	// Chat Autopilot: タスク生成成功時に自動実行を開始
+	if len(resp.GeneratedTasks) > 0 {
+		// 1. StartExecution() を冪等に呼び出し（実行系が未初期化の場合はスキップ）
+		if a.executionOrchestrator != nil {
+			if execErr := a.StartExecution(); execErr != nil {
+				// 予期しないエラーのみログ出力（already running は冪等化済み）
+				safeRuntimeLogErrorf(a.ctx, "Failed to start execution: %v", execErr)
+			}
+		}
+
+		// 2. 即時スケジューリング（2秒ポーリング待ちを回避）
+		if a.scheduler != nil {
+			if _, schedErr := a.scheduler.ScheduleReadyTasks(); schedErr != nil {
+				safeRuntimeLogErrorf(a.ctx, "Failed to schedule ready tasks: %v", schedErr)
+			}
+		}
+
+		// 3. 進捗イベント発火（ユーザーに自動実行開始を通知）
+		if a.eventEmitter != nil {
+			a.eventEmitter.Emit(orchestrator.EventChatProgress, orchestrator.ChatProgressEvent{
+				SessionID: sessionID,
+				Step:      "AutopilotStartingExecution",
+				Message:   fmt.Sprintf("自動実行を開始しました（%d タスク生成）", len(resp.GeneratedTasks)),
+				Timestamp: time.Now(),
+			})
 		}
 	}
 

@@ -97,23 +97,31 @@ func TestHandleMessage_FailsOnUnknownDependency(t *testing.T) {
 
 	resp := &meta.DecomposeResponse{
 		Understanding: "Test",
-		Phases: []meta.DecomposedPhase{
+		Phases:        []meta.DecomposedPhase{},
+	}
+
+	title := "Task1"
+	desc := "desc"
+	wbs := 3
+	phase := "Impl"
+	milestone := "M1"
+	patch := &meta.PlanPatchResponse{
+		Understanding: resp.Understanding,
+		Operations: []meta.PlanOperation{
 			{
-				Name: "Impl",
-				Tasks: []meta.DecomposedTask{
-					{
-						ID:           "t1",
-						Title:        "Task1",
-						Description:  "desc",
-						Dependencies: []string{"ghost-task"},
-						WBSLevel:     3,
-					},
-				},
+				Op:           meta.PlanOpCreate,
+				TempID:       "t1",
+				Title:        &title,
+				Description:  &desc,
+				Dependencies: []string{"ghost-task"},
+				WBSLevel:     &wbs,
+				PhaseName:    &phase,
+				Milestone:    &milestone,
 			},
 		},
 	}
 
-	handler := chat.NewHandler(staticMetaClient{resp: resp}, taskStore, sessionStore, "ws", tmpDir, nil, recorder)
+	handler := chat.NewHandler(staticMetaClient{resp: patch}, taskStore, sessionStore, "ws", tmpDir, nil, recorder)
 
 	ctx := context.Background()
 	session, err := handler.CreateSession(ctx)
@@ -147,11 +155,19 @@ func (failingMetaClient) Decompose(context.Context, *meta.DecomposeRequest) (*me
 	return nil, fmt.Errorf("meta failure")
 }
 
+func (failingMetaClient) PlanPatch(context.Context, *meta.PlanPatchRequest) (*meta.PlanPatchResponse, error) {
+	return nil, fmt.Errorf("meta failure")
+}
+
 type staticMetaClient struct {
-	resp *meta.DecomposeResponse
+	resp *meta.PlanPatchResponse
 }
 
 func (s staticMetaClient) Decompose(context.Context, *meta.DecomposeRequest) (*meta.DecomposeResponse, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+func (s staticMetaClient) PlanPatch(context.Context, *meta.PlanPatchRequest) (*meta.PlanPatchResponse, error) {
 	return s.resp, nil
 }
 
